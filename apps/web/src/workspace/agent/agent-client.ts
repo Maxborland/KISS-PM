@@ -39,7 +39,79 @@ export type AgentProposeResponse = {
   iterations: number;
   stopReason?: string;
   outputTokens?: number;
+  // Персистентность (P1): id треда и записанных сервером ходов (user + ответ агента).
+  // Отсутствуют честно, если collaboration-персистентность не сконфигурирована.
+  threadId?: string;
+  messageIds?: string[];
 };
+
+// Персистентный тред агента (guarded GET /agent/thread + существующий messages-роут).
+export type AgentThreadInfo = { id: string };
+export type AgentThreadOutcome = {
+  tool: string;
+  status: string;
+  auditEventId?: string;
+  planningAuditEventId?: string;
+  planVersion?: number;
+  projectId?: string;
+};
+export type AgentThreadTurn = {
+  id: string;
+  createdAt: string;
+  body: string;
+  role: "user" | "agent";
+  kind?: "error" | "result";
+  proposal?: { actionsTotal?: number; actions?: Array<{ tool?: string; title?: string }> };
+  correlationId?: string;
+  outcomes?: AgentThreadOutcome[];
+};
+// rawCount — размер СЫРОГО окна сообщений (до фильтра agent-метки): по нему клиент
+// решает, есть ли более ранняя история (окно короче лимита = истории больше нет).
+export type AgentThreadHistoryPage = { turns: AgentThreadTurn[]; nextCursor: string | null; rawCount: number };
+
+export const AGENT_HISTORY_PAGE_LIMIT = 30;
+
+// Ходы треда — только сообщения с metadata.agent (беседа agent-типа readonly для клиента,
+// но контракт не запрещает будущие системные сообщения — незнакомое пропускаем честно).
+function decodeThreadTurns(value: unknown): AgentThreadHistoryPage {
+  const record = (value && typeof value === "object" ? value : {}) as { messages?: unknown; nextCursor?: unknown };
+  const messages = Array.isArray(record.messages) ? record.messages : [];
+  const turns: AgentThreadTurn[] = [];
+  for (const raw of messages) {
+    const message = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const metadata = (message.metadata && typeof message.metadata === "object" ? message.metadata : {}) as { agent?: unknown };
+    const agent = (metadata.agent && typeof metadata.agent === "object" ? metadata.agent : null) as
+      | { role?: unknown; kind?: unknown; proposal?: unknown; correlationId?: unknown; outcomes?: unknown }
+      | null;
+    if (!agent || (agent.role !== "user" && agent.role !== "agent")) continue;
+    if (typeof message.id !== "string" || typeof message.body !== "string") continue;
+    const outcomes = Array.isArray(agent.outcomes)
+      ? agent.outcomes.flatMap((entry): AgentThreadOutcome[] => {
+          const item = (entry && typeof entry === "object" ? entry : {}) as Record<string, unknown>;
+          if (typeof item.tool !== "string" || typeof item.status !== "string") return [];
+          return [{
+            tool: item.tool,
+            status: item.status,
+            ...(typeof item.auditEventId === "string" ? { auditEventId: item.auditEventId } : {}),
+            ...(typeof item.planningAuditEventId === "string" ? { planningAuditEventId: item.planningAuditEventId } : {}),
+            ...(typeof item.planVersion === "number" ? { planVersion: item.planVersion } : {}),
+            ...(typeof item.projectId === "string" ? { projectId: item.projectId } : {})
+          }];
+        })
+      : undefined;
+    turns.push({
+      id: message.id,
+      createdAt: typeof message.createdAt === "string" ? message.createdAt : "",
+      body: message.body,
+      role: agent.role,
+      ...(agent.kind === "error" || agent.kind === "result" ? { kind: agent.kind } : {}),
+      ...(agent.proposal && typeof agent.proposal === "object" ? { proposal: agent.proposal as NonNullable<AgentThreadTurn["proposal"]> } : {}),
+      ...(typeof agent.correlationId === "string" ? { correlationId: agent.correlationId } : {}),
+      ...(outcomes && outcomes.length > 0 ? { outcomes } : {})
+    });
+  }
+  return { turns, nextCursor: typeof record.nextCursor === "string" ? record.nextCursor : null, rawCount: messages.length };
+}
 
 // Реплика истории треда (память чата) — отправляется в propose перед текущей целью.
 export type AgentHistoryTurn = { role: "user" | "assistant"; text: string };
@@ -64,6 +136,7 @@ export type AgentExecuteResultItem = {
   auditEventId?: string;
   planningAuditEventId?: string;
   planVersion?: number;
+  projectId?: string;
 };
 export type AgentExecuteSummary = Record<AgentExecuteStatus, number>;
 export type AgentExecuteResponse = {
@@ -71,6 +144,9 @@ export type AgentExecuteResponse = {
   applied: boolean;
   summary: AgentExecuteSummary;
   correlationId?: string;
+  // Персистентность (P1): id треда и записанного сервером result-сообщения.
+  threadId?: string;
+  messageId?: string;
 };
 
 const EXECUTE_STATUS_VALUES = ["applied", "denied", "conflict", "failed"] as const;
@@ -90,6 +166,7 @@ function decodeExecuteResponse(value: unknown, actions: AgentActionInput[]): Age
       && (item.auditEventId === undefined || typeof item.auditEventId === "string")
       && (item.planningAuditEventId === undefined || typeof item.planningAuditEventId === "string")
       && (item.planVersion === undefined || typeof item.planVersion === "number")
+      && (item.projectId === undefined || typeof item.projectId === "string")
     );
   const summary = response.summary;
   const summaryValid = summary && EXECUTE_STATUS_VALUES.every((status) =>
@@ -130,8 +207,23 @@ export function createAgentClient(options: AgentApiClientOptions) {
     listTools() {
       return requestJson<{ tools: AgentToolAvailability[]; provider?: { model: string; live: boolean; configured?: boolean } }>("/api/workspace/agent/tools");
     },
-    propose(goal: string, attachmentIds: string[] = [], history: AgentHistoryTurn[] = []) {
-      return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal, attachmentIds, history }) });
+    propose(goal: string, attachmentIds: string[] = [], history: AgentHistoryTurn[] = [], threadId?: string) {
+      return requestJson<AgentProposeResponse>("/api/workspace/agent/propose", { method: "POST", body: JSON.stringify({ goal, attachmentIds, history, ...(threadId ? { threadId } : {}) }) });
+    },
+    // Персистентный тред пользователя: create-or-get (guarded-роут P1).
+    async loadThread(): Promise<AgentThreadInfo> {
+      const body = await requestJson<{ conversation?: { id?: unknown } }>("/api/workspace/agent/thread");
+      const id = body.conversation && typeof body.conversation.id === "string" ? body.conversation.id : "";
+      if (!id) throw new DomainApiError(502, "invalid_thread_response", { error: "invalid_thread_response" });
+      return { id };
+    },
+    // Страница истории треда (существующий messages-роут, membership-доступ).
+    async loadThreadHistory(threadId: string, cursor?: string): Promise<AgentThreadHistoryPage> {
+      const query = cursor
+        ? `?limit=${AGENT_HISTORY_PAGE_LIMIT}&cursor=${encodeURIComponent(cursor)}`
+        : `?limit=${AGENT_HISTORY_PAGE_LIMIT}`;
+      const body = await requestJson<unknown>(`/api/workspace/conversations/${encodeURIComponent(threadId)}/messages${query}`);
+      return decodeThreadTurns(body);
     },
     // Загрузка файла через ШТАТНУЮ ручку вложений (multipart), привязка к сущности-якорю.
     async uploadAttachment(file: File, entityType: string, entityId: string): Promise<{ id: string; name: string }> {
@@ -161,18 +253,25 @@ export function createAgentClient(options: AgentApiClientOptions) {
       return (body.projects ?? []).map((project) => ({ id: String(project.id ?? ""), label: String(project.title ?? project.name ?? project.id ?? "") })).filter((p) => p.id.length > 0);
     },
     // Потоковое предложение: вызывает onEvent на каждое SSE-событие, резолвится финальным `done`.
-    async proposeStream(goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = []): Promise<AgentProposeResponse> {
+    async proposeStream(goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = [], threadId?: string): Promise<AgentProposeResponse> {
       const response = await fetchImpl(`${options.apiOrigin}/api/workspace/agent/propose/stream`, {
         method: "POST",
         credentials,
         headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
-        body: JSON.stringify({ goal, attachmentIds, history })
+        body: JSON.stringify({ goal, attachmentIds, history, ...(threadId ? { threadId } : {}) })
       });
       if (!response.ok) {
         const raw = await response.text();
         let err = "request_failed";
-        try { const parsed = JSON.parse(raw) as { error?: string }; if (typeof parsed.error === "string") err = parsed.error; } catch { /* keep */ }
-        throw new DomainApiError(response.status, err, { error: err });
+        let body: Record<string, unknown> = { error: err };
+        try {
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          if (parsed && typeof parsed === "object") body = parsed;
+          if (typeof parsed.error === "string") err = parsed.error;
+        } catch { /* keep */ }
+        // Полное тело важно вызывающему: 503 agent_provider_not_configured несёт
+        // threadId/messageIds персистированной сервером квитанции (P1).
+        throw new DomainApiError(response.status, err, body);
       }
       if (!response.body) throw new DomainApiError(500, "stream_unsupported", { error: "stream_unsupported" });
       const reader = response.body.getReader();

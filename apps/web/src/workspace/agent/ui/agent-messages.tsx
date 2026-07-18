@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { Bot, Check, Clock3, MessageSquare } from "lucide-react";
 
 import { Spinner } from "@/components/ui/loaders";
 import { cn } from "@/lib/cn";
-import type { AgentMessage } from "@/workspace/agent/agent-model";
+import type { AgentMessage, AgentReceipt } from "@/workspace/agent/agent-model";
 
 /**
  * Тред сообщений агента. role="log" — чат-лог с имплицитным aria-live=polite:
@@ -13,19 +15,31 @@ import type { AgentMessage } from "@/workspace/agent/agent-model";
 export function ChatThread({
   messages,
   thinking,
-  liveSteps
+  liveSteps,
+  historyLoading = false
 }: {
   messages: AgentMessage[];
   thinking: boolean;
   liveSteps: string[];
+  historyLoading?: boolean;
 }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const lastMessageId = messages[messages.length - 1]?.id;
+  // Чат открывается на ПОСЛЕДНЕМ сообщении (гидрация вставляет историю сверху) и
+  // докручивается при новых ходах; префикс «Показать раньше» last id не меняет —
+  // позиция чтения при подгрузке старого не прыгает.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
+  }, [lastMessageId, thinking]);
   return (
     <div
+      ref={containerRef}
       role="log"
       aria-label="Диалог с агентом"
       className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 md:px-6"
     >
-      {messages.length === 0 && !thinking ? <ChatEmpty /> : null}
+      {messages.length === 0 && !thinking && !historyLoading ? <ChatEmpty /> : null}
       {messages.map((message) =>
         message.role === "trace" ? (
           // aria-live=off: шаги уже были озвучены при стриме — повторная вставка
@@ -87,8 +101,49 @@ function MessageBubble({ message }: { message: Extract<AgentMessage, { role: "us
         >
           {message.text}
         </p>
+        {message.role === "agent" && message.receipt ? <ReceiptBlock receipt={message.receipt} /> : null}
       </div>
     </article>
+  );
+}
+
+/**
+ * Квитанция применения: кликабельная ссылка — ТОЛЬКО на коммит плана
+ * (planningAuditEventId + projectId, запись реально видна в «Коммитах»); для
+ * остальных действий — копируемые идентификаторы audit-записи без href, потому что
+ * события agent-action-* в ленту «Коммитов» не попадают и ссылка вела бы в пустоту.
+ */
+function ReceiptBlock({ receipt }: { receipt: AgentReceipt }) {
+  return (
+    <div className="mt-1.5 flex flex-col gap-1 text-left text-[length:var(--text-xs)] text-[var(--muted-strong)]" data-testid="agent-receipt">
+      {receipt.items.map((item, index) => (
+        <div key={`${item.tool}-${index}`} className="flex flex-wrap items-baseline gap-1.5">
+          {item.planningAuditEventId && item.projectId ? (
+            <>
+              <span>Коммит плана{item.planVersion !== undefined ? ` v${item.planVersion}` : ""}:</span>
+              <span className="mono break-all">{item.planningAuditEventId}</span>
+              <Link
+                href={`/projects/${encodeURIComponent(item.projectId)}/commits?commit=${encodeURIComponent(item.planningAuditEventId)}`}
+                className="font-medium text-[var(--accent)] underline underline-offset-2"
+              >
+                Открыть в Коммитах
+              </Link>
+            </>
+          ) : item.auditEventId ? (
+            <>
+              <span>Аудит-запись ({item.status}):</span>
+              <span className="mono break-all">{item.auditEventId}</span>
+            </>
+          ) : null}
+        </div>
+      ))}
+      {receipt.correlationId ? (
+        <div className="flex flex-wrap items-baseline gap-1.5 text-[var(--muted)]">
+          <span>Корреляция батча:</span>
+          <span className="mono break-all">{receipt.correlationId}</span>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

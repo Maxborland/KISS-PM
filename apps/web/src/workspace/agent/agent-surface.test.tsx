@@ -113,7 +113,15 @@ describe("AgentSurface production shell contract", () => {
   });
 
   it("квитирует реплику и очищает composer при ненастроенном LLM-провайдере", async () => {
+    // Новый контракт (P1): 503 приходит от СЕРВЕРА, который персистит реплику и
+    // квитанцию (переживают reload); клиент квитирует по коду ошибки и принимает
+    // серверные id для дедупликации при последующей гидрации.
     agentMock.provider = { configured: false, live: false, model: "mock-provider" };
+    agentMock.proposeStream.mockResolvedValueOnce({
+      ok: false,
+      code: "agent_provider_not_configured",
+      persisted: { threadId: "agent-thread-user-1", messageIds: ["message-server-1", "message-server-2"] }
+    });
     const root = await renderAgent();
 
     await submitGoal("Проверь проект");
@@ -122,7 +130,7 @@ describe("AgentSurface production shell contract", () => {
     expect(input?.value).toBe("");
     expect(getTextContent("[role='log']")).toContain("Проверь проект");
     expect(getTextContent("[role='log']")).toContain("LLM-провайдер не настроен");
-    expect(agentMock.proposeStream).not.toHaveBeenCalled();
+    expect(agentMock.proposeStream).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(input);
 
     await act(async () => {

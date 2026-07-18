@@ -117,7 +117,7 @@ test("Agent Workspace показывает честный partial apply и по�
   await expect(page.getByText("Без комментария", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Применить выбранное" }).click();
-  await expect(page.getByText("Результат: применено 1, отказано 0, конфликтов 1, ошибок 1.")).toBeVisible();
+  await expect(page.getByText("Результат: применено 1, отказано 0, конфликтов 1, ошибок 1.").last()).toBeVisible();
   await expect(page.getByText(/Предложение по задаче устарело/)).toBeVisible();
   await expect(page.getByRole("button", { name: "применено" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "конфликт" })).toBeDisabled();
@@ -143,7 +143,7 @@ test("Agent Workspace показывает честный partial apply и по�
   await retryButton.focus();
   await expect(retryButton).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByText("Результат: применено 1, отказано 0, конфликтов 0, ошибок 0.")).toBeVisible();
+  await expect(page.getByText("Результат: применено 1, отказано 0, конфликтов 0, ошибок 0.").last()).toBeVisible();
   expect(executeCalls).toBe(2);
 
   await page.getByRole("button", { name: "Сбросить" }).click();
@@ -249,7 +249,7 @@ test("Agent Workspace применяет live batch и показывает ко
     await page.getByRole("button", { name: "Применить выбранное" }).click();
     expect((await executeResponse).status()).toBe(200);
 
-    await expect(page.getByText("Результат: применено 1, отказано 0, конфликтов 1, ошибок 0.")).toBeVisible();
+    await expect(page.getByText("Результат: применено 1, отказано 0, конфликтов 1, ошибок 0.").last()).toBeVisible();
     await expect(page.getByRole("button", { name: "применено" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "конфликт" })).toBeDisabled();
 

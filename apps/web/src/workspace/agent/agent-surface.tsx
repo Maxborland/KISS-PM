@@ -6,7 +6,7 @@ import { BannerInline } from "@/components/ui/banner-inline";
 import { Button } from "@/components/ui/button";
 import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { useAgent } from "@/workspace/agent/use-agent";
-import type { AgentActionInput, ProposedAction } from "@/workspace/agent/agent-client";
+import { AGENT_HISTORY_PAGE_LIMIT, type AgentActionInput, type AgentThreadTurn, type ProposedAction } from "@/workspace/agent/agent-client";
 import type { AgentChange, AgentMessage, AgentPhase } from "@/workspace/agent/agent-model";
 import { TERMINAL_STATUSES } from "@/workspace/agent/agent-model";
 import { AgentComposer } from "@/workspace/agent/ui/agent-composer";
@@ -52,11 +52,17 @@ const formatMessageTime = (date = new Date()): string =>
  * Оболочку (WorkspaceShell) даёт route — поверхность рендерится и в Storybook standalone.
  */
 export function AgentSurface() {
-  const { proposeStream, execute, uploadAttachment, listProjects, status, provider, tools, toolsError, toolsReloading, reloadTools } = useAgent();
+  const { proposeStream, execute, uploadAttachment, listProjects, status, provider, tools, toolsError, toolsReloading, reloadTools, loadThread, loadThreadHistory, live } = useAgent();
 
   const [phase, setPhase] = useState<AgentPhase>("draft");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<AgentMessage[]>([]);
+  // Персистентный тред (P1): гидрация истории при монтировании. degraded — история
+  // недоступна, но чат работает (fake-историю не показываем); mock-режим эфемерен честно.
+  const [thread, setThread] = useState<{ id: string } | null>(null);
+  const [historyStatus, setHistoryStatus] = useState<"loading" | "ready" | "degraded">(live ? "loading" : "ready");
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [liveSteps, setLiveSteps] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<Array<{ id: string; name: string }>>([]);
   const [anchorId, setAnchorId] = useState("");
@@ -74,13 +80,29 @@ export function AgentSurface() {
   const reviewVisible = changes.length > 0 && !thinking && phase !== "draft";
   const now = () => formatMessageTime();
 
-  const addMessage = (role: "user" | "agent", text: string, kind?: "error" | "result") =>
+  // Локальные id уникальны на сессию (счётчик, не длина списка): после adoptServerIds
+  // длина и индексы расходятся, а коллизия id ломала бы React-ключи и дедупликацию.
+  const localMessageSeq = useRef(0);
+  const nextLocalId = (role: "user" | "agent") => `local-${role}-${localMessageSeq.current++}`;
+
+  const addMessage = (role: "user" | "agent", text: string, kind?: "error" | "result", id?: string) => {
+    const messageId = id ?? nextLocalId(role);
     setMessages((m) => [
       ...m,
       role === "user"
-        ? { id: `user-${m.length}`, role, time: now(), text }
-        : { id: `agent-${m.length}`, role, time: now(), text, ...(kind ? { kind } : {}) }
+        ? { id: messageId, role, time: now(), text }
+        : { id: messageId, role, time: now(), text, ...(kind ? { kind } : {}) }
     ]);
+    return messageId;
+  };
+
+  // Optimistic-сообщения принимают серверные id из ответа propose (P1): последующая
+  // гидрация (retry после degraded) дедупится по id и не дублирует ходы сессии.
+  const adoptServerIds = (pairs: Array<[localId: string, serverId: string | undefined]>) =>
+    setMessages((m) => m.map((message) => {
+      const pair = pairs.find(([localId]) => localId === message.id);
+      return pair && pair[1] ? { ...message, id: pair[1] } : message;
+    }));
 
   // Проекты-якоря для вложений грузим один раз.
   useEffect(() => {
@@ -88,6 +110,87 @@ export function AgentSurface() {
     void listProjects().then((list) => { if (active) setProjects(list); });
     return () => { active = false; };
   }, [listProjects]);
+
+  // Персистентный ход → сообщение треда. Снимок предложения показываем текстом
+  // (без controls: применить из истории нельзя — backend это честно не поддерживает).
+  const threadTurnToMessage = (turn: AgentThreadTurn): AgentMessage => {
+    const time = turn.createdAt ? formatMessageTime(new Date(turn.createdAt)) : "";
+    if (turn.role === "user") return { id: turn.id, role: "user", time, text: turn.body };
+    let text = turn.body;
+    const proposalActions = turn.proposal?.actions ?? [];
+    if (proposalActions.length > 0) {
+      const titles = proposalActions.map((action) => action.title).filter(Boolean).slice(0, 5);
+      text += `\n\nПредложение (${turn.proposal?.actionsTotal ?? titles.length}): ${titles.join("; ")}`;
+    }
+    const receipt = turn.kind === "result" && turn.outcomes
+      ? { items: turn.outcomes, ...(turn.correlationId ? { correlationId: turn.correlationId } : {}) }
+      : undefined;
+    return { id: turn.id, role: "agent", time, text, ...(turn.kind ? { kind: turn.kind } : {}), ...(receipt ? { receipt } : {}) };
+  };
+
+  // Зависшая гидрация не должна блокировать composer навсегда: у fetch нет таймаута,
+  // поэтому гонка с таймером → degraded (чат работает, история подгрузится повтором).
+  const HISTORY_TIMEOUT_MS = 10_000;
+  const withHistoryTimeout = <T,>(request: Promise<{ ok: true; data: T } | { ok: false; code: string }>) =>
+    Promise.race([
+      request,
+      new Promise<{ ok: false; code: string }>((resolve) =>
+        setTimeout(() => resolve({ ok: false, code: "history_timeout" }), HISTORY_TIMEOUT_MS))
+    ]);
+
+  // Гидрация истории при монтировании (live): последняя страница треда + курсор «раньше».
+  async function hydrateThread() {
+    setHistoryStatus("loading");
+    const threadRes = await withHistoryTimeout(loadThread());
+    if (!threadRes.ok) {
+      // mock-режим и инсталляция без collaboration-персистентности эфемерны честно:
+      // баннер «Загрузить историю» с бессмысленным retry там не показываем.
+      setHistoryStatus(threadRes.code === "mock_mode" || threadRes.code === "collaboration_not_configured" ? "ready" : "degraded");
+      return;
+    }
+    const page = await withHistoryTimeout(loadThreadHistory(threadRes.data.id));
+    if (!page.ok) {
+      setThread(threadRes.data);
+      setHistoryStatus("degraded");
+      return;
+    }
+    setThread(threadRes.data);
+    const hydrated = page.data.turns.map(threadTurnToMessage);
+    // Дедупликация по id: optimistic-сообщения получают серверные id (adoptServerIds),
+    // поэтому повторная гидрация после degraded не дублирует ходы текущей сессии.
+    setMessages((current) => {
+      const known = new Set(current.map((message) => message.id));
+      return [...hydrated.filter((message) => !known.has(message.id)), ...current];
+    });
+    // «Есть более ранняя история» ⇔ сырое окно заполнено под лимит: сервер отдаёт
+    // nextCursor и для исчерпанной истории, по нему одному кнопка была бы фантомной.
+    setOlderCursor(page.data.rawCount >= AGENT_HISTORY_PAGE_LIMIT ? page.data.nextCursor : null);
+    setHistoryStatus("ready");
+  }
+
+  useEffect(() => {
+    if (!live) return;
+    void hydrateThread();
+    // Гидрация — строго один раз на монтирование live-поверхности.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live]);
+
+  async function loadOlderTurns() {
+    if (!thread || !olderCursor || loadingOlder) return;
+    setLoadingOlder(true);
+    const page = await loadThreadHistory(thread.id, olderCursor);
+    setLoadingOlder(false);
+    if (!page.ok) {
+      addMessage("agent", "Не удалось загрузить более раннюю историю — попробуйте ещё раз.", "error");
+      return;
+    }
+    const older = page.data.turns.map(threadTurnToMessage);
+    setMessages((current) => {
+      const known = new Set(current.map((message) => message.id));
+      return [...older.filter((message) => !known.has(message.id)), ...current];
+    });
+    setOlderCursor(page.data.rawCount >= AGENT_HISTORY_PAGE_LIMIT ? page.data.nextCursor : null);
+  }
 
   async function onFilePicked(file: File) {
     const res = await uploadAttachment(file, "project", anchorId);
@@ -103,19 +206,21 @@ export function AgentSurface() {
   async function sendMessage() {
     if (applyInFlight.current) return;
     if (status === "proposing") return; // второй submit во время thinking перемешал бы два хода
+    // До резолва гидрации (ready|degraded) не отправляем: иначе гидрация продублирует
+    // только что записанные сервером ходы. Composer в это время заблокирован.
+    if (historyStatus === "loading") return;
     const goal = inputValue.trim();
     if (goal.length === 0) return;
-    addMessage("user", goal);
+    const localUserId = addMessage("user", goal);
     setInputValue("");
     composerInputRef.current?.focus();
-    if (provider?.configured === false) {
-      addMessage("agent", `LLM-провайдер не настроен (провайдер ${provider.model}) — задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY на сервере.`, "error");
-      return;
-    }
-    // Историю собираем без текущей реплики: messages — снимок до addMessage этого submit.
-    const history = messages
-      .filter((message): message is Extract<AgentMessage, { role: "user" | "agent" }> => message.role !== "trace")
-      .map((message) => ({ role: message.role === "user" ? ("user" as const) : ("assistant" as const), text: message.text }));
+    // Источник истины истории при живом треде — сервер (propose(threadId)); клиентскую
+    // реконструкцию из UI-стейта отправляем только без персистентности (mock/degraded).
+    const history = thread
+      ? []
+      : messages
+          .filter((message): message is Extract<AgentMessage, { role: "user" | "agent" }> => message.role !== "trace")
+          .map((message) => ({ role: message.role === "user" ? ("user" as const) : ("assistant" as const), text: message.text }));
     setPhase("thinking");
     setLiveSteps([]);
     const attachmentIds = attachments.map((file) => file.id);
@@ -129,7 +234,7 @@ export function AgentSurface() {
         : event.text.length > 80 ? `${event.text.slice(0, 80)}…` : event.text;
       collectedSteps.push(label);
       setLiveSteps((steps) => [...steps, label]);
-    }, attachmentIds, history);
+    }, attachmentIds, history, thread?.id);
     // Завершённый трейс остаётся в треде сообщением-ролью trace (история хода агента);
     // прерванный ошибкой ход помечается честно, а не зелёными галочками.
     if (collectedSteps.length > 0) {
@@ -141,7 +246,15 @@ export function AgentSurface() {
     setLiveSteps([]);
     if (!res.ok) {
       // НЕ стираем вложения при сбое — пользователь сможет повторить, не загружая файл заново.
-      addMessage("agent", `Не удалось обработать запрос: ${res.code}`, "error");
+      // 503 «LLM не настроен» приходит от сервера (он же персистит реплику и квитанцию —
+      // семантика #244 переживает reload); остальные ошибки — общим текстом.
+      const localErrorId = res.code === "agent_provider_not_configured"
+        ? addMessage("agent", `LLM-провайдер не настроен (провайдер ${provider?.model ?? "—"}) — задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY на сервере.`, "error")
+        : addMessage("agent", `Не удалось обработать запрос: ${res.code}`, "error");
+      if (res.persisted) {
+        setThread((current) => current ?? { id: res.persisted!.threadId });
+        adoptServerIds([[localUserId, res.persisted.messageIds[0]], [localErrorId, res.persisted.messageIds[1]]]);
+      }
       setPhase("draft");
       return;
     }
@@ -160,7 +273,12 @@ export function AgentSurface() {
     setActionMap(map);
     setChanges(newChanges);
     setActiveChangeId(newChanges[0]?.id ?? "");
-    addMessage("agent", data.reasoning || (newChanges.length ? "Подготовил предложение — проверьте сверку справа." : "Безопасных действий не нашёл."));
+    const localAgentId = addMessage("agent", data.reasoning || (newChanges.length ? "Подготовил предложение — проверьте сверку справа." : "Безопасных действий не нашёл."));
+    // Optimistic-ходы принимают серверные id (P1): дедупликация при повторной гидрации.
+    if (data.messageIds) {
+      if (data.threadId) setThread((current) => current ?? { id: data.threadId! });
+      adoptServerIds([[localUserId, data.messageIds[0]], [localAgentId, data.messageIds[1]]]);
+    }
     setPhase(newChanges.length ? "review-open" : "applied");
   }
 
@@ -210,11 +328,31 @@ export function AgentSurface() {
     }));
     setPhase(res.data.summary.failed > 0 ? "review-open" : "applied");
     const { applied, denied, conflict, failed } = res.data.summary;
-    addMessage(
-      "agent",
-      `Результат: применено ${applied}, отказано ${denied}, конфликтов ${conflict}, ошибок ${failed}.`,
-      "result"
-    );
+    // Квитанция (P0): адресуемые следы audit-записей по каждому действию с исходом.
+    const receiptItems = res.data.results
+      .filter((result) => result.auditEventId || result.planningAuditEventId)
+      .map((result) => ({
+        tool: result.tool,
+        status: result.status,
+        ...(result.auditEventId ? { auditEventId: result.auditEventId } : {}),
+        ...(result.planningAuditEventId ? { planningAuditEventId: result.planningAuditEventId } : {}),
+        ...(result.planVersion !== undefined ? { planVersion: result.planVersion } : {}),
+        ...(result.projectId ? { projectId: result.projectId } : {})
+      }));
+    const receipt = receiptItems.length > 0
+      ? { items: receiptItems, ...(res.data.correlationId ? { correlationId: res.data.correlationId } : {}) }
+      : undefined;
+    setMessages((m) => [
+      ...m,
+      {
+        id: res.data.messageId ?? `agent-${m.length}`,
+        role: "agent",
+        time: now(),
+        text: `Результат: применено ${applied}, отказано ${denied}, конфликтов ${conflict}, ошибок ${failed}.`,
+        kind: "result",
+        ...(receipt ? { receipt } : {})
+      }
+    ]);
     if (res.data.results.some((result) => result.error === "task_version_conflict")) {
       addMessage(
         "agent",
@@ -235,6 +373,12 @@ export function AgentSurface() {
     setEditingChangeId(undefined);
     setPhase("draft");
     setMobileReview(false);
+    // Honesty «Сбросить» при персистентном треде: обнуляем thread — следующий propose
+    // уходит БЕЗ threadId с пустой историей (контекст агента реально сброшен, а не только
+    // вид), сервер продолжает персистить новые ходы в тот же тред. Устаревший olderCursor
+    // тоже снимаем — иначе «Показать раньше» влил бы среднюю страницу в пустой чат.
+    setThread(null);
+    setOlderCursor(null);
   }
 
   // Первичная загрузка возможностей агента (GET /agent/tools): skeleton вместо
@@ -298,11 +442,52 @@ export function AgentSurface() {
             onOpenMobileReview={() => setMobileReview(true)}
             reviewButtonRef={reviewButtonRef}
           />
-          <ChatThread messages={messages} thinking={thinking} liveSteps={liveSteps} />
+          {historyStatus === "degraded" ? (
+            // История не загрузилась: чат работает, но прошлые ходы недоступны —
+            // честный баннер вместо fake-пустоты, с повтором гидрации. После повтора
+            // баннер размонтируется — фокус переводим в composer, а не роняем на body.
+            <div role="alert">
+              <BannerInline variant="warn" className="m-3">
+                <span>История треда недоступна — новые сообщения не потеряются, но прошлые ходы не загрузились.</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void hydrateThread().then(() => composerInputRef.current?.focus())}
+                >
+                  Загрузить историю
+                </Button>
+              </BannerInline>
+            </div>
+          ) : null}
+          {historyStatus === "loading" && live ? (
+            <div className="px-4 py-2 md:px-6" role="status" data-testid="agent-history-loading">
+              <SkeletonText className="w-64" />
+              <span className="sr-only">Загрузка истории треда…</span>
+            </div>
+          ) : null}
+          {olderCursor && historyStatus === "ready" ? (
+            <div className="flex justify-center border-b border-[var(--border-subtle)] px-4 py-1.5">
+              {/* Без disabled: дизейбл сфокусированной кнопки роняет фокус на body;
+                  повторные клики гасит гард loadingOlder внутри loadOlderTurns. */}
+              <Button type="button" size="sm" variant="ghost" aria-busy={loadingOlder} onClick={() => void loadOlderTurns()}>
+                {loadingOlder ? "Загружаем…" : "Показать раньше"}
+              </Button>
+            </div>
+          ) : null}
+          {/* key: ре-монтирование лога после гидрации — role=log (имплицитный aria-live)
+              не должен озвучивать 30 вставленных исторических сообщений как новые. */}
+          <ChatThread
+            key={historyStatus === "loading" ? "hydrating" : "hydrated"}
+            messages={messages}
+            thinking={thinking}
+            liveSteps={liveSteps}
+            historyLoading={historyStatus === "loading"}
+          />
           <AgentComposer
             value={inputValue}
             inputRef={composerInputRef}
-            disabled={status === "executing"}
+            disabled={status === "executing" || historyStatus === "loading"}
             projects={projects}
             anchorId={anchorId}
             attachments={attachments}

@@ -12,12 +12,17 @@ import {
   type AgentHistoryTurn,
   type AgentProposeResponse,
   type AgentStreamEvent,
+  type AgentThreadHistoryPage,
+  type AgentThreadInfo,
   type AgentToolAvailability
 } from "./agent-client";
 import { createMockAgentFetch } from "./mock-agent-backend";
 
 export type AgentStatus = "loading" | "idle" | "proposing" | "executing";
 export type AgentResult<T> = { ok: true; data: T } | { ok: false; code: string };
+/** Ошибка propose может нести персистированную сервером квитанцию (503 LLM-недоступен). */
+export type AgentProposeError = { ok: false; code: string; persisted?: { threadId: string; messageIds: string[] } };
+export type AgentProposeResult = { ok: true; data: AgentProposeResponse } | AgentProposeError;
 export type AgentExecuteResult =
   | { ok: true; data: AgentExecuteResponse }
   | { ok: false; code: string; status: number | null; uncertain: boolean };
@@ -84,15 +89,41 @@ export function useAgent() {
     [client]
   );
 
+  // Персистентный тред (P1): create-or-get и страницы истории. Только live-режим —
+  // mock/Storybook живёт эфемерно, и это честно (истории там нет, а не «не загрузилась»).
+  const loadThread = useCallback(
+    async (): Promise<AgentResult<AgentThreadInfo>> => {
+      if (!live) return { ok: false, code: "mock_mode" };
+      try {
+        return { ok: true, data: await client.loadThread() };
+      } catch (e) {
+        return { ok: false, code: e instanceof AgentApiError ? e.code : "request_failed" };
+      }
+    },
+    [client, live]
+  );
+
+  const loadThreadHistory = useCallback(
+    async (threadId: string, cursor?: string): Promise<AgentResult<AgentThreadHistoryPage>> => {
+      if (!live) return { ok: false, code: "mock_mode" };
+      try {
+        return { ok: true, data: await client.loadThreadHistory(threadId, cursor) };
+      } catch (e) {
+        return { ok: false, code: e instanceof AgentApiError ? e.code : "request_failed" };
+      }
+    },
+    [client, live]
+  );
+
   const proposeStream = useCallback(
-    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = []): Promise<AgentResult<AgentProposeResponse>> => {
+    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = [], threadId?: string): Promise<AgentProposeResult> => {
       setStatus("proposing");
       setError(null);
       try {
         // live → реальный SSE; mock/Storybook (нет stream-ручки) → обычный propose +
         // синтез событий из результата, чтобы CoT-трейс отображался и в витрине.
         const data = live
-          ? await client.proposeStream(goal, onEvent, attachmentIds, history)
+          ? await client.proposeStream(goal, onEvent, attachmentIds, history, threadId)
           : await (async () => {
               const result = await client.propose(goal, attachmentIds, history);
               for (const analyze of result.analyzeResults) onEvent({ type: "analyze", tool: analyze.tool, title: analyze.tool, ok: true });
@@ -105,7 +136,14 @@ export function useAgent() {
       } catch (e) {
         const code = e instanceof AgentApiError ? e.code : "request_failed";
         setError(code);
-        return { ok: false, code };
+        // 503 «LLM не настроен» персистится сервером — отдаём ids поверхности для
+        // дедупликации её optimistic-сообщений при последующей гидрации.
+        const body = e instanceof AgentApiError ? e.body : null;
+        const threadId = body && typeof body.threadId === "string" ? body.threadId : undefined;
+        const messageIds = body && Array.isArray(body.messageIds) && body.messageIds.every((id) => typeof id === "string")
+          ? body.messageIds as string[]
+          : undefined;
+        return { ok: false, code, ...(threadId && messageIds ? { persisted: { threadId, messageIds } } : {}) };
       } finally {
         setStatus("idle");
       }
@@ -157,5 +195,5 @@ export function useAgent() {
     [client]
   );
 
-  return { tools, toolsError, toolsReloading, reloadTools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute };
+  return { tools, toolsError, toolsReloading, reloadTools, provider, proposal, setProposal, status, error, propose, proposeStream, uploadAttachment, listProjects, execute, loadThread, loadThreadHistory, live };
 }
