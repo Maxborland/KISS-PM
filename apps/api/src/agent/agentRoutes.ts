@@ -164,11 +164,20 @@ export async function buildProposalActionMetadata(
       : payload.conflictEffect === "reduced" ? "перегруз снижен"
       : "перегруз принят как риск";
     const expiresHhMm = run.expiresAt.toISOString().slice(11, 16);
+    // Entity-последствия обязаны быть видны ДО подтверждения: какие задачи и
+    // назначения меняет сценарий, а не только счётчик команд.
+    const listWithCap = (ids: string[], cap = 5) =>
+      ids.length === 0 ? "" : ` (${ids.slice(0, cap).join(", ")}${ids.length > cap ? ` и ещё ${ids.length - cap}` : ""})`;
+    const changedTaskIds = explain?.changedTaskIds ?? [];
+    const changedAssignmentIds = explain?.changedAssignmentIds ?? [];
     return {
       title: `Применить сценарий разрешения перегрузки: профиль «${payload.profile ?? "?"}» · проект ${projectId}`,
       preview: {
         before: `План v${run.planVersion}; перегруз ${typeof target.overloadMinutes === "number" ? `${target.overloadMinutes} мин` : "—"} · ресурс ${typeof target.resourceId === "string" ? target.resourceId : "—"} · ${typeof target.date === "string" ? target.date : "—"}`,
         after: `Команд плана: ${commandCount}; ${conflictEffectLabel}`
+          + `; задач затронуто: ${changedTaskIds.length}${listWithCap(changedTaskIds)}`
+          + `; назначений: ${changedAssignmentIds.length}${listWithCap(changedAssignmentIds)}`
+          + (explain && explain.deadlineDeltaDays !== 0 ? `; сдвиг финиша: ${explain.deadlineDeltaDays > 0 ? "+" : ""}${explain.deadlineDeltaDays} дн` : "")
           + (explain && explain.riskScore > 0 ? `; риск ${explain.riskScore}` : "")
           + (explain && explain.requiredApprovals.length > 0 ? `; согласования: ${explain.requiredApprovals.join(", ")}` : "")
           + `; действует до ${expiresHhMm} UTC`
@@ -189,9 +198,26 @@ export async function buildProposalActionMetadata(
     const plannedStart = typeof action.input.plannedStart === "string" ? action.input.plannedStart : isoDate();
     const plannedFinish = typeof action.input.plannedFinish === "string" ? action.input.plannedFinish : plannedStart;
     const plannedWork = numberInput(action.input.plannedWork, 8);
-    const participants = Array.isArray(action.input.participants) && action.input.participants.length > 0
-      ? `участников: ${action.input.participants.length}`
+    // ВСЕ поля, которые execute передаст в governed-роут, видны до подтверждения:
+    // скрытые участники/приоритет/описание = одобрение вслепую (ревью #248).
+    const priority = typeof action.input.priority === "string" ? action.input.priority : "normal";
+    const rawParticipants = Array.isArray(action.input.participants) ? action.input.participants : [];
+    const participantLabels = rawParticipants
+      .map((entry) => {
+        const record = (entry && typeof entry === "object" ? entry : {}) as { userId?: unknown; role?: unknown };
+        if (typeof record.userId !== "string") return null;
+        return typeof record.role === "string" ? `${record.userId} (${record.role})` : record.userId;
+      })
+      .filter((label): label is string => label !== null);
+    const participants = participantLabels.length > 0
+      ? `участники: ${participantLabels.slice(0, 5).join(", ")}${participantLabels.length > 5 ? ` и ещё ${participantLabels.length - 5}` : ""}`
       : "исполнитель: вы";
+    const description = typeof action.input.description === "string" && action.input.description.trim().length > 0
+      ? action.input.description.trim()
+      : "";
+    const descriptionPart = description
+      ? `; описание: «${description.length > 120 ? `${description.slice(0, 120)}…` : description}»`
+      : "";
     const projectLabel = project
       ? `проект «${project.title}»`
       : projectId
@@ -201,7 +227,7 @@ export async function buildProposalActionMetadata(
       title: `Создать задачу: «${title}»${project ? ` · проект «${project.title}»` : ""}`,
       preview: {
         before: "Задачи не существует",
-        after: `«${title}» · ${projectLabel} · ${plannedStart} → ${plannedFinish} · ${plannedWork} ч · ${participants}`
+        after: `«${title}» · ${projectLabel} · ${plannedStart} → ${plannedFinish} · ${plannedWork} ч · приоритет: ${priority} · ${participants}${descriptionPart}`
       },
       preconditionVersions: {}
     };

@@ -607,10 +607,32 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
     expect(metadata.title).toContain("Создать задачу: «Проверить смету»");
     expect(metadata.title).toContain("Проект");
     expect(metadata.preview.before).toBe("Задачи не существует");
-    // Дефолты execute-ветки честно видны до применения: 8 ч и исполнитель-автор.
+    // Дефолты execute-ветки честно видны до применения: 8 ч, приоритет и исполнитель-автор.
     expect(metadata.preview.after).toContain("8 ч");
+    expect(metadata.preview.after).toContain("приоритет: normal");
     expect(metadata.preview.after).toContain("исполнитель: вы");
     expect(metadata.preview.after).toMatch(/\d{4}-\d{2}-\d{2} → \d{4}-\d{2}-\d{2}/);
+  });
+
+  it("create_task: явные участники, приоритет и описание видны в карточке (ревью #248 — без одобрения вслепую)", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      {
+        tool: "create_task",
+        input: {
+          title: "Задача",
+          projectId: "project-1",
+          priority: "high",
+          description: "Проверить смету по разделу электрики до пятницы",
+          participants: [{ userId: "user-exec", role: "executor" }, { userId: "user-co", role: "co_executor" }]
+        }
+      }
+    );
+    expect(metadata.preview.after).toContain("приоритет: high");
+    expect(metadata.preview.after).toContain("user-exec (executor)");
+    expect(metadata.preview.after).toContain("user-co (co_executor)");
+    expect(metadata.preview.after).toContain("описание: «Проверить смету");
   });
 
   it("create_task: несуществующий проект честно маркируется в карточке", async () => {
@@ -640,6 +662,9 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
     expect(metadata.preview.before).toContain("План v5");
     expect(metadata.preview.before).toContain(overload.resourceId);
     expect(metadata.preview.after).toMatch(/Команд плана: \d+/);
+    // Entity-последствия видны до подтверждения (ревью #248): какие задачи/назначения.
+    expect(metadata.preview.after).toMatch(/задач затронуто: \d+/);
+    expect(metadata.preview.after).toMatch(/назначений: \d+/);
     expect(metadata.preview.after).toContain("действует до");
     expect(metadata.preconditionVersions).toEqual({ planVersion: 5 });
     expect(metadata.capability).toBeUndefined();
