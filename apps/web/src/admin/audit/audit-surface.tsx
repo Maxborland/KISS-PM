@@ -215,7 +215,12 @@ function AuditEventDeepLinkResolver({
     const eventParam = new URLSearchParams(search).get("event");
     if (resolvedEventParamRef.current === eventParam) return;
     resolvedEventParamRef.current = eventParam;
-    if (!eventParam) return;
+    if (!eventParam) {
+      // Параметр снят (навигация назад / очистка после битого id) — панель
+      // «Событие по ссылке» не должна показывать устаревшую запись.
+      setDeepEvent(null);
+      return;
+    }
     let active = true;
     void getEvent(eventParam).then((event) => {
       if (!active) return;
@@ -223,6 +228,7 @@ function AuditEventDeepLinkResolver({
         setDeepEvent(event);
         return;
       }
+      setDeepEvent(null);
       clearEventParam();
       toast.error("Событие аудита не найдено");
     });
