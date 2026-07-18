@@ -964,6 +964,75 @@ describe("planning repository", () => {
     expect(crossProjectRun).toBeUndefined();
   });
 
+  it("purgeExpiredPlanningRuns удаляет только неприменённые истёкшие runs своего тенанта", async () => {
+    const db = createDatabase(client);
+    const intakeRepository = createProjectIntakeRepository(db);
+    const workRepository = createProjectWorkRepository(db);
+    const planningRepository = createPlanningRepository(db);
+    const projectId = await createActiveProjectWithTasks(intakeRepository, workRepository);
+
+    const scenarioBase = {
+      tenantId: "tenant-alpha",
+      projectId,
+      planVersion: 1,
+      engineVersion: "planning-core-v1",
+      targetConflict: { type: "resource_overload" },
+      proposalPayload: { id: "p", profile: "balanced" },
+      proposalPayloadHash: "hash",
+      actorUserId: "user-alpha-admin"
+    };
+    // Истёкший неприменённый — должен удалиться.
+    await planningRepository.createPlanningScenarioRun({
+      ...scenarioBase,
+      id: "scenario-expired",
+      expiresAt: new Date("2026-05-20T00:00:00.000Z")
+    });
+    // Истёкший, но ПРИМЕНЁННЫЙ — историческая ссылка квитанции, не удаляется.
+    await planningRepository.createPlanningScenarioRun({
+      ...scenarioBase,
+      id: "scenario-applied",
+      expiresAt: new Date("2026-05-20T00:00:00.000Z")
+    });
+    await planningRepository.markPlanningScenarioRunApplied({
+      tenantId: "tenant-alpha",
+      projectId,
+      scenarioRunId: "scenario-applied",
+      appliedAt: new Date("2026-05-19T00:00:00.000Z")
+    });
+    // Свежий — не удаляется.
+    await planningRepository.createPlanningScenarioRun({
+      ...scenarioBase,
+      id: "scenario-fresh",
+      expiresAt: new Date("2099-01-01T00:00:00.000Z")
+    });
+    // Истёкший solver-run — удаляется тем же вызовом.
+    await planningRepository.createPlanningSolverRun({
+      id: "solver-expired",
+      tenantId: "tenant-alpha",
+      projectId,
+      mode: "schedule",
+      clientPlanVersion: 1,
+      engineVersion: "planning-core-v1",
+      inputSnapshotMetadata: { projectId, planVersion: 1 },
+      targetDeadline: "2026-06-20",
+      proposals: [],
+      proposalPayloadHash: "hash-solver",
+      actorUserId: "user-alpha-admin",
+      expiresAt: new Date("2026-05-20T00:00:00.000Z")
+    });
+
+    const purged = await planningRepository.purgeExpiredPlanningRuns({
+      tenantId: "tenant-alpha",
+      expiredBefore: new Date("2026-05-21T00:00:00.000Z")
+    });
+    expect(purged).toEqual({ scenarioRuns: 1, solverRuns: 1 });
+
+    expect(await planningRepository.findPlanningScenarioRun("tenant-alpha", projectId, "scenario-expired")).toBeUndefined();
+    expect(await planningRepository.findPlanningScenarioRun("tenant-alpha", projectId, "scenario-applied")).toBeDefined();
+    expect(await planningRepository.findPlanningScenarioRun("tenant-alpha", projectId, "scenario-fresh")).toBeDefined();
+    expect(await planningRepository.findPlanningSolverRun("tenant-alpha", projectId, "solver-expired")).toBeUndefined();
+  });
+
   it("excludes archived tasks and their planning edges from PlanSnapshot", async () => {
     const db = createDatabase(client);
     const intakeRepository = createProjectIntakeRepository(db);

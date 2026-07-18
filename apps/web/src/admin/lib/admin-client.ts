@@ -109,6 +109,9 @@ export function createAdminClient(options: AdminApiClientOptions) {
 
     // журнал аудита тенанта (GET /api/tenant/current/audit-events?limit=N) — последние события.
     listAuditEvents(limit = 50) { return requestJson<{ auditEvents: AuditEvent[] }>(`/api/tenant/current/audit-events?limit=${limit}`); },
+    // точечная выборка события (deep-link ?event= из квитанций агента): запись может быть
+    // старше окна ленты, поэтому читаем по id, а не поиском в списке.
+    getAuditEvent(auditEventId: string) { return requestJson<{ auditEvent: AuditEvent }>(`/api/tenant/current/audit-events/${enc(auditEventId)}`); },
 
     // политика безопасности тенанта (GET/PUT /api/tenant/current/security-policy)
     getSecurityPolicy() { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy"); },

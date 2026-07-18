@@ -108,6 +108,12 @@ export type PlanningRepository = {
     proposalId: string;
     appliedAt: Date;
   }): Promise<void>;
+  /** Purge неприменённых истёкших runs (TTL): applied-runs не трогаем — они историческая
+      ссылка квитанций. Возвращает счётчики удалённого по обеим таблицам. */
+  purgeExpiredPlanningRuns(input: {
+    tenantId: string;
+    expiredBefore: Date;
+  }): Promise<{ scenarioRuns: number; solverRuns: number }>;
   findPlanningCommandIdempotency(
     tenantId: string,
     projectId: string,
@@ -571,6 +577,30 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
             eq(planningScenarioRuns.id, input.scenarioRunId)
           )
         );
+    },
+
+    async purgeExpiredPlanningRuns(input) {
+      const scenarioDeleted = await db
+        .delete(planningScenarioRuns)
+        .where(
+          and(
+            eq(planningScenarioRuns.tenantId, input.tenantId),
+            lte(planningScenarioRuns.expiresAt, input.expiredBefore),
+            isNull(planningScenarioRuns.appliedAt)
+          )
+        )
+        .returning({ id: planningScenarioRuns.id });
+      const solverDeleted = await db
+        .delete(planningSolverRuns)
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, input.tenantId),
+            lte(planningSolverRuns.expiresAt, input.expiredBefore),
+            isNull(planningSolverRuns.appliedAt)
+          )
+        )
+        .returning({ id: planningSolverRuns.id });
+      return { scenarioRuns: scenarioDeleted.length, solverRuns: solverDeleted.length };
     },
 
     async createPlanningSolverRun(input) {

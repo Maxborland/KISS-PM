@@ -110,10 +110,13 @@ export function createDemoLlmProvider(): LlmProvider {
         return Promise.resolve({ stopReason: "end_turn", content: [{ type: "text", text: "Демо-агент: нет доступных инструментов анализа." }] });
       }
       const first = tasks.find((task) => task.id && task.projectId);
-      if (first && has("change_task_status")) {
+      // comment_task вместо change_task_status: у demo нет знания реальных statusId
+      // тенанта (прежний хардкод "status-review" не существовал в seed и всегда
+      // ронял execute), а комментарий честно применим в любой инсталляции.
+      if (first && has("comment_task")) {
         return Promise.resolve({
           stopReason: "tool_use",
-          content: [{ type: "tool_use", id: "demo-m", name: "change_task_status", input: { projectId: first.projectId!, taskId: first.id!, statusId: "status-review" } }]
+          content: [{ type: "tool_use", id: "demo-m", name: "comment_task", input: { taskId: first.id!, body: "Демо-агент: зафиксировал статус по задаче." } }]
         });
       }
       return Promise.resolve({ stopReason: "end_turn", content: [{ type: "text", text: "Демо-агент: подходящих безопасных действий не найдено." }] });

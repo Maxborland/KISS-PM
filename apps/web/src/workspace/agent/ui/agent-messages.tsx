@@ -16,12 +16,15 @@ export function ChatThread({
   messages,
   thinking,
   liveSteps,
-  historyLoading = false
+  historyLoading = false,
+  auditLinkEnabled = false
 }: {
   messages: AgentMessage[];
   thinking: boolean;
   liveSteps: string[];
   historyLoading?: boolean;
+  /** Право tenant.audit_events.read: agent-action квитанции становятся ссылками в админ-журнал. */
+  auditLinkEnabled?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lastMessageId = messages[messages.length - 1]?.id;
@@ -48,7 +51,7 @@ export function ChatThread({
             <TraceSteps steps={message.steps} done failed={message.failed ?? false} />
           </div>
         ) : (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble key={message.id} message={message} auditLinkEnabled={auditLinkEnabled} />
         )
       )}
       {thinking ? <TraceSteps steps={liveSteps} done={false} /> : null}
@@ -67,7 +70,7 @@ function ChatEmpty() {
   );
 }
 
-function MessageBubble({ message }: { message: Extract<AgentMessage, { role: "user" | "agent" }> }) {
+function MessageBubble({ message, auditLinkEnabled = false }: { message: Extract<AgentMessage, { role: "user" | "agent" }>; auditLinkEnabled?: boolean }) {
   const isUser = message.role === "user";
   return (
     // 720px — намеренная локальная мера строки треда (комфортное чтение);
@@ -101,7 +104,7 @@ function MessageBubble({ message }: { message: Extract<AgentMessage, { role: "us
         >
           {message.text}
         </p>
-        {message.role === "agent" && message.receipt ? <ReceiptBlock receipt={message.receipt} /> : null}
+        {message.role === "agent" && message.receipt ? <ReceiptBlock receipt={message.receipt} auditLinkEnabled={auditLinkEnabled} /> : null}
       </div>
     </article>
   );
@@ -113,7 +116,7 @@ function MessageBubble({ message }: { message: Extract<AgentMessage, { role: "us
  * остальных действий — копируемые идентификаторы audit-записи без href, потому что
  * события agent-action-* в ленту «Коммитов» не попадают и ссылка вела бы в пустоту.
  */
-function ReceiptBlock({ receipt }: { receipt: AgentReceipt }) {
+function ReceiptBlock({ receipt, auditLinkEnabled = false }: { receipt: AgentReceipt; auditLinkEnabled?: boolean }) {
   return (
     <div className="mt-1.5 flex flex-col gap-1 text-left text-[length:var(--text-xs)] text-[var(--muted-strong)]" data-testid="agent-receipt">
       {receipt.items.map((item, index) => (
@@ -133,6 +136,16 @@ function ReceiptBlock({ receipt }: { receipt: AgentReceipt }) {
             <>
               <span>Аудит-запись ({item.status}):</span>
               <span className="mono break-all">{item.auditEventId}</span>
+              {/* Ссылка в админ-журнал — только при праве tenant.audit_events.read:
+                  без права страница ответила бы forbidden, ссылка была бы обманом. */}
+              {auditLinkEnabled ? (
+                <Link
+                  href={`/admin/audit?event=${encodeURIComponent(item.auditEventId)}`}
+                  className="font-medium text-[var(--accent)] underline underline-offset-2"
+                >
+                  Открыть в журнале аудита
+                </Link>
+              ) : null}
             </>
           ) : null}
         </div>

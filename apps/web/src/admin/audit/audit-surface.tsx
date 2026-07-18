@@ -1,14 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { adminErr, auditActionLabel, AuditResultChip } from "@/admin/ui/admin-bits";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { useAdmin } from "@/admin/lib/use-admin";
 import { useAdminRuntime } from "@/admin/lib/admin-runtime";
 import { useAuditEvents } from "@/admin/lib/use-audit-events";
+import type { AuditEvent } from "@/admin/lib/admin-client";
+import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 // Дата+время события (ru-RU, как боевой формат журнала).
@@ -27,7 +32,10 @@ const selCls = "h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-
  */
 export function AdminAuditSurface() {
   const { live } = useAdminRuntime();
-  const { events, status, error, reload } = useAuditEvents(50);
+  const { events, status, error, reload, getEvent } = useAuditEvents(50);
+  // Deep-link ?event=<auditEventId> из квитанций агента: запись может быть старше
+  // окна ленты (limit 50) — резолвим точечной выборкой, а не поиском в списке.
+  const [deepEvent, setDeepEvent] = useState<AuditEvent | null>(null);
   // Справочник людей для колонки «Кто» (G6-05): actorUserId → имя. Если список
   // пользователей роли недоступен (403) — фолбэк «Участник xxxx», не сырой id (R3).
   const admin = useAdmin();
@@ -84,6 +92,24 @@ export function AdminAuditSurface() {
         errorFormat={(c) => adminErr(c)}
         empty={{ title: "Событий пока нет", description: "Журнал аудита пуст — управленческие действия появятся здесь." }}
       >
+        <AuditEventDeepLinkResolver getEvent={getEvent} setDeepEvent={setDeepEvent} />
+        {deepEvent ? (
+          <div data-testid="audit-deep-event" className="mb-3 rounded-[var(--radius-card)] border border-[var(--accent)] bg-[var(--panel)] px-3 py-2 shadow-[var(--shadow-card)]">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
+                Событие по ссылке: {auditActionLabel(deepEvent.actionType)}
+              </div>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setDeepEvent(null)}>Скрыть</Button>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+              <span>Кто: {who(deepEvent.actorUserId)}</span>
+              <span>Когда: {fmt(deepEvent.createdAt)}</span>
+              <span className="flex items-center gap-1">Результат: <AuditResultChip status={deepEvent.executionResult?.status} /></span>
+              {deepEvent.sourceEntity?.type ? <span>Сущность: {deepEvent.sourceEntity.type}{deepEvent.sourceEntity.id ? ` · ${deepEvent.sourceEntity.id}` : ""}</span> : null}
+              <span className="v4-mono break-all text-[var(--muted-soft)]">{deepEvent.id}</span>
+            </div>
+          </div>
+        ) : null}
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
             Тип события
@@ -166,4 +192,48 @@ export function AdminAuditSurface() {
       </SurfaceState>
     </AdminFrame>
   );
+}
+
+/**
+ * Резолв deep-link `?event=<auditEventId>` — только в ready-ветке (useSearchParams вне её
+ * заставил бы Next требовать Suspense при prerender, см. CommitDeepLinkResolver). Каждое
+ * значение резолвится один раз; не найденное событие честно снимает параметр + toast.
+ */
+function AuditEventDeepLinkResolver({
+  getEvent,
+  setDeepEvent
+}: {
+  getEvent: (auditEventId: string) => Promise<AuditEvent | null>;
+  setDeepEvent: (event: AuditEvent | null) => void;
+}) {
+  const searchParams = useSearchParams();
+  const clearEventParam = useUrlPeekParamCleaner("event");
+  const resolvedEventParamRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const search = searchParams ? searchParams.toString() : window.location.search;
+    const eventParam = new URLSearchParams(search).get("event");
+    if (resolvedEventParamRef.current === eventParam) return;
+    resolvedEventParamRef.current = eventParam;
+    if (!eventParam) {
+      // Параметр снят (навигация назад / очистка после битого id) — панель
+      // «Событие по ссылке» не должна показывать устаревшую запись.
+      setDeepEvent(null);
+      return;
+    }
+    let active = true;
+    void getEvent(eventParam).then((event) => {
+      if (!active) return;
+      if (event) {
+        setDeepEvent(event);
+        return;
+      }
+      setDeepEvent(null);
+      clearEventParam();
+      toast.error("Событие аудита не найдено");
+    });
+    return () => { active = false; };
+  }, [clearEventParam, getEvent, searchParams, setDeepEvent]);
+
+  return null;
 }

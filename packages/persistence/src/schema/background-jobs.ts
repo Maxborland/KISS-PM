@@ -47,7 +47,7 @@ export const backgroundJobSchedules = pgTable(
     ),
     check(
       "background_job_schedules_kind_chk",
-      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup', 'calls.recording_janitor', 'calls.recording_compose')`
+      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup', 'calls.recording_janitor', 'calls.recording_compose', 'planning.expired_runs_purge')`
     ),
     check("background_job_schedules_interval_chk", sql`${table.intervalSeconds} > 0`)
   ]
@@ -94,7 +94,7 @@ export const backgroundJobRuns = pgTable(
     index("background_job_runs_tenant_status_idx").on(table.tenantId, table.status),
     check(
       "background_job_runs_kind_chk",
-      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup', 'calls.recording_janitor', 'calls.recording_compose')`
+      sql`${table.kind} in ('storage.asset_cleanup', 'notification.dispatch', 'connector.sync', 'search.projection_rebuild', 'capacity.cache_warmup', 'calls.recording_janitor', 'calls.recording_compose', 'planning.expired_runs_purge')`
     ),
     check(
       "background_job_runs_status_chk",

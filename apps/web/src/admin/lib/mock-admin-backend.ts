@@ -204,6 +204,12 @@ export function createMockAdminFetch(): typeof fetch {
       const limit = Math.max(1, Math.min(100, Number(new URL(url, "http://x").searchParams.get("limit")) || 50));
       return json({ auditEvents: AUDIT_EVENTS.slice(0, limit) });
     }
+    // Точечная выборка (deep-link ?event=) — зеркало боевого GET /audit-events/:id.
+    const auditEventMatch = /^\/api\/tenant\/current\/audit-events\/([^/]+)$/.exec(path);
+    if (auditEventMatch && method === "GET") {
+      const event = AUDIT_EVENTS.find((candidate) => candidate.id === decodeURIComponent(auditEventMatch[1]!));
+      return event ? json({ auditEvent: event }) : err("audit_event_not_found", 404);
+    }
 
     /* ---- security-policy (политика безопасности тенанта) ---- */
     if (path === "/api/tenant/current/security-policy" && method === "GET") {
