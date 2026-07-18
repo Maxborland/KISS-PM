@@ -5,6 +5,7 @@ import { canApplyPlanningScenarios } from "@kiss-pm/access-control";
 import { readLimitedJsonBody } from "../jsonBody";
 import { parseScenarioRejectEnvelope } from "../planningParsers";
 import { requireCapabilities } from "../dataSourceCapabilities";
+import { canReadPlanningReadModel } from "./planningRouteAuth";
 import { denyPlanningAction, respondFromFailedResult } from "./planningRouteResponders";
 import {
   appendPlanningAuditIfConfigured,
@@ -15,8 +16,9 @@ import {
 
 /**
  * Явное отклонение persisted scenario run (reject-flow): до этого статус «отклонён»
- * существовал только неявно (истечение TTL). Кто вправе применять сценарии — тот вправе
- * и отклонять (та же RBAC-точка canApplyPlanningScenarios). Отклонённый run нельзя
+ * существовал только неявно (истечение TTL). RBAC как у preview/apply: право применения
+ * (canApplyPlanningScenarios) + право чтения план-модели (canReadPlanningReadModel).
+ * Отклонённый run нельзя
  * применить (409 scenario_rejected в apply), повторный reject — 409. План не мутирует,
  * версия плана не растёт; факт отклонения фиксируется аудитом planning.scenario.rejected.
  */
@@ -50,6 +52,18 @@ export function registerPlanningScenarioRejectRoute(app: Hono, deps: PlanningRou
         projectId: parsedProjectId.value,
         actionType: "planning.scenario_denied",
         decision,
+        commandInput: { scenarioRunId: parsedScenarioRunId.value, intent: "reject" }
+      });
+    }
+    // Как preview/apply: без права чтения план-модели нельзя и отклонять — иначе
+    // actor c apply-без-read мог бы инвалидировать любой известный ему scenario id.
+    const readDecision = canReadPlanningReadModel({ actor, profile });
+    if (!readDecision.allowed) {
+      return await denyPlanningAction(deps, context, {
+        actor,
+        projectId: parsedProjectId.value,
+        actionType: "planning.scenario_denied",
+        decision: readDecision,
         commandInput: { scenarioRunId: parsedScenarioRunId.value, intent: "reject" }
       });
     }

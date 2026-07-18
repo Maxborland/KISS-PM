@@ -223,6 +223,23 @@ describe("POST /planning/scenarios/:scenarioId/reject", () => {
     expect(allowedReject.status).toBe(200);
   });
 
+  it("apply без права чтения план-модели → 403 + audit, reject недоступен (как preview/apply)", async () => {
+    // Профиль «оператор сценариев без чтения плана»: canApplyPlanningScenarios пропустил бы,
+    // но такой actor не может ни preview, ни apply — reject не должен быть исключением.
+    const restricted = createHarness({
+      permissions: [
+        "tenant.projects.read",
+        "tenant.planning_scenarios.preview",
+        "tenant.planning_scenarios.apply"
+      ]
+    });
+
+    const reject = await post(restricted.app, "/api/workspace/projects/project-1/planning/scenarios/scenario-any/reject", {});
+
+    expect(reject.status).toBe(403);
+    expect(restricted.auditActionTypes).toContain("planning.scenario_denied");
+  });
+
   it("чужой projectId → 404 scenario_not_found (единый ответ, существование не раскрывается)", async () => {
     const harness = createHarness();
     const scenarioId = await previewScenarioId(harness);
