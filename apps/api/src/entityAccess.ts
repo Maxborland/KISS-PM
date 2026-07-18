@@ -154,6 +154,13 @@ export async function resolveEntityAccessContext<T extends AppEntityType>(input:
     });
   }
 
+  // Тред агента обслуживается только выделенным guarded-роутом (persistent agent
+  // history): generic entity-доступ для 'agent' закрыт fail-closed — иначе
+  // fall-through как task позволил бы создать 'agent'-беседу на чужом entityId.
+  if (input.entityType === "agent") {
+    return { ok: false, status: 404, error: notFoundError };
+  }
+
   const task = await input.dataSource.findTaskById?.(input.actor.tenantId, input.entityId);
   if (!task) return { ok: false, status: 404, error: notFoundError };
   // Литерал "task", а не input.entityType: fall-through достижим и для "direct",

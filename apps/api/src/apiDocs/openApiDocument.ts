@@ -205,7 +205,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/agent/tools", tag: "Agent", summary: "List agent tools available to the current user" },
   { method: "post", path: "/api/workspace/agent/propose", tag: "Agent", summary: "Run the agent loop and return proposed actions (no mutation)" },
   { method: "post", path: "/api/workspace/agent/propose/stream", tag: "Agent", summary: "Run the agent loop and stream reasoning/tool/proposal events (SSE)", response: "event-stream" },
-  { method: "post", path: "/api/workspace/agent/execute", tag: "Agent", summary: "Apply confirmed agent actions via governed commands" },
+  { method: "post", path: "/api/workspace/agent/execute", tag: "Agent", summary: "Apply confirmed agent actions via governed commands; per-item outcomes applied/denied/conflict/failed with audit receipt (correlationId, auditEventId, planningAuditEventId for plan-affecting actions); apply_* actions require explicit clientPlanVersion" },
   { method: "get", path: "/api/workspace/realtime/events", tag: "Collaboration", summary: "Workspace realtime event stream (SSE)", response: "event-stream" },
   { method: "get", path: "/api/workspace/presence", tag: "Collaboration", summary: "Presence snapshot of tenant users" },
   { method: "get", path: "/api/workspace/notification-preferences", tag: "Collaboration", summary: "Read notification preferences", successSchema: "NotificationPreferencesResponse" },

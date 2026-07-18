@@ -12,11 +12,14 @@ export const collaborationEntityTypes = [
   "product",
   "communication_channel",
   // Прямые сообщения (DM): беседа не привязана к сущности, доступ — по членству.
-  "direct"
+  "direct",
+  // Тред AI-агента: приватная беседа пользователя с агентом (entityId = userId),
+  // доступ — по членству как у direct; писатель agent-семантики — только сервер.
+  "agent"
 ] as const;
 export type CollaborationEntityType = (typeof collaborationEntityTypes)[number];
 
-export const conversationTypes = ["default", "meeting_followup", "direct"] as const;
+export const conversationTypes = ["default", "meeting_followup", "direct", "agent"] as const;
 export type ConversationType = (typeof conversationTypes)[number];
 
 export const communicationChannelTypes = [
