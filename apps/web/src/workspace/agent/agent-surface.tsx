@@ -8,7 +8,8 @@ import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { hasPermission } from "@/lib/permissions";
 import { useSessionUser } from "@/shell/use-session-user";
 import { useAgent } from "@/workspace/agent/use-agent";
-import { AGENT_HISTORY_PAGE_LIMIT, type AgentActionInput, type AgentThreadTurn, type ProposedAction } from "@/workspace/agent/agent-client";
+import { AGENT_HISTORY_PAGE_LIMIT, decodeAgentThreadTurn, type AgentActionInput, type AgentThreadTurn, type ProposedAction } from "@/workspace/agent/agent-client";
+import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import type { AgentChange, AgentMessage, AgentPhase } from "@/workspace/agent/agent-model";
 import { TERMINAL_STATUSES } from "@/workspace/agent/agent-model";
 import { AgentComposer } from "@/workspace/agent/ui/agent-composer";
@@ -105,10 +106,17 @@ export function AgentSurface() {
   // Optimistic-сообщения принимают серверные id из ответа propose (P1): последующая
   // гидрация (retry после degraded) дедупится по id и не дублирует ходы сессии.
   const adoptServerIds = (pairs: Array<[localId: string, serverId: string | undefined]>) =>
-    setMessages((m) => m.map((message) => {
-      const pair = pairs.find(([localId]) => localId === message.id);
-      return pair && pair[1] ? { ...message, id: pair[1] } : message;
-    }));
+    setMessages((m) => {
+      const existingIds = new Set(m.map((message) => message.id));
+      return m.flatMap((message) => {
+        const pair = pairs.find(([localId]) => localId === message.id);
+        if (!pair || !pair[1]) return [message];
+        // Серверная копия уже пришла по realtime — локальный optimistic убираем,
+        // иначе после adopt получились бы два сообщения с одним id.
+        if (existingIds.has(pair[1])) return [];
+        return [{ ...message, id: pair[1] }];
+      });
+    });
 
   // Проекты-якоря для вложений грузим один раз.
   useEffect(() => {
@@ -121,6 +129,9 @@ export function AgentSurface() {
   // (без controls: применить из истории нельзя — backend это честно не поддерживает).
   const threadTurnToMessage = (turn: AgentThreadTurn): AgentMessage => {
     const time = turn.createdAt ? formatMessageTime(new Date(turn.createdAt)) : "";
+    if (turn.role === "trace") {
+      return { id: turn.id, role: "trace", time, steps: turn.steps, ...(turn.failed ? { failed: true } : {}) };
+    }
     if (turn.role === "user") return { id: turn.id, role: "user", time, text: turn.body };
     let text = turn.body;
     const proposalActions = turn.proposal?.actions ?? [];
@@ -180,6 +191,21 @@ export function AgentSurface() {
     // Гидрация — строго один раз на монтирование live-поверхности.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live]);
+
+  // Realtime: ходы, записанные сервером (в т.ч. из другой вкладки), приходят тем же
+  // message.created, что и обычные беседы. Свои ходы текущего propose/apply покрыты
+  // optimistic-сообщениями + adopt серверных id — echo в полёте пропускаем.
+  useWorkspaceRealtime({
+    conversationId: thread?.id ?? null,
+    onMessage: (event) => {
+      if (applyInFlight.current || status === "proposing" || historyStatus === "loading") return;
+      const turn = decodeAgentThreadTurn(event.message);
+      if (!turn) return;
+      setMessages((current) =>
+        current.some((message) => message.id === turn.id) ? current : [...current, threadTurnToMessage(turn)]
+      );
+    }
+  });
 
   async function loadOlderTurns() {
     if (!thread || !olderCursor || loadingOlder) return;
@@ -243,10 +269,11 @@ export function AgentSurface() {
     }, attachmentIds, history, thread?.id);
     // Завершённый трейс остаётся в треде сообщением-ролью trace (история хода агента);
     // прерванный ошибкой ход помечается честно, а не зелёными галочками.
-    if (collectedSteps.length > 0) {
+    const localTraceId = collectedSteps.length > 0 ? `local-trace-${localMessageSeq.current++}` : null;
+    if (localTraceId) {
       setMessages((m) => [
         ...m,
-        { id: `trace-${m.length}`, role: "trace", time: now(), steps: collectedSteps, ...(res.ok ? {} : { failed: true }) }
+        { id: localTraceId, role: "trace", time: now(), steps: collectedSteps, ...(res.ok ? {} : { failed: true }) }
       ]);
     }
     setLiveSteps([]);
@@ -283,7 +310,11 @@ export function AgentSurface() {
     // Optimistic-ходы принимают серверные id (P1): дедупликация при повторной гидрации.
     if (data.messageIds) {
       if (data.threadId) setThread((current) => current ?? { id: data.threadId! });
-      adoptServerIds([[localUserId, data.messageIds[0]], [localAgentId, data.messageIds[1]]]);
+      adoptServerIds([
+        [localUserId, data.messageIds[0]],
+        [localAgentId, data.messageIds[1]],
+        ...(localTraceId && data.traceMessageId ? [[localTraceId, data.traceMessageId] as [string, string]] : [])
+      ]);
     }
     setPhase(newChanges.length ? "review-open" : "applied");
   }

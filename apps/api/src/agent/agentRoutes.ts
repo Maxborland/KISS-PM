@@ -14,11 +14,13 @@ import { createPlanningReadModel } from "../planning/planningReadModel";
 import { canReadPlanningReadModel } from "../planning/planningRouteAuth";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { canEditTaskFields, canParticipateInTaskActivity, canParticipantTransitionTask } from "../project-work/taskCommandGuards";
+import { emitMessageCreated } from "../workspaceEventBus";
 import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
 import {
   agentThreadConfigured,
   agentThreadId,
   appendAgentTurn,
+  capTraceSteps,
   ensureAgentThread,
   historyFromThreadMessages,
   proposalSnapshot,
@@ -697,36 +699,54 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   // (messageIds в ответе нет), fake persistence с клиента запрещена.
   type ProposePersistOutcome =
     | { kind: "provider_unavailable"; providerModel: string }
-    | { kind: "success"; result: Awaited<ReturnType<typeof runProposeLoop>> };
+    | { kind: "success"; result: Awaited<ReturnType<typeof runProposeLoop>>; traceSteps?: string[] };
   async function persistProposeTurns(
     request: ProposeRequest,
     outcome: ProposePersistOutcome
-  ): Promise<{ threadId: string; messageIds: string[] } | null> {
+  ): Promise<{ threadId: string; messageIds: string[]; traceMessageId?: string } | null> {
     if (!agentThreadConfigured(deps.dataSource)) return null;
     const conversation = await ensureAgentThread(deps.dataSource, request.actor);
+    // Каждый персистентный ход эмитится в канал беседы: вторая вкладка/подписчики
+    // видят живые сообщения тем же message.created, что и обычные беседы.
+    const persistTurn = async (body: string, agent: Parameters<typeof appendAgentTurn>[4], attachmentIds?: string[]) => {
+      const turn = await appendAgentTurn(deps.dataSource, request.actor, conversation.id, body, agent, attachmentIds);
+      emitMessageCreated(conversation.id, turn.serialized);
+      return turn.id;
+    };
     const messageIds: string[] = [];
-    messageIds.push(await appendAgentTurn(
-      deps.dataSource, request.actor, conversation.id, request.goal, { role: "user" }, request.attachmentIds
-    ));
+    let traceMessageId: string | undefined;
+    messageIds.push(await persistTurn(request.goal, { role: "user" }, request.attachmentIds));
     if (outcome.kind === "provider_unavailable") {
-      messageIds.push(await appendAgentTurn(
-        deps.dataSource, request.actor, conversation.id,
+      messageIds.push(await persistTurn(
         `LLM-провайдер не настроен (провайдер ${outcome.providerModel}) — задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY на сервере.`,
         { role: "agent", kind: "error" }
       ));
     } else {
       const result = outcome.result;
+      // Трейс — между репликой и ответом (как в live-виде): история хода агента
+      // переживает reload; в history для LLM трейс не попадает (см. agentThread).
+      if (outcome.traceSteps && outcome.traceSteps.length > 0) {
+        traceMessageId = await persistTurn(
+          `Ход агента: шагов ${outcome.traceSteps.length}.`,
+          { role: "trace", steps: capTraceSteps(outcome.traceSteps) }
+        );
+      }
       const bodyText = result.reasoning.trim().length > 0
         ? result.reasoning
         : result.proposedActions.length > 0
           ? `Предложений: ${result.proposedActions.length}.`
           : "Предложений нет.";
-      messageIds.push(await appendAgentTurn(
-        deps.dataSource, request.actor, conversation.id, bodyText,
-        { role: "agent", proposal: proposalSnapshot(result) }
-      ));
+      messageIds.push(await persistTurn(bodyText, { role: "agent", proposal: proposalSnapshot(result) }));
     }
-    return { threadId: conversation.id, messageIds };
+    return { threadId: conversation.id, messageIds, ...(traceMessageId ? { traceMessageId } : {}) };
+  }
+
+  // Серверная сборка меток трейса — тем же форматом, что live-лейблы клиента:
+  // персистентный трейс после reload выглядит как только что показанный.
+  function traceLabelFromEvent(event: AgentLoopEvent): string {
+    if (event.type === "analyze") return `Анализ: ${event.title}${event.ok ? "" : " (ошибка)"}`;
+    if (event.type === "proposal") return `Предложение: ${event.title}`;
+    return event.text.length > 80 ? `${event.text.slice(0, 80)}…` : event.text;
   }
 
   // Guarded-роут персистентного треда (P1): create-or-get приватного треда пользователя.
@@ -757,8 +777,11 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const slot = agentLlmConcurrency.tryAcquire(`${actor.tenantId}:${actor.id}`);
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     try {
-      const result = await runProposeLoop(parsed.value, runtime.provider);
-      const persisted = await persistProposeTurns(parsed.value, { kind: "success", result });
+      const traceSteps: string[] = [];
+      const result = await runProposeLoop(parsed.value, runtime.provider, (event) => {
+        traceSteps.push(traceLabelFromEvent(event));
+      });
+      const persisted = await persistProposeTurns(parsed.value, { kind: "success", result, traceSteps });
       return context.json({ ...result, ...(persisted ?? {}) });
     } finally {
       slot.release();
@@ -780,10 +803,12 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (!slot.ok) return context.json({ error: "agent_busy" }, 429);
     return streamSSE(context, async (stream) => {
       try {
+        const traceSteps: string[] = [];
         const result = await runProposeLoop(parsed.value, runtime.provider, async (event) => {
+          traceSteps.push(traceLabelFromEvent(event));
           await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
-        const persisted = await persistProposeTurns(parsed.value, { kind: "success", result });
+        const persisted = await persistProposeTurns(parsed.value, { kind: "success", result, traceSteps });
         await stream.writeSSE({ event: "done", data: JSON.stringify({ ...result, ...(persisted ?? {}) }) });
       } catch (error) {
         await stream.writeSSE({ event: "error", data: JSON.stringify({ error: error instanceof Error ? error.message : "agent_failed" }) });
@@ -1090,7 +1115,7 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     let persisted: { threadId: string; messageId: string } | null = null;
     if (agentThreadConfigured(deps.dataSource)) {
       const conversation = await ensureAgentThread(deps.dataSource, actor);
-      const messageId = await appendAgentTurn(
+      const turn = await appendAgentTurn(
         deps.dataSource, actor, conversation.id,
         `Результат: применено ${summary.applied}, отказано ${summary.denied}, конфликтов ${summary.conflict}, ошибок ${summary.failed}.`,
         {
@@ -1107,7 +1132,8 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           }))
         }
       );
-      persisted = { threadId: conversation.id, messageId };
+      emitMessageCreated(conversation.id, turn.serialized);
+      persisted = { threadId: conversation.id, messageId: turn.id };
     }
 
     return context.json({

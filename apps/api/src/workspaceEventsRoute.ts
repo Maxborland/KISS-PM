@@ -47,8 +47,9 @@ export function registerWorkspaceEventsRoute(app: Hono, deps: WorkspaceEventsRou
       }
       const conversation = await deps.dataSource.findConversation(actor.tenantId, conversationIdRaw);
       if (!conversation) return context.json({ error: "conversation_not_found" }, 404);
-      if (conversation.conversationType === "direct") {
-        // DM: доступ по членству (а не по правам на сущность).
+      if (conversation.conversationType === "direct" || conversation.conversationType === "agent") {
+        // DM и тред агента: доступ по членству (а не по правам на сущность) —
+        // generic entity-резолвер для 'agent' fail-closed и отдал бы 404.
         const member = deps.dataSource.isConversationMember
           ? await deps.dataSource.isConversationMember(actor.tenantId, conversation.id, actor.id)
           : false;

@@ -58,6 +58,10 @@ export async function ensureAgentThread(
   return conversation;
 }
 
+// Кап персистентного трейса: история хода — компактный след, не полный дамп.
+const TRACE_STEPS_CAP = 50;
+const TRACE_STEP_TEXT_CAP = 200;
+
 /** Типизированная agent-часть metadata персистентного хода. */
 export type AgentTurnMetadata =
   | { role: "user" }
@@ -72,8 +76,15 @@ export type AgentTurnMetadata =
         auditEventId?: string;
         planningAuditEventId?: string;
         planVersion?: number;
+        projectId?: string;
       }>;
-    };
+    }
+  /** Завершённый CoT-трейс хода: реальные SSE-шаги (анализ/рассуждение/предложение). */
+  | { role: "trace"; steps: string[]; failed?: boolean };
+
+export function capTraceSteps(steps: string[]): string[] {
+  return steps.slice(0, TRACE_STEPS_CAP).map((step) => capText(step, TRACE_STEP_TEXT_CAP));
+}
 
 export async function appendAgentTurn(
   dataSource: ApiTenantDataSource,
@@ -82,9 +93,9 @@ export async function appendAgentTurn(
   body: string,
   agent: AgentTurnMetadata,
   attachmentIds?: string[]
-): Promise<string> {
+): Promise<{ id: string; serialized: Record<string, unknown> }> {
   const id = `message-agent-turn-${randomUUID()}`;
-  await dataSource.createDiscussionMessage!({
+  const message = await dataSource.createDiscussionMessage!({
     id,
     tenantId: actor.tenantId,
     conversationId,
@@ -95,7 +106,16 @@ export async function appendAgentTurn(
       ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds: attachmentIds.slice(0, 20) } : {})
     }
   });
-  return id;
+  // Сериализация как у messages-роута (Date → ISO): один и тот же формат в
+  // гидрации и в realtime message.created — клиентский декодер общий.
+  const serialized: Record<string, unknown> = {
+    ...message,
+    createdAt: message.createdAt.toISOString(),
+    editedAt: message.editedAt?.toISOString() ?? null,
+    archivedAt: message.archivedAt?.toISOString() ?? null,
+    pinnedAt: message.pinnedAt?.toISOString() ?? null
+  };
+  return { id, serialized };
 }
 
 /**

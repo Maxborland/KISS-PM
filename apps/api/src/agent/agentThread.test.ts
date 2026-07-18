@@ -5,6 +5,7 @@ import type { Conversation } from "@kiss-pm/domain";
 
 import type { ApiTenantDataSource } from "../apiTypes";
 import { createApp } from "../app";
+import { conversationChannel, subscribeWorkspaceEvents } from "../workspaceEventBus";
 import type { LlmProvider } from "./llmProvider";
 import { setAgentLlmProviderOverride } from "./llmProvider";
 
@@ -209,11 +210,35 @@ describe("propose → персистентность треда", () => {
     expect(propose.status).toBe(200);
     expect(propose.body.threadId).toBe("agent-thread-user-agent");
     expect(propose.body.messageIds).toHaveLength(2);
-    const agentTurn = harness.messages[1]!;
+    // Порядок как в live-виде: user → trace (шаги хода) → ответ агента.
+    expect(harness.messages).toHaveLength(3);
+    const traceTurn = harness.messages[1]!;
+    const traceMeta = traceTurn.metadata.agent as { role: string; steps: string[] };
+    expect(traceMeta.role).toBe("trace");
+    expect(traceMeta.steps.length).toBeGreaterThan(0);
+    expect(propose.body.traceMessageId).toBe(traceTurn.id);
+    const agentTurn = harness.messages[2]!;
     const agentMeta = agentTurn.metadata.agent as { role: string; proposal: { actions: Array<{ tool: string; allowed: boolean }>; actionsTotal: number } };
     expect(agentMeta.role).toBe("agent");
     expect(agentMeta.proposal.actionsTotal).toBe(1);
     expect(agentMeta.proposal.actions[0]).toMatchObject({ tool: "comment_task" });
+  });
+
+  it("realtime: каждый персистентный ход эмитится message.created в канал треда", async () => {
+    setAgentLlmProviderOverride(liveTestProvider());
+    const harness = createHarness();
+    const received: Array<{ type: string; conversationId: string }> = [];
+    const unsubscribe = subscribeWorkspaceEvents(conversationChannel("agent-thread-user-agent"), (event) => {
+      if (event.type === "message.created") received.push({ type: event.type, conversationId: event.conversationId });
+    });
+    try {
+      await post(harness.app, "/api/workspace/agent/propose", { goal: "Зафиксируй статус" });
+    } finally {
+      unsubscribe();
+    }
+    // user + trace + ответ агента — все три хода видны подписчикам канала беседы.
+    expect(received).toHaveLength(3);
+    expect(received.every((event) => event.conversationId === "agent-thread-user-agent")).toBe(true);
   });
 
   it("отвергает чужой threadId (403 agent_thread_forbidden) до запуска LLM", async () => {

@@ -43,6 +43,7 @@ export type AgentProposeResponse = {
   // Отсутствуют честно, если collaboration-персистентность не сконфигурирована.
   threadId?: string;
   messageIds?: string[];
+  traceMessageId?: string;
 };
 
 // Персистентный тред агента (guarded GET /agent/thread + существующий messages-роут).
@@ -55,16 +56,20 @@ export type AgentThreadOutcome = {
   planVersion?: number;
   projectId?: string;
 };
-export type AgentThreadTurn = {
-  id: string;
-  createdAt: string;
-  body: string;
-  role: "user" | "agent";
-  kind?: "error" | "result";
-  proposal?: { actionsTotal?: number; actions?: Array<{ tool?: string; title?: string }> };
-  correlationId?: string;
-  outcomes?: AgentThreadOutcome[];
-};
+export type AgentThreadProposalSnapshot = { actionsTotal?: number; actions?: Array<{ tool?: string; title?: string }> };
+export type AgentThreadTurn =
+  | {
+      id: string;
+      createdAt: string;
+      body: string;
+      role: "user" | "agent";
+      kind?: "error" | "result";
+      proposal?: AgentThreadProposalSnapshot;
+      correlationId?: string;
+      outcomes?: AgentThreadOutcome[];
+    }
+  /** Персистентный CoT-трейс хода: шаги как в live-виде. */
+  | { id: string; createdAt: string; role: "trace"; steps: string[]; failed?: boolean };
 // rawCount — размер СЫРОГО окна сообщений (до фильтра agent-метки): по нему клиент
 // решает, есть ли более ранняя история (окно короче лимита = истории больше нет).
 export type AgentThreadHistoryPage = { turns: AgentThreadTurn[]; nextCursor: string | null; rawCount: number };
@@ -73,18 +78,30 @@ export const AGENT_HISTORY_PAGE_LIMIT = 30;
 
 // Ходы треда — только сообщения с metadata.agent (беседа agent-типа readonly для клиента,
 // но контракт не запрещает будущие системные сообщения — незнакомое пропускаем честно).
-function decodeThreadTurns(value: unknown): AgentThreadHistoryPage {
-  const record = (value && typeof value === "object" ? value : {}) as { messages?: unknown; nextCursor?: unknown };
-  const messages = Array.isArray(record.messages) ? record.messages : [];
-  const turns: AgentThreadTurn[] = [];
-  for (const raw of messages) {
-    const message = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-    const metadata = (message.metadata && typeof message.metadata === "object" ? message.metadata : {}) as { agent?: unknown };
-    const agent = (metadata.agent && typeof metadata.agent === "object" ? metadata.agent : null) as
-      | { role?: unknown; kind?: unknown; proposal?: unknown; correlationId?: unknown; outcomes?: unknown }
-      | null;
-    if (!agent || (agent.role !== "user" && agent.role !== "agent")) continue;
-    if (typeof message.id !== "string" || typeof message.body !== "string") continue;
+/** Декод одного персистентного сообщения треда (гидрация и realtime message.created). */
+export function decodeAgentThreadTurn(raw: unknown): AgentThreadTurn | null {
+  const message = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const metadata = (message.metadata && typeof message.metadata === "object" ? message.metadata : {}) as { agent?: unknown };
+  const agent = (metadata.agent && typeof metadata.agent === "object" ? metadata.agent : null) as
+    | { role?: unknown; kind?: unknown; proposal?: unknown; correlationId?: unknown; outcomes?: unknown; steps?: unknown; failed?: unknown }
+    | null;
+  if (!agent) return null;
+  if (typeof message.id !== "string") return null;
+  if (agent.role === "trace") {
+    const steps = Array.isArray(agent.steps)
+      ? agent.steps.filter((step): step is string => typeof step === "string")
+      : [];
+    if (steps.length === 0) return null;
+    return {
+      id: message.id,
+      createdAt: typeof message.createdAt === "string" ? message.createdAt : "",
+      role: "trace",
+      steps,
+      ...(agent.failed === true ? { failed: true } : {})
+    };
+  }
+  if (agent.role !== "user" && agent.role !== "agent") return null;
+  if (typeof message.body !== "string") return null;
     const outcomes = Array.isArray(agent.outcomes)
       ? agent.outcomes.flatMap((entry): AgentThreadOutcome[] => {
           const item = (entry && typeof entry === "object" ? entry : {}) as Record<string, unknown>;
@@ -99,17 +116,24 @@ function decodeThreadTurns(value: unknown): AgentThreadHistoryPage {
           }];
         })
       : undefined;
-    turns.push({
-      id: message.id,
-      createdAt: typeof message.createdAt === "string" ? message.createdAt : "",
-      body: message.body,
-      role: agent.role,
-      ...(agent.kind === "error" || agent.kind === "result" ? { kind: agent.kind } : {}),
-      ...(agent.proposal && typeof agent.proposal === "object" ? { proposal: agent.proposal as NonNullable<AgentThreadTurn["proposal"]> } : {}),
-      ...(typeof agent.correlationId === "string" ? { correlationId: agent.correlationId } : {}),
-      ...(outcomes && outcomes.length > 0 ? { outcomes } : {})
-    });
-  }
+  return {
+    id: message.id,
+    createdAt: typeof message.createdAt === "string" ? message.createdAt : "",
+    body: message.body,
+    role: agent.role,
+    ...(agent.kind === "error" || agent.kind === "result" ? { kind: agent.kind } : {}),
+    ...(agent.proposal && typeof agent.proposal === "object" ? { proposal: agent.proposal as AgentThreadProposalSnapshot } : {}),
+    ...(typeof agent.correlationId === "string" ? { correlationId: agent.correlationId } : {}),
+    ...(outcomes && outcomes.length > 0 ? { outcomes } : {})
+  };
+}
+
+function decodeThreadTurns(value: unknown): AgentThreadHistoryPage {
+  const record = (value && typeof value === "object" ? value : {}) as { messages?: unknown; nextCursor?: unknown };
+  const messages = Array.isArray(record.messages) ? record.messages : [];
+  const turns = messages
+    .map(decodeAgentThreadTurn)
+    .filter((turn): turn is AgentThreadTurn => turn !== null);
   return { turns, nextCursor: typeof record.nextCursor === "string" ? record.nextCursor : null, rawCount: messages.length };
 }
 
