@@ -131,26 +131,92 @@ export function createScriptedLlmProvider(): LlmProvider {
   return {
     model: "scripted-llm",
     createMessage(input) {
+      const has = (name: string) => input.tools.some((tool) => tool.name === name);
+      // Текущая цель — последнее строковое user-сообщение (tool_result тоже role=user,
+      // но с массивом блоков; история предыдущих ходов идёт раньше цели).
+      let currentGoal = "";
+      for (const message of input.messages) {
+        if (message.role === "user" && typeof message.content === "string") currentGoal = message.content;
+      }
+
+      type Overload = { projectId?: string; resourceId?: string; date?: string; overloadMinutes?: number; taskIds?: string[] };
+      type PreviewData = { projectId?: string; clientPlanVersion?: number; proposals?: Array<{ scenarioId?: string; profile?: string; conflictEffect?: string }> };
       let tasks: Array<{ id?: string; title?: string }> | null = null;
+      let overloads: Overload[] | null = null;
+      let previewData: PreviewData | null = null;
       let alreadyProposed = false;
       for (const message of input.messages) {
         if (!Array.isArray(message.content)) continue;
         for (const block of message.content) {
-          if (block.type === "tool_use" && block.name === "comment_task") alreadyProposed = true;
+          if (block.type === "tool_use" && (block.name === "comment_task" || block.name === "apply_resource_resolution")) alreadyProposed = true;
           if (block.type !== "tool_result") continue;
           try {
-            const parsed = JSON.parse(block.content) as { tasks?: unknown };
+            const parsed = JSON.parse(block.content) as { tasks?: unknown; overloads?: unknown; proposals?: unknown };
             if (Array.isArray(parsed.tasks)) tasks = parsed.tasks as Array<{ id?: string; title?: string }>;
+            if (Array.isArray(parsed.overloads)) overloads = parsed.overloads as Overload[];
+            if (Array.isArray(parsed.proposals)) previewData = parsed as PreviewData;
           } catch {
             /* ignore */
           }
         }
       }
-      const has = (name: string) => input.tools.some((tool) => tool.name === name);
 
       if (alreadyProposed) {
         return Promise.resolve({ stopReason: "end_turn", content: [{ type: "text", text: "Скриптованный агент: предложение готово, жду подтверждения." }] });
       }
+
+      // Сценарный флоу PM-as-code: перегруз → живой preview сценариев → предложение apply.
+      if (/перегру/i.test(currentGoal)) {
+        if (overloads === null && has("detect_resource_overloads")) {
+          return Promise.resolve({
+            stopReason: "tool_use",
+            content: [
+              { type: "text", text: "Скриптованный агент: ищу перегруженные ресурсы." },
+              { type: "tool_use", id: "scripted-o1", name: "detect_resource_overloads", input: {} }
+            ]
+          });
+        }
+        const target = (overloads ?? []).find((overload) => overload.projectId && overload.resourceId && overload.date);
+        if (!target) {
+          return Promise.resolve({ stopReason: "end_turn", content: [{ type: "text", text: "Скриптованный агент: перегрузок не найдено." }] });
+        }
+        if (previewData === null && has("preview_resource_resolution")) {
+          return Promise.resolve({
+            stopReason: "tool_use",
+            content: [{
+              type: "tool_use",
+              id: "scripted-o2",
+              name: "preview_resource_resolution",
+              input: {
+                projectId: target.projectId!,
+                target: { resourceId: target.resourceId!, date: target.date!, overloadMinutes: target.overloadMinutes ?? 0, taskIds: target.taskIds ?? [] }
+              }
+            }]
+          });
+        }
+        // Предпочитаем сценарий без принятия риска; aggressive — только с обоснованием.
+        const proposals = previewData?.proposals ?? [];
+        const chosen = proposals.find((proposal) => proposal.scenarioId && proposal.conflictEffect !== "accepted")
+          ?? proposals.find((proposal) => proposal.scenarioId);
+        if (chosen && previewData && has("apply_resource_resolution")) {
+          return Promise.resolve({
+            stopReason: "tool_use",
+            content: [{
+              type: "tool_use",
+              id: "scripted-o3",
+              name: "apply_resource_resolution",
+              input: {
+                projectId: previewData.projectId ?? target.projectId!,
+                scenarioId: chosen.scenarioId!,
+                ...(typeof previewData.clientPlanVersion === "number" ? { clientPlanVersion: previewData.clientPlanVersion } : {}),
+                ...(chosen.conflictEffect === "accepted" ? { acceptedRiskReason: "Скриптованный e2e: сохранить сроки, приняв перегруз" } : {})
+              }
+            }]
+          });
+        }
+        return Promise.resolve({ stopReason: "end_turn", content: [{ type: "text", text: "Скриптованный агент: применимых сценариев не найдено." }] });
+      }
+
       if (tasks === null && has("list_my_tasks")) {
         return Promise.resolve({
           stopReason: "tool_use",

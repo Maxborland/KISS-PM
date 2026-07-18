@@ -26,7 +26,7 @@ export type ProposedAction = {
   input: Record<string, unknown>;
   capability: AgentCapability;
   preview: { before: string; after: string };
-  preconditionVersions?: { taskUpdatedAt?: string };
+  preconditionVersions?: { taskUpdatedAt?: string; planVersion?: number };
 };
 export type AnalyzeResult = { tool: string; input: Record<string, unknown>; result: unknown };
 
@@ -193,7 +193,7 @@ function decodeExecuteResponse(value: unknown, actions: AgentActionInput[]): Age
 export type AgentActionInput = {
   tool: string;
   input: Record<string, unknown>;
-  preconditionVersions?: { taskUpdatedAt?: string };
+  preconditionVersions?: { taskUpdatedAt?: string; planVersion?: number };
 };
 
 export function createAgentClient(options: AgentApiClientOptions) {
