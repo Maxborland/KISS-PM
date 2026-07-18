@@ -39,6 +39,18 @@ export type WorkspaceError = {
 
 export type PreflightResult = { ok: true } | WorkspaceError;
 
+// Единый конверт конфликта optimistic-lock: currentVersions даёт клиенту версию
+// для честного refresh/retry. Использовать во ВСЕХ командах вместо литералов —
+// дрейф форм между PATCH и status-переходом уже случался (ревью #252).
+export function taskVersionConflict(updatedAt: Date): WorkspaceError {
+  return {
+    ok: false,
+    status: 409,
+    error: "task_version_conflict",
+    currentVersions: { taskUpdatedAt: updatedAt.toISOString() }
+  };
+}
+
 export type TaskResult =
   | { ok: true; task: TaskRecord; project?: ProjectRecord; planVersion?: number | null }
   | WorkspaceError;

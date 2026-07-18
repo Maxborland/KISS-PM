@@ -56,11 +56,6 @@ const previewScenarioProposals: Handler = async (context) => {
     return context.json({ error: "persistence_not_configured" }, 501);
   }
 
-  const body = await readLimitedJsonBody(context);
-  if (!body.ok) return context.json({ error: body.error }, body.status);
-  const parsed = parseScenarioPreviewEnvelope(body.value);
-  if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
   const profile = await deps.getActorProfile(actor);
   const decision = canPreviewPlanningScenarios({
     actor,
@@ -75,6 +70,13 @@ const previewScenarioProposals: Handler = async (context) => {
       permissionPreview: readDecision
     }, 403);
   }
+
+  // Тело — ПОСЛЕ RBAC (как planningRevertRoute): без прав нельзя пробником 400
+  // различать валидность формы тела до авторизации.
+  const body = await readLimitedJsonBody(context);
+  if (!body.ok) return context.json({ error: body.error }, body.status);
+  const parsed = parseScenarioPreviewEnvelope(body.value);
+  if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
   const projectId = parsedProjectId.value;
   const snapshot = await deps.dataSource.getPlanSnapshot(actor.tenantId, projectId);
@@ -159,20 +161,16 @@ const applyScenarioProposal: Handler = async (context) => {
     return context.json({ error: "persistence_not_configured" }, 501);
   }
 
-  const body = await readLimitedJsonBody(context);
-  if (!body.ok) return context.json({ error: body.error }, body.status);
-  const parsed = parseScenarioApplyEnvelope(body.value);
-  if (!parsed.ok) return context.json({ error: parsed.error }, 400);
-
   const profile = await deps.getActorProfile(actor);
   const decision = canApplyPlanningScenarios({
     actor,
     profile,
     targetTenantId: actor.tenantId
   });
+  // В denial-аудите нет clientPlanVersion: тело парсится только ПОСЛЕ RBAC —
+  // неавторизованный вызов получает аудируемый 403 без пробника формы тела.
   const scenarioDenyInput = {
-    scenarioRunId: parsedScenarioRunId.value,
-    clientPlanVersion: parsed.value.clientPlanVersion
+    scenarioRunId: parsedScenarioRunId.value
   };
   if (!decision.allowed) {
     return await denyPlanningAction(deps, context, {
@@ -193,6 +191,11 @@ const applyScenarioProposal: Handler = async (context) => {
       commandInput: scenarioDenyInput
     });
   }
+
+  const body = await readLimitedJsonBody(context);
+  if (!body.ok) return context.json({ error: body.error }, body.status);
+  const parsed = parseScenarioApplyEnvelope(body.value);
+  if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
   const result = await deps.runDataSourceTransaction(async (rawStore) => {
     const transactionDataSource = requireCapabilities(rawStore, [

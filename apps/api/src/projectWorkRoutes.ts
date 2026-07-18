@@ -212,7 +212,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
       // currentVersions при 409 — версия для честного refresh/retry клиента.
       return context.json({
         error: updateResult.error,
-        ...("currentVersions" in updateResult && updateResult.currentVersions ? { currentVersions: updateResult.currentVersions } : {})
+        ...(updateResult.currentVersions ? { currentVersions: updateResult.currentVersions } : {})
       }, updateResult.status);
     }
 
@@ -275,7 +275,7 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
         // Симметрично PATCH-задаче: 409 несёт currentVersions для refresh/retry.
         return context.json({
           error: transition.error,
-          ...("currentVersions" in transition && transition.currentVersions ? { currentVersions: transition.currentVersions } : {})
+          ...(transition.currentVersions ? { currentVersions: transition.currentVersions } : {})
         }, transition.status);
       }
       invalidateCapacityCacheForTenant(actor.tenantId);

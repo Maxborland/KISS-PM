@@ -1461,7 +1461,11 @@ describe("project work API routes", () => {
 
     expect(firstUpdate.status).toBe(200);
     expect(staleUpdate.status).toBe(409);
-    await expect(staleUpdate.json()).resolves.toEqual({ error: "task_version_conflict" });
+    await expect(staleUpdate.json()).resolves.toEqual({
+      error: "task_version_conflict",
+      // Честный optimistic-concurrency: 409 несёт актуальную версию для refresh/retry.
+      currentVersions: { taskUpdatedAt: expect.any(String) }
+    });
   });
 
   it("keeps concurrent duplicate task PATCH updates single-use", async () => {
@@ -1531,7 +1535,7 @@ describe("project work API routes", () => {
             title: "Конкурентное сохранение принято"
           })
         }),
-        { error: "task_version_conflict" }
+        expect.objectContaining({ error: "task_version_conflict" })
       ])
     );
 
@@ -1645,7 +1649,11 @@ describe("project work API routes", () => {
     });
 
     expect(staleUpdate.status).toBe(409);
-    await expect(staleUpdate.json()).resolves.toEqual({ error: "task_version_conflict" });
+    await expect(staleUpdate.json()).resolves.toEqual({
+      error: "task_version_conflict",
+      // Честный optimistic-concurrency: 409 несёт актуальную версию для refresh/retry.
+      currentVersions: { taskUpdatedAt: expect.any(String) }
+    });
     await expect(currentDetail.json()).resolves.toMatchObject({
       task: {
         participants: expect.arrayContaining([

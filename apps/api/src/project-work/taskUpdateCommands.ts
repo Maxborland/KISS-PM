@@ -9,7 +9,7 @@ import {
   getParticipantUserId,
   normalizeTaskParticipants
 } from "./taskCommandGuards";
-import type { TaskCommandWorkspaceDeps, TaskResult, UpdateTaskInput } from "./taskCommandTypes";
+import { taskVersionConflict, type TaskCommandWorkspaceDeps, type TaskResult, type UpdateTaskInput } from "./taskCommandTypes";
 
 export async function updateTask(
   deps: TaskCommandWorkspaceDeps,
@@ -74,6 +74,11 @@ export async function updateTask(
     if (!currentEditDecision.allowed) {
       return { ok: false as const, status: 403, error: currentEditDecision.reason };
     }
+    // Версия — сразу после загрузки задачи: на устаревший запрос не тратим
+    // снапшот плана, списки пользователей/статусов и сборку planning-команд.
+    if (currentTask.updatedAt.getTime() !== input.body.clientUpdatedAt.getTime()) {
+      return taskVersionConflict(currentTask.updatedAt);
+    }
     if (input.body.statusId !== currentTask.statusId) {
       return {
         ok: false as const,
@@ -113,16 +118,6 @@ export async function updateTask(
       snapshot,
       projectAssignments
     });
-    if (currentTask.updatedAt.getTime() !== input.body.clientUpdatedAt.getTime()) {
-      // Честный optimistic-concurrency: клиент получает актуальную версию для
-      // refresh/retry — как transitionTaskStatus (taskLifecycleCommands).
-      return {
-        ok: false as const,
-        status: 409,
-        error: "task_version_conflict",
-        currentVersions: { taskUpdatedAt: currentTask.updatedAt.toISOString() }
-      };
-    }
     const planningParticipantsChanged =
       !planningParticipantsSemanticallyEqual(currentTask.participants, participants) ||
       currentTask.ownerUserId !== ownerUserId;

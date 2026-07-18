@@ -1,8 +1,8 @@
 {
  "schemaVersion": 2,
- "generatedAt": "2026-07-18T18:23:26.622431+00:00",
+ "generatedAt": "2026-07-18T19:29:40.652135+00:00",
  "scope": "agent-first / PM-as-code (Блок 7, документация направления)",
- "journeyRun": "3 passed (agent-first-evidence, agent-journey-resume, agent-live-stream) — живой backend, без route-моков",
+ "journeyRun": "6 passed (agent-first-evidence, journey-resume, live-stream, scenario-commit, persona-journey x2) — живой backend, без route-моков; повторный прогон после ревью-фиксов",
  "matrix": [
   {
    "criterion": "S14-1 live SSE-стрим propose без моков",
@@ -52,12 +52,12 @@
  "uniqueScreenshotHashes": 5,
  "badArtifacts": 0,
  "artifactHashes": {
-  "01-agent-thread.png": "2DB7C697334A86959196244672BD7A2150D25C95DB4B76854501BA454F9A61E5",
-  "02-proposal-card.png": "9F08FD5EC33C7200DBE12181C4E6B8B6B17E781B3D67771FC810FEB72B328C16",
-  "03-receipt.png": "CE469A0E6B35E172219E8112B5994FEB179E649B45CF1CD962B9E8F8929C0FE3",
-  "04-commit-selected.png": "B50DD0626EE6D2F764D3004E4524C2F48CA0A45D1BBD5B05ED791B6E27EA9A6C",
-  "05-revert-applied.png": "D1370693C1B3303A36C66069DCA996ECF4946BB322B9FD749CC64972A0E78B38",
-  "execute-receipt.json": "47436A5D9C3B399F1638C2D40BC8A1FA0EAA0C39C5C1ED24EFE8595E926E0A38",
-  "journey-iab.json": "C27CCCAC7D0EF820AC23CA84F8BEB77BB325CE86EA58DB8550B9B3468DC77BF4"
+  "01-agent-thread.png": "C939D6CB0F13962B8FA72DD1362AB2904761F8DDAD0F7373F1A92A6F3FFD1DFA",
+  "02-proposal-card.png": "3A249861311D0799AB51CC5298B2D3993461258C90144F87A871742710C2CF16",
+  "03-receipt.png": "4AEF015657640F3DF74A7DDE90441750D97352AC63F6D0D25FC0D555110536F3",
+  "04-commit-selected.png": "C18BF0E06DD47BCA4751C723472D7142DC2601585A9522334DBED44DB32BCAF9",
+  "05-revert-applied.png": "6C1271415CE47E48B5188AD9500949906FB9885D49ED2132FFB96EF8C11AE66A",
+  "execute-receipt.json": "74AE0FB3A3D21324052FEECC3B6B00D9B5490D0E14D97D356CEE8439B05027F8",
+  "journey-iab.json": "F4DFA82E0F3F47E9041993ACE2DE3D2B9A677EBDF8DB1D2D7089113EC32292CB"
  }
 }

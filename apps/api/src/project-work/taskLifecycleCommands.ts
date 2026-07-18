@@ -14,12 +14,7 @@ import {
   getActorTaskParticipantRole,
   isTaskStatusTransitionAllowed
 } from "./taskCommandGuards";
-import type {
-  ArchiveTaskInput,
-  TaskCommandWorkspaceDeps,
-  TaskResult,
-  TransitionTaskStatusInput
-} from "./taskCommandTypes";
+import { taskVersionConflict, type ArchiveTaskInput, type TaskCommandWorkspaceDeps, type TaskResult, type TransitionTaskStatusInput } from "./taskCommandTypes";
 
 export async function archiveTask(
   deps: TaskCommandWorkspaceDeps,
@@ -177,12 +172,7 @@ export async function transitionTaskStatus(
     }
 
     if (input.clientUpdatedAt && task.updatedAt.getTime() !== input.clientUpdatedAt.getTime()) {
-      return {
-        ok: false as const,
-        status: 409,
-        error: "task_version_conflict",
-        currentVersions: { taskUpdatedAt: task.updatedAt.toISOString() }
-      };
+      return taskVersionConflict(task.updatedAt);
     }
 
     if (!isTaskStatusTransitionAllowed(task.status, targetStatus.category)) {

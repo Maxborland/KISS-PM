@@ -114,7 +114,16 @@ export function parseCreateTaskBody(input: unknown): CreateTaskParseResult {
     return { ok: false, error: "invalid_task_dates" };
   }
 
-  const durationWorkingDays = getIntegerField(input, "durationWorkingDays") ?? 1;
+  // Присутствующее, но невалидное значение (дробь, строка) — честная ошибка, а не
+  // молчаливый дефолт в 1: иначе клиент получает success с НЕ тем, что отправил.
+  const durationProvided =
+    input !== null && typeof input === "object" && "durationWorkingDays" in input &&
+    (input as Record<string, unknown>).durationWorkingDays !== undefined;
+  const durationField = getIntegerField(input, "durationWorkingDays");
+  if (durationProvided && durationField === null) {
+    return { ok: false, error: "invalid_task_duration" };
+  }
+  const durationWorkingDays = durationField ?? 1;
   if (durationWorkingDays < 1 || durationWorkingDays > 1000) {
     return { ok: false, error: "invalid_task_duration" };
   }
