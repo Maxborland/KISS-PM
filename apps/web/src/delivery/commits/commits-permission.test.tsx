@@ -53,6 +53,16 @@ const readModel = {
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
+// Deep-link ?commit=: useSearchParams читается из адреса happy-dom, а очистка параметра
+// фиксируется в clearedParams (реальный useUrlPeekParamCleaner тянет Next-роутер).
+const clearedParams: string[] = [];
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(window.location.search)
+}));
+vi.mock("@/workspace/lib/url-peek", () => ({
+  useUrlPeekParamCleaner: (param: string) => () => { clearedParams.push(param); }
+}));
+
 vi.mock("@/shell/use-session-user", () => ({
   useSessionUser: () => ({ id: "user", name: "Test User", permissions })
 }));
@@ -265,6 +275,46 @@ describe("commit permission controls", () => {
     await act(async () => rendered.root.unmount());
   });
 
+});
+
+describe("commit deep link ?commit=", () => {
+  beforeEach(() => {
+    permissions = ["tenant.project_plan.read"];
+    clearedParams.length = 0;
+    window.history.replaceState(null, "", "/projects/project/commits");
+    loadCommits.mockReset();
+    loadCommits.mockImplementation(async () => ({
+      commits: [
+        { auditEventId: "audit-new", actionType: "planning.task.updated", version: 5, at: "2026-07-10T05:00:00.000Z", summary: "Новая версия", changedTaskIds: [], revertible: false },
+        { auditEventId: "audit-old", actionType: "planning.task.updated", version: 4, at: "2026-07-10T04:00:00.000Z", summary: "Старая версия", changedTaskIds: [], revertible: false }
+      ],
+      latestRevert: null
+    }));
+  });
+
+  it("selects the commit from the URL instead of the default first row", async () => {
+    window.history.replaceState(null, "", "/projects/project/commits?commit=audit-old");
+
+    const rendered = await renderCommits();
+    const rows = [...rendered.host.querySelectorAll<HTMLButtonElement>('[data-testid="commit-row"]')];
+    expect(rows.find((row) => row.dataset.auditEventId === "audit-old")?.getAttribute("aria-pressed")).toBe("true");
+    expect(rows.find((row) => row.dataset.auditEventId === "audit-new")?.getAttribute("aria-pressed")).toBe("false");
+    expect(clearedParams).toEqual([]);
+    await act(async () => rendered.root.unmount());
+  });
+
+  it("honestly clears an unknown commit param and reports it instead of a silent default", async () => {
+    const { toast } = await import("sonner");
+    window.history.replaceState(null, "", "/projects/project/commits?commit=audit-missing");
+
+    const rendered = await renderCommits();
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith("Коммит не найден в истории плана");
+    expect(clearedParams).toEqual(["commit"]);
+    // после честного отказа остаётся дефолтный выбор первого коммита
+    const rows = [...rendered.host.querySelectorAll<HTMLButtonElement>('[data-testid="commit-row"]')];
+    expect(rows[0]?.getAttribute("aria-pressed")).toBe("true");
+    await act(async () => rendered.root.unmount());
+  });
 });
 
 function deferred<T>() {

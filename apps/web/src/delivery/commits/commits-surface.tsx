@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { GitCommitVertical, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+
+import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
 
 import { Button } from "@/components/ui/button";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -158,6 +161,9 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
   };
   return (
     <DeliveryFrame project={projectMeta} projectId={projectId} activeTab="Коммиты">
+      {/* Резолв deep-link ?commit= — только в ready-ветке (useSearchParams вне её
+          заставил бы Next требовать Suspense-границу при prerender, см. deals-surface). */}
+      <CommitDeepLinkResolver commits={commits} setSel={setSel} />
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Коммиты плана</h2>
@@ -243,4 +249,35 @@ export function ProjectCommits({ projectId = MOCK_PROJECT_ID }: { projectId?: st
 
     </DeliveryFrame>
   );
+}
+
+/**
+ * Deep-link `?commit=<auditEventId>`: выбирает запись в ленте (приоритет над дефолтным
+ * выбором первого коммита). Лента ограничена серверным окном истории — коммит вне окна
+ * или с чужим/несуществующим id честно снимает параметр replace-ом и сообщает toast'ом,
+ * а не показывает молчаливую пустоту. Каждое значение параметра резолвится один раз:
+ * ручной выбор другого коммита при открытой странице не перетирается обратно.
+ */
+function CommitDeepLinkResolver({ commits, setSel }: { commits: CommitMetaView[]; setSel: (id: string) => void }) {
+  // В Next это App Router-параметры; в Storybook хук отдаёт null — тогда
+  // читаем window.location.search (fallback как в useUrlPeek).
+  const searchParams = useSearchParams();
+  const clearCommitParam = useUrlPeekParamCleaner("commit");
+  const resolvedCommitParamRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const search = searchParams ? searchParams.toString() : window.location.search;
+    const commitParam = new URLSearchParams(search).get("commit");
+    if (resolvedCommitParamRef.current === commitParam) return;
+    resolvedCommitParamRef.current = commitParam;
+    if (!commitParam) return;
+    if (commits.some((commit) => commit.auditEventId === commitParam)) {
+      setSel(commitParam);
+      return;
+    }
+    clearCommitParam();
+    toast.error("Коммит не найден в истории плана");
+  }, [clearCommitParam, commits, searchParams, setSel]);
+
+  return null;
 }

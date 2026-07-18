@@ -278,7 +278,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           {/* формулировка сознательно отличается от toast («Сценарий … применён»): e2e ловит текст тоста substring-регекспом */}
           <span>Применён сценарий «{lastApplied.label}» — коммит v{lastApplied.planVersion}.</span>
           <span className="mono text-[length:var(--text-2xs)] text-[var(--muted-strong)]">{lastApplied.auditEventId}</span>
-          <Link href={`/projects/${encodeURIComponent(projectId)}/commits`} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">Открыть в Коммитах</Link>
+          <Link href={`/projects/${encodeURIComponent(projectId)}/commits?commit=${encodeURIComponent(lastApplied.auditEventId)}`} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">Открыть в Коммитах</Link>
         </div>
       ) : null}
 
