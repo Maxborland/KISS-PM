@@ -193,12 +193,13 @@ export function AgentSurface() {
   }, [live]);
 
   // Realtime: ходы, записанные сервером (в т.ч. из другой вкладки), приходят тем же
-  // message.created, что и обычные беседы. Свои ходы текущего propose/apply покрыты
-  // optimistic-сообщениями + adopt серверных id — echo в полёте пропускаем.
+  // message.created, что и у обычных бесед. Никакого гарда «в полёте» (ревью #251:
+  // он ронял бы чужие ходы во время нашего propose) — дубли закрывает дедупликация
+  // по id: echo своих ходов принимается первым, а adoptServerIds после ответа
+  // propose убирает локальный optimistic, если серверная копия уже в треде.
   useWorkspaceRealtime({
     conversationId: thread?.id ?? null,
     onMessage: (event) => {
-      if (applyInFlight.current || status === "proposing" || historyStatus === "loading") return;
       const turn = decodeAgentThreadTurn(event.message);
       if (!turn) return;
       setMessages((current) =>
