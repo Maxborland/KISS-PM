@@ -121,7 +121,7 @@ export function createMockAgentFetch(): typeof fetch {
       });
       const summary = results.reduce(
         (counts, result) => ({ ...counts, [result.status]: counts[result.status] + 1 }),
-        { applied: 0, skipped: 0, denied: 0, conflict: 0, failed: 0 }
+        { applied: 0, denied: 0, conflict: 0, failed: 0 }
       );
       return json({ results, applied: summary.applied > 0, summary });
     }

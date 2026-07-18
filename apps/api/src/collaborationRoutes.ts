@@ -217,7 +217,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const auth = await authenticateRoute(context, deps);
     if (!auth.ok) return auth.response;
     const { actor } = auth.value;
-    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps, "write");
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const body = await readLimitedJsonBody(context);
     if (!body.ok) return context.json({ error: body.error }, body.status);
@@ -321,7 +321,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const auth = await authenticateRoute(context, deps);
     if (!auth.ok) return auth.response;
     const { actor } = auth.value;
-    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps, "write");
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const message = await deps.dataSource.findDiscussionMessage?.(
       actor.tenantId,
@@ -359,7 +359,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const auth = await authenticateRoute(context, deps);
     if (!auth.ok) return auth.response;
     const { actor } = auth.value;
-    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps, "write");
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const message = await deps.dataSource.findDiscussionMessage?.(
       actor.tenantId,
@@ -394,7 +394,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const auth = await authenticateRoute(context, deps);
     if (!auth.ok) return auth.response;
     const { actor } = auth.value;
-    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps, "write");
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const message = await deps.dataSource.findDiscussionMessage?.(
       actor.tenantId,
@@ -449,7 +449,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const auth = await authenticateRoute(context, deps);
     if (!auth.ok) return auth.response;
     const { actor } = auth.value;
-    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps, "write");
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     if (!conversation.value.access.manageDecision.allowed) {
       await appendDeniedAudit(deps, {
@@ -499,7 +499,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const auth = await authenticateRoute(context, deps);
     if (!auth.ok) return auth.response;
     const { actor } = auth.value;
-    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps, "write");
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     if (!conversation.value.access.manageDecision.allowed) {
       await appendDeniedAudit(deps, {
@@ -547,7 +547,7 @@ export function registerCollaborationRoutes(app: Hono, deps: CollaborationRouteD
     const auth = await authenticateRoute(context, deps);
     if (!auth.ok) return auth.response;
     const { actor } = auth.value;
-    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps);
+    const conversation = await resolveConversationForActor(context.req.param("conversationId"), actor, deps, "write");
     if (!conversation.ok) return context.json({ error: conversation.error }, conversation.status);
     const message = await deps.dataSource.findDiscussionMessage?.(
       actor.tenantId,
@@ -1266,7 +1266,10 @@ function parseEntityQuery(entityType: unknown, entityId: unknown) {
 async function resolveConversationForActor(
   conversationIdRaw: string,
   actor: TenantUser,
-  deps: CollaborationRouteDeps
+  deps: CollaborationRouteDeps,
+  // Намерение вызывающего роута: mutation-роуты передают "write", чтобы тред агента
+  // оставался readonly для клиента (единственный писатель agent-семантики — сервер).
+  intent: "read" | "write" = "read"
 ): Promise<
   | { ok: true; value: { conversation: Conversation; access: CollaborationEntityAccessContext } }
   | { ok: false; status: 400 | 403 | 404 | 501; error: string }
@@ -1275,13 +1278,16 @@ async function resolveConversationForActor(
   if (!conversationId.ok) return { ok: false, status: 400, error: conversationId.error };
   const conversation = await deps.dataSource.findConversation?.(actor.tenantId, conversationId.value);
   if (!conversation) return { ok: false, status: 404, error: "conversation_not_found" };
-  // DM: доступ по членству (а не по правам на сущность). Синтезируем access-контекст.
-  if (conversation.conversationType === "direct") {
+  // DM и тред агента: доступ по членству (а не по правам на сущность). Синтезируем access-контекст.
+  if (conversation.conversationType === "direct" || conversation.conversationType === "agent") {
     const member = deps.dataSource.isConversationMember
       ? await deps.dataSource.isConversationMember(actor.tenantId, conversation.id, actor.id)
       : false;
     if (!member) return { ok: false, status: 403, error: "conversation_forbidden" };
-    return { ok: true, value: { conversation, access: directAccessContext(conversation) } };
+    if (conversation.conversationType === "agent" && intent === "write") {
+      return { ok: false, status: 403, error: "agent_conversation_readonly" };
+    }
+    return { ok: true, value: { conversation, access: memberAccessContext(conversation) } };
   }
   const profile = await deps.getActorProfile(actor);
   const access = await resolveCollaborationEntityAccess({
@@ -1613,16 +1619,21 @@ function routeForEntity(entity: CollaborationEntityAccessContext) {
   if (entity.entityType === "contact") return `/contacts/${entity.entityId}`;
   if (entity.entityType === "product") return `/products/${entity.entityId}`;
   if (entity.entityType === "direct") return `/communications/chat?conversationId=${entity.entityId}`;
+  if (entity.entityType === "agent") return "/agent";
   return `/communication-channels/${entity.entityId}`;
 }
 
-// Синтез access-контекста для DM-беседы: доступ уже подтверждён членством.
-function directAccessContext(conversation: Conversation): CollaborationEntityAccessContext {
+// Синтез access-контекста для membership-scoped беседы (DM или тред агента):
+// доступ уже подтверждён членством.
+function memberAccessContext(conversation: Conversation): CollaborationEntityAccessContext {
   const allowed = { allowed: true as const, reason: "same_tenant_permission_granted" as const };
   return {
-    entityType: "direct",
+    entityType: conversation.entityType,
     entityId: conversation.entityId,
-    sourceEntity: { type: "DirectMessage", id: conversation.id },
+    sourceEntity: {
+      type: conversation.conversationType === "agent" ? "AgentThread" : "DirectMessage",
+      id: conversation.id
+    },
     readDecision: allowed,
     manageDecision: allowed,
     title: conversation.title

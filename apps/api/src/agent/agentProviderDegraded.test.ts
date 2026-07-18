@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { ApiTenantDataSource } from "../apiTypes";
@@ -43,6 +47,41 @@ async function post(app: ReturnType<typeof createApp>, path: string, body: unkno
   const raw = await res.text();
   return { status: res.status, body: raw ? JSON.parse(raw) as Record<string, unknown> : {} };
 }
+
+describe("agent provider gates (scripted/demo only behind test hooks)", () => {
+  it("keeps the demo provider fail-closed without KISS_PM_E2E_TEST_HOOKS", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("KISS_PM_AGENT_PROVIDER", "");
+    vi.stubEnv("KISS_PM_AGENT_DEMO", "true");
+    vi.stubEnv("KISS_PM_E2E_TEST_HOOKS", "");
+    const app = createHarness();
+
+    // Раньше KISS_PM_AGENT_DEMO=true включал фейкового агента с configured=true на
+    // любой инсталляции — теперь без test-hooks канал честно остаётся mock (503).
+    const tools = await app.request("/api/workspace/agent/tools", { headers: { cookie: COOKIE } });
+    await expect(tools.json()).resolves.toMatchObject({ provider: { model: "mock-llm", configured: false } });
+  });
+
+  it("enables the scripted provider only behind the double env gate and reports it as non-live", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    vi.stubEnv("KISS_PM_AGENT_PROVIDER", "");
+    vi.stubEnv("KISS_PM_AGENT_DEMO", "");
+    vi.stubEnv("KISS_PM_AGENT_SCRIPTED", "1");
+    vi.stubEnv("KISS_PM_E2E_TEST_HOOKS", "");
+    const app = createHarness();
+
+    // Одного KISS_PM_AGENT_SCRIPTED недостаточно — без test-hooks остаётся mock.
+    const withoutHooks = await app.request("/api/workspace/agent/tools", { headers: { cookie: COOKIE } });
+    await expect(withoutHooks.json()).resolves.toMatchObject({ provider: { model: "mock-llm", configured: false } });
+
+    vi.stubEnv("KISS_PM_E2E_TEST_HOOKS", "1");
+    const withHooks = await app.request("/api/workspace/agent/tools", { headers: { cookie: COOKIE } });
+    // configured=true (канал работает), live=false (это не настоящий LLM — UI покажет деградацию).
+    await expect(withHooks.json()).resolves.toMatchObject({ provider: { model: "scripted-llm", live: false, configured: true } });
+  });
+});
 
 describe("agent provider degraded mode", () => {
   it("reports degraded provider status without allowing a silent mock proposal success", async () => {

@@ -86,6 +86,56 @@ describe("entity access module", () => {
       expect(result.value.manageDecision.allowed).toBe(false);
     }
   });
+
+  it("fail-closed: refuses generic entity access for the 'agent' thread type even when entityId collides with a task", async () => {
+    const actor = createTenantUser({
+      id: "user-alpha-admin",
+      tenantId: "tenant-alpha",
+      name: "Анна",
+      accessProfileId: "profile-admin"
+    });
+    // findTaskById отвечает записью: без явной ветки 'agent' fall-through
+    // отрезолвил бы тред агента как task-контекст по чужому entityId.
+    const dataSource = ensureCompleteDataSource({
+      findTaskById: async () => ({
+        actualWork: 0,
+        archivedAt: null,
+        createdAt: new Date("2026-05-01T00:00:00.000Z"),
+        description: null,
+        durationWorkingDays: 1,
+        id: "task-alpha",
+        ownerUserId: actor.id,
+        participants: [{ role: "executor", userId: actor.id }],
+        plannedFinish: new Date("2026-05-02T00:00:00.000Z"),
+        plannedStart: new Date("2026-05-01T00:00:00.000Z"),
+        plannedWork: 8,
+        priority: "normal",
+        progress: 0,
+        projectId: "project-alpha",
+        requesterUserId: actor.id,
+        requiresAcceptance: false,
+        source: "manual",
+        stageId: null,
+        status: "new",
+        statusCategory: "new",
+        statusId: "task-status-todo",
+        statusName: "К выполнению",
+        tenantId: actor.tenantId,
+        title: "Интервью заказчика",
+        updatedAt: new Date("2026-05-01T00:00:00.000Z")
+      })
+    });
+
+    const result = await resolveEntityAccessContext({
+      actor,
+      dataSource,
+      entityId: "task-alpha",
+      entityType: "agent",
+      profile: tenantAdminProfile
+    });
+
+    expect(result).toEqual({ ok: false, status: 404, error: "entity_not_found" });
+  });
 });
 
 const projectRecord: ProjectRecord = {

@@ -54,10 +54,14 @@ describe("agent attachments", () => {
     } as unknown as ApiApp;
 
     const result = await resolveAttachments(app, "kiss_pm_session=x", ["text-1", "bin-1", "missing"]);
-    expect(result).toHaveLength(2); // missing (404) пропущен
+    expect(result).toHaveLength(3);
     expect(result[0]).toEqual({ name: "spec.md", content: "содержимое спеки" });
     expect(result[1]!.name).toBe("pic.png");
     expect(result[1]!.content).toContain("нетекстовый файл"); // бинарь не извлекаем, но помечаем
+    // Недоступное вложение (404/RBAC) не пропадает молча: честный маркер вместо
+    // решения по неполному контексту без ведома пользователя.
+    expect(result[2]!.name).toBe("missing");
+    expect(result[2]!.content).toContain("вложение недоступно: HTTP 404");
   });
 
   it("имя с литеральным % не роняет батч (review #3); крупный файл обрезается (review #5)", async () => {

@@ -32,17 +32,29 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] }
     }
   ],
+  // Кросс-платформенный webServer: env-переменные задаются нативной опцией `env`
+  // (прежняя powershell-обёртка привязывала запуск e2e к Windows).
   webServer: [
     {
-      command: `powershell -NoProfile -Command "$env:DATABASE_URL='${databaseUrl}'; $env:PORT='${apiPort}'; $env:KISS_PM_E2E_TEST_HOOKS='1'; $env:KISS_PM_TRUSTED_MUTATION_ORIGINS='${webOrigin}'; pnpm --dir '${configDir}' --filter @kiss-pm/api dev"`,
+      command: `pnpm --dir "${configDir}" --filter @kiss-pm/api dev`,
       cwd: configDir,
+      env: {
+        DATABASE_URL: databaseUrl,
+        PORT: apiPort,
+        KISS_PM_E2E_TEST_HOOKS: "1",
+        // Детерминированный LLM-провайдер для живого SSE-пути (двойной гейт с test-hooks);
+        // спеки, мокающие /propose/stream на границе HTTP, от него не зависят.
+        KISS_PM_AGENT_SCRIPTED: "1",
+        KISS_PM_TRUSTED_MUTATION_ORIGINS: webOrigin
+      },
       url: `${apiOrigin}/health`,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000
     },
     {
-      command: `powershell -NoProfile -Command "$env:KISS_PM_API_ORIGIN='${apiOrigin}'; pnpm --dir '${configDir}' --filter @kiss-pm/web exec next dev -H 127.0.0.1 -p ${webPort}"`,
+      command: `pnpm --dir "${configDir}" --filter @kiss-pm/web exec next dev -H 127.0.0.1 -p ${webPort}`,
       cwd: configDir,
+      env: { KISS_PM_API_ORIGIN: apiOrigin },
       url: webOrigin,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000

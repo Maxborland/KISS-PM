@@ -145,9 +145,9 @@ export const conversations = pgTable(
     ),
     check(
       "conversations_entity_type_chk",
-      sql`${table.entityType} in ('project', 'task', 'opportunity', 'client', 'contact', 'product', 'communication_channel', 'direct')`
+      sql`${table.entityType} in ('project', 'task', 'opportunity', 'client', 'contact', 'product', 'communication_channel', 'direct', 'agent')`
     ),
-    check("conversations_type_chk", sql`${table.conversationType} in ('default', 'meeting_followup', 'direct')`)
+    check("conversations_type_chk", sql`${table.conversationType} in ('default', 'meeting_followup', 'direct', 'agent')`)
   ]
 );
 
