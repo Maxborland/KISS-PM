@@ -45,6 +45,7 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
   const appliedCommandTypes: string[] = [];
   const auditActionTypes: string[] = [];
   const auditEvents: AuditEventRecordInput[] = [];
+  const updateTaskInputs: Array<Record<string, unknown>> = [];
   const taskUpdatedAt = new Date("2026-06-01T10:00:00.000Z");
   const task: TaskRecord = {
     id: "task-a",
@@ -90,7 +91,8 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
     "tenant.project_resources.read",
     "tenant.project_resources.manage",
     "tenant.planning_scenarios.preview",
-    "tenant.planning_scenarios.apply"
+    "tenant.planning_scenarios.apply",
+    "tenant.tasks.edit"
   ];
 
   const dataSource: Partial<ApiTenantDataSource> = {
@@ -102,11 +104,10 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
     async findAccessProfileById() { return { id: "p", permissions }; },
     async listUsersByTenantId() { return []; },
     async listWorkspaceUsers() {
-      return [{
-        id: "res-1",
+      // user-planner — активный участник задач (валидация участников в update-команде
+      // сверяется с этим списком), res-1 — ресурс планирования.
+      const base = {
         tenantId: "tenant-1",
-        name: "Ресурс",
-        email: "resource@kiss-pm.local",
         accessProfileId: "p",
         positionId: null,
         positionName: null,
@@ -115,7 +116,11 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
         status: "active",
         theme: "system",
         accentColor: "blue"
-      }];
+      };
+      return [
+        { ...base, id: "res-1", name: "Ресурс", email: "resource@kiss-pm.local" },
+        { ...base, id: "user-planner", name: "Планировщик", email: "planner@kiss-pm.local" }
+      ];
     },
     async findSessionByTokenHash() {
       return { id: "s", tenantId: "tenant-1", userId: "user-planner", tokenHash: "ignored", expiresAt: new Date("2099-01-01T00:00:00.000Z") };
@@ -143,12 +148,17 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
       snapshot = reducePlanningCommand(snapshot, command).nextSnapshot;
     },
     async incrementPlanVersion() { snapshot = { ...snapshot, planVersion: snapshot.planVersion + 1 }; return snapshot.planVersion; },
+    async listProjectTaskAssignments() { return []; },
+    async updateTaskMetadata(input) {
+      updateTaskInputs.push(input as Record<string, unknown>);
+      return { ...task, title: (input as { title?: string }).title ?? task.title, updatedAt: new Date("2026-06-01T11:00:00.000Z") };
+    },
     ...(options.auditPersistence === false
       ? {}
       : { async appendAuditEvent(input: AuditEventRecordInput) { auditActionTypes.push(input.actionType); auditEvents.push(input); } })
   };
 
-  return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), dataSource: dataSource as ApiTenantDataSource, task, appliedCommandTypes, auditActionTypes, auditEvents, get planVersion() { return snapshot.planVersion; } };
+  return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), dataSource: dataSource as ApiTenantDataSource, task, appliedCommandTypes, auditActionTypes, auditEvents, updateTaskInputs, get planVersion() { return snapshot.planVersion; } };
 }
 
 async function post(app: ReturnType<typeof createApp>, path: string, body: unknown) {
@@ -575,9 +585,9 @@ describe("agent apply truth contract", () => {
     // D2/D3: create_task и apply_resource_resolution получили payload-backed карточки.
     expect(isAgentToolOfferable(byName.get("create_task")!)).toBe(true);
     expect(isAgentToolOfferable(byName.get("apply_resource_resolution")!)).toBe(true);
+    expect(isAgentToolOfferable(byName.get("update_task")!)).toBe(true);
     expect(isAgentToolOfferable(byName.get("create_crm_client")!)).toBe(false);
     expect(isAgentToolOfferable(byName.get("apply_plan_commands")!)).toBe(false);
-    expect(isAgentToolOfferable(byName.get("update_task")!)).toBe(false);
   });
 });
 
@@ -678,6 +688,67 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
     );
     expect(metadata.capability).toEqual({ allowed: false, reason: "scenario_not_found" });
     expect(metadata.preview.before).toContain("не найден");
+  });
+
+  it("update_task: карточка показывает field-level diff и версию задачи в preconditions", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, plannerActor, plannerProfile,
+      { tool: "update_task", input: { taskId: "task-a", fields: { title: "Новое название", priority: "high" } } }
+    );
+    expect(metadata.title).toContain("Изменить задачу: «A»");
+    expect(metadata.preview.after).toContain("название: A → Новое название");
+    expect(metadata.preview.after).toContain("приоритет: normal → high");
+    expect(metadata.preconditionVersions).toEqual({ taskUpdatedAt: "2026-06-01T10:00:00.000Z" });
+  });
+
+  it("update_task: execute мёржит частичные поля и СОХРАНЯЕТ участников и статус", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { title: "Обновлённая смета" } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+
+    expect(execute.status).toBe(200);
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]!.error).toBeUndefined();
+    expect((execute.body.results as Array<{ status: string }>)[0]).toMatchObject({ status: "applied" });
+    // Метаданные (участники/приоритет) идут через updateTaskMetadata — участники
+    // НЕ затёрты, незатронутый приоритет пришёл из текущего состояния.
+    expect(harness.updateTaskInputs).toHaveLength(1);
+    const patched = harness.updateTaskInputs[0]!;
+    // Исходный executor сохранён (команда штатно дополняет постановщика).
+    expect(patched.participants).toEqual(expect.arrayContaining([{ userId: "user-planner", role: "executor" }]));
+    expect(patched.priority).toBe("normal");
+    // Название/расписание уходят planning-командой в governed apply.
+    expect(harness.appliedCommandTypes).toContain("task.update_identity");
+  });
+
+  it("update_task: без preconditionVersions.taskUpdatedAt — fail-closed 400", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "update_task", input: { taskId: "task-a", fields: { title: "Без версии" } } }]
+    });
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
+      status: "failed",
+      error: "missing_precondition_versions"
+    });
+    expect(harness.updateTaskInputs).toHaveLength(0);
+  });
+
+  it("update_task: неизвестное поле отвергается, а не игнорируется молча", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { participants: [] } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((execute.body.results as Array<{ error?: string }>)[0]!.error).toBe("unsupported_update_field");
+    expect(harness.updateTaskInputs).toHaveLength(0);
   });
 
   it("execute принимает planVersion из preconditionVersions карточки (без серверной подстановки)", async () => {

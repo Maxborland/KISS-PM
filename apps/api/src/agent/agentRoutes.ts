@@ -55,7 +55,11 @@ const EXECUTABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "cre
 // create_task и apply_resource_resolution стали offerable после появления полных
 // payload-backed карточек (D2/D3); apply_plan_commands остаётся вне набора —
 // его generic-preview («число команд») недостаточно честен для review.
-const OFFERABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution"]);
+const OFFERABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution", "update_task"]);
+
+// Поля, которые агент может частично обновлять в update_task: остальное (участники,
+// статус) — отдельные инструменты; неизвестное поле в execute — fail-closed 400.
+const UPDATE_TASK_FIELDS = new Set(["title", "description", "priority", "plannedStart", "plannedFinish", "plannedWork", "durationWorkingDays"]);
 
 export function isAgentToolOfferable(tool: AgentTool): boolean {
   return (Boolean(tool.binding) && tool.kind === "analyze")
@@ -187,6 +191,46 @@ export async function buildProposalActionMetadata(
       // Версия плана — precondition применения: /execute требует её явно (A1, без
       // серверной подстановки); review-карточка показывает её пользователю.
       preconditionVersions: { planVersion: run.planVersion }
+    };
+  }
+  // Честный частичный update_task: карточка показывает ТОЛЬКО изменяемые поля в виде
+  // «поле: было → станет»; участники и статус не затрагиваются (мёрж на execute).
+  if (action.tool === "update_task") {
+    const taskId = typeof action.input.taskId === "string" ? action.input.taskId : "";
+    const fields = (action.input.fields && typeof action.input.fields === "object" ? action.input.fields : {}) as Record<string, unknown>;
+    const task = taskId ? await dataSource.findTaskById?.(actor.tenantId, taskId) : undefined;
+    const canEdit = task ? canEditTaskFields(actor, profile, task).allowed : false;
+    if (!task || !canEdit) {
+      return {
+        preview: { before: "Данные задачи недоступны", after: `Изменить поля: ${Object.keys(fields).join(", ") || "—"}` },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: "task_edit_permission_required" }
+      };
+    }
+    const FIELD_LABELS: Record<string, { label: string; current: () => string }> = {
+      title: { label: "название", current: () => task.title },
+      description: { label: "описание", current: () => task.description ?? "—" },
+      priority: { label: "приоритет", current: () => task.priority },
+      plannedStart: { label: "старт", current: () => task.plannedStart.toISOString().slice(0, 10) },
+      plannedFinish: { label: "финиш", current: () => task.plannedFinish.toISOString().slice(0, 10) },
+      plannedWork: { label: "работа (ч)", current: () => String(task.plannedWork) },
+      durationWorkingDays: { label: "длительность (дн)", current: () => String(task.durationWorkingDays) }
+    };
+    const capValue = (value: string) => value.length > 120 ? `${value.slice(0, 120)}…` : value;
+    const changes = Object.entries(fields).map(([field, next]) => {
+      const known = FIELD_LABELS[field];
+      // Неизвестное поле честно видно в карточке — execute его отвергнет (fail-closed).
+      if (!known) return `${field}: не поддерживается`;
+      return `${known.label}: ${capValue(known.current())} → ${capValue(String(next))}`;
+    });
+    return {
+      title: `Изменить задачу: «${task.title}» · проект ${task.projectId}, задача ${task.id}`,
+      preview: {
+        before: changes.length > 0 ? changes.map((line) => line.split(" → ")[0]!).join("; ") : "Без изменений",
+        after: changes.length > 0 ? changes.join("; ") : "Поля не указаны"
+      },
+      // Версия задачи — обязательный precondition применения (fail-closed на execute).
+      preconditionVersions: { taskUpdatedAt: task.updatedAt.toISOString() }
     };
   }
   // D2: payload-backed карточка создания задачи — показывает ВСЁ, что реально будет
@@ -464,9 +508,9 @@ function agentLimitsFromEnv(): { maxIterations: number; maxTotalOutputTokens: nu
  * эндпоинты планирования (scenarios/preview, scenarios/:id/apply, apply-command-batch), что и
  * человеческий UI: RBAC, транзакция, version-lock, integrity и audit переиспользуются как есть.
  */
-async function dispatchInternal(app: ApiApp, cookie: string | null, path: string, body: unknown): Promise<{ status: number; body: Record<string, unknown> }> {
+async function dispatchInternal(app: ApiApp, cookie: string | null, path: string, body: unknown, method: "POST" | "PATCH" = "POST"): Promise<{ status: number; body: Record<string, unknown> }> {
   const response = await app.request(path, {
-    method: "POST",
+    method,
     headers: { "content-type": "application/json", "x-kiss-pm-action": "same-origin", ...(cookie ? { cookie } : {}) },
     body: JSON.stringify(body)
   });
@@ -1027,9 +1071,64 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         continue;
       }
 
-      // update_task пока НЕ исполняем: PATCH требует полное тело + clientUpdatedAt (риск затирания
-      // участников при сборке из частичных fields). До безопасного частичного апдейта он не
-      // предлагается LLM (см. OFFERABLE_MUTATIONS), так что сюда штатно не попадаем.
+      // Честный частичный update_task: PATCH-роут требует ПОЛНОЕ тело, поэтому сервер
+      // мёржит переданные fields поверх текущей задачи — участники и статус берутся
+      // из текущего состояния и НЕ затираются. Версия задачи — только из
+      // preconditionVersions (fail-closed, как у change_task_status).
+      if (tool.name === "update_task") {
+        const taskId = typeof input.taskId === "string" ? input.taskId : "";
+        const fields = (input.fields && typeof input.fields === "object" ? input.fields : null) as Record<string, unknown> | null;
+        if (!taskId || !fields || Object.keys(fields).length === 0) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_action_input" });
+          continue;
+        }
+        // Fail-closed по полям: неизвестное поле не игнорируем молча — пользователь
+        // одобрял карточку, в которой его не было бы видно.
+        const unsupported = Object.keys(fields).find((field) => !UPDATE_TASK_FIELDS.has(field));
+        if (unsupported) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "unsupported_update_field" });
+          continue;
+        }
+        const clientUpdatedAt = typeof preconditionVersions.taskUpdatedAt === "string"
+          ? preconditionVersions.taskUpdatedAt
+          : undefined;
+        if (!clientUpdatedAt || Number.isNaN(new Date(clientUpdatedAt).getTime())) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "missing_precondition_versions" });
+          continue;
+        }
+        const task = await deps.dataSource.findTaskById?.(actor.tenantId, taskId);
+        if (!task) {
+          results.push({ tool: tool.name, ok: false, status: 404, error: "task_not_found" });
+          continue;
+        }
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
+        const description = typeof fields.description === "string" ? fields.description : task.description;
+        const res = await dispatchInternal(app, cookie, `/api/workspace/tasks/${taskId}`, {
+          title: typeof fields.title === "string" ? fields.title : task.title,
+          ...(description !== null && description !== undefined ? { description } : {}),
+          priority: typeof fields.priority === "string" ? fields.priority : task.priority,
+          plannedStart: typeof fields.plannedStart === "string" ? fields.plannedStart : task.plannedStart.toISOString().slice(0, 10),
+          plannedFinish: typeof fields.plannedFinish === "string" ? fields.plannedFinish : task.plannedFinish.toISOString().slice(0, 10),
+          durationWorkingDays: numberInput(fields.durationWorkingDays, task.durationWorkingDays),
+          plannedWork: numberInput(fields.plannedWork, task.plannedWork),
+          participants: task.participants,
+          statusId: task.statusId,
+          clientUpdatedAt
+        }, "PATCH");
+        if (res.status === 200) results.push({ tool: tool.name, ok: true, result: res.body });
+        else {
+          const currentVersions = res.body.currentVersions;
+          results.push({
+            tool: tool.name,
+            ok: false,
+            status: res.status,
+            error: typeof res.body.error === "string" ? res.body.error : "update_failed",
+            ...(currentVersions && typeof currentVersions === "object" ? { currentVersions: currentVersions as AgentActionPreconditionVersions } : {})
+          });
+        }
+        continue;
+      }
+
       results.push({ tool: tool.name, ok: false, status: 501, error: "tool_not_executable_yet" });
     }
 
