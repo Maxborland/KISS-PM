@@ -785,9 +785,10 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
         preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
       }]
     });
+    // Нечисловой тип ловит типовой гард (до парсера), дробь — сам парсер.
     expect((strAsNumber.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
       status: "failed",
-      error: "invalid_task_planned_work"
+      error: "invalid_update_field_value"
     });
     // Дробное значение: раньше проходило агентскую проверку (конечное > 0), парсер
     // отвергает (целые 1..10000) — карточка-пустышка больше не «одобряема».
@@ -808,6 +809,24 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
       }]
     });
     expect((fractionalDuration.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_task_duration");
+    // Нестроковые description/priority парсер нормализует (null/"normal") — без
+    // типового гарда карточка «описание → 123» молча ОЧИЩАЛА бы описание.
+    const nonStringDescription = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { description: 123 } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((nonStringDescription.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_update_field_value");
+    const nonStringPriority = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { priority: 123 } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((nonStringPriority.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_update_field_value");
     expect(harness.updateTaskInputs).toHaveLength(0);
   });
 

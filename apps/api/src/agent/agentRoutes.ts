@@ -68,6 +68,18 @@ const UPDATE_TASK_FIELDS = new Set(["title", "description", "priority", "planned
 // сбросит незатронутое поле в дефолт (прецедент: requiresAcceptance → false).
 // Глубокое решение — честный partial-update в governed-слое; до него этот helper —
 // единственная точка мёржа (используется и propose-карточкой, и execute).
+// Типовой гард ПРИСУТСТВУЮЩИХ полей: parseUpdateTaskBody лоялен к нестроковым
+// description/priority (нормализует в null/"normal"), поэтому без этого гарда
+// карточка «описание → 123» молча ОЧИЩАЛА бы описание вместо fail-closed отказа.
+// Границы/enum/целочисленность — зона парсера; здесь только типы значений.
+function invalidUpdateTaskFieldType(fields: Record<string, unknown>): boolean {
+  return Object.entries(fields).some(([field, value]) =>
+    field === "plannedWork" || field === "durationWorkingDays"
+      ? typeof value !== "number"
+      : typeof value !== "string"
+  );
+}
+
 function buildUpdateTaskPatchBody(
   task: {
     title: string;
@@ -278,6 +290,7 @@ export async function buildProposalActionMetadata(
     // мёрж-тело валидируется ТЕМ ЖЕ парсером, что и governed PATCH (целые числа,
     // границы, длина названия, enum приоритета, порядок дат).
     const unsupportedField = Object.keys(fields).find((field) => !UPDATE_TASK_FIELDS.has(field));
+    const invalidFieldType = invalidUpdateTaskFieldType(fields);
     const parsedBody = parseUpdateTaskBody(buildUpdateTaskPatchBody(task, fields, task.updatedAt.toISOString()));
     return {
       title: `Изменить задачу: «${task.title}» · проект ${task.projectId}, задача ${task.id}`,
@@ -289,9 +302,11 @@ export async function buildProposalActionMetadata(
       preconditionVersions: { taskUpdatedAt: task.updatedAt.toISOString() },
       ...(unsupportedField
         ? { capability: { allowed: false, reason: "unsupported_update_field" } }
-        : parsedBody.ok
-          ? {}
-          : { capability: { allowed: false, reason: parsedBody.error } })
+        : invalidFieldType
+          ? { capability: { allowed: false, reason: "invalid_update_field_value" } }
+          : parsedBody.ok
+            ? {}
+            : { capability: { allowed: false, reason: parsedBody.error } })
     };
   }
   // D2: payload-backed карточка создания задачи — показывает ВСЁ, что реально будет
@@ -1162,10 +1177,13 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 404, error: "task_not_found" });
           continue;
         }
+        if (invalidUpdateTaskFieldType(fields)) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_update_field_value" });
+          continue;
+        }
         // Мёрж (присутствие поля — через `in`, без typeof-фолбэка на текущее значение)
         // + валидация ТЕМ ЖЕ парсером, что и governed PATCH: одна точка правды по
-        // целым числам, границам, длине названия, enum приоритета и порядку дат —
-        // ручная проверка типов дрейфовала от правил парсера.
+        // целым числам, границам, длине названия, enum приоритета и порядку дат.
         const patchBody = buildUpdateTaskPatchBody(task, fields, clientUpdatedAt);
         const parsedPatch = parseUpdateTaskBody(patchBody);
         if (!parsedPatch.ok) {
