@@ -31,6 +31,7 @@ function createAuthFakeDataSource() {
   const sessions = new Map<string, UserSessionRecord>(); // ключ — tokenHash
   const resetTokens = new Map<string, PasswordResetTokenRecord>(); // ключ — id
   const auditEvents: Array<{ actionType?: string }> = [];
+  const refreshedPipelineGraphs: string[] = []; // "tenantId:pipelineId" пересобранных графов воронок
 
   const dataSource: Partial<ApiTenantDataSource> = {
     async listDevUsers() {
@@ -85,6 +86,10 @@ function createAuthFakeDataSource() {
       const record: DealStageRecord = { ...input, createdAt: now, updatedAt: now };
       dealStages.set(record.id, record);
       return record;
+    },
+    async refreshCrmPipelineLifecycleGraph(tenantId, pipelineId) {
+      refreshedPipelineGraphs.push(`${tenantId}:${pipelineId}`);
+      return undefined;
     },
     async findCredentialByEmail(email) {
       return credentials.get(email);
@@ -155,7 +160,7 @@ function createAuthFakeDataSource() {
 
   return {
     dataSource: dataSource as ApiTenantDataSource,
-    state: { tenants, accessProfiles, users, positions, projectTypes, pipelines, dealStages, credentials, sessions, resetTokens, auditEvents }
+    state: { tenants, accessProfiles, users, positions, projectTypes, pipelines, dealStages, credentials, sessions, resetTokens, auditEvents, refreshedPipelineGraphs }
   };
 }
 
@@ -209,6 +214,10 @@ describe("POST /api/auth/register", () => {
     expect([...state.pipelines.values()]).toEqual([
       expect.objectContaining({ name: "Основная воронка", isDefault: true })
     ]);
+    // Ревью #244: после сида стадий граф воронки пересобран — иначе createPipeline
+    // оставил бы пустой lifecycleGraphMetadata и переходы по стадиям не работали бы.
+    const seededPipelineId = [...state.pipelines.keys()][0];
+    expect(state.refreshedPipelineGraphs).toEqual([`${payload.workspace.id}:${seededPipelineId}`]);
     // У владельца полный admin-набор прав.
     const profile = [...state.accessProfiles.values()][0];
     expect(profile?.name).toBe("Владелец");

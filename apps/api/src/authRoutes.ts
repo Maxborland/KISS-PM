@@ -160,9 +160,14 @@ export function registerAuthRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "session_required" }, 401);
     }
 
+    // Обогащение ярлыками (имя профиля доступа/воркспейса) опционально: в partial
+    // data-source режиме listAccessProfilesByTenantId может быть не подключён, и
+    // /auth/me обязан вернуть сессию без ярлыков, а не 500.
     const [profile, accessProfiles, workspace, users] = await Promise.all([
       getActorProfile(actor),
-      dataSource.listAccessProfilesByTenantId(actor.tenantId),
+      dataSource.listAccessProfilesByTenantId
+        ? dataSource.listAccessProfilesByTenantId(actor.tenantId)
+        : Promise.resolve([]),
       dataSource.findTenantById?.(actor.tenantId),
       dataSource.listWorkspaceUsers
         ? dataSource.listWorkspaceUsers(actor.tenantId)

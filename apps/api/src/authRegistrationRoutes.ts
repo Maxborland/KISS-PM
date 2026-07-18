@@ -187,6 +187,10 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
             status: "active"
           });
         }
+        // createPipeline записал пустой lifecycleGraphMetadata (initialStageId: null,
+        // stages: []) — после сида стадий пересобираем граф тем же путём, что и
+        // штатный роут создания стадии, иначе переходы по воронке не работают.
+        await tx.refreshCrmPipelineLifecycleGraph?.(tenantId, pipelineId);
         // Авто-логин: выдаём сессию так же, как в /api/auth/login.
         await tx.createSession({
           id: `session-${randomUUID()}`,
