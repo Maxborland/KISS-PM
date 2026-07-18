@@ -7,6 +7,7 @@ import { controlClosureSchemas } from "./controlClosure";
 import { collaborationSchemas } from "./collaboration";
 import { backgroundJobSchemas } from "./backgroundJobs";
 import { planningSchemas } from "./planning";
+import { agentSchemas } from "./agent";
 
 export const openApiSchemas = {
   ...coreSchemas,
@@ -17,5 +18,6 @@ export const openApiSchemas = {
   ...controlClosureSchemas,
   ...collaborationSchemas,
   ...backgroundJobSchemas,
-  ...planningSchemas
+  ...planningSchemas,
+  ...agentSchemas
 };

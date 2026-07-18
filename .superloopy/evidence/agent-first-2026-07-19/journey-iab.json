@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-07-18T18:22:52.094Z",
+  "browser": "Playwright chromium (live backend, no route mocks)",
+  "role": "admin",
+  "checks": {
+    "proposalCardVisible": true,
+    "executeStatus": 200,
+    "correlationId": "agent-execute-2f58d0ac-a29b-4887-a025-b05c844ec3c9",
+    "appliedAuditEventId": "agent-action-89b25bcc-9285-4bab-be93-3ec4f0d7061a",
+    "appliedPlanningAuditEventId": "audit-589b87b8-2b9a-446b-95e6-b935ac6a6ef4",
+    "appliedPlanVersion": 56,
+    "projectId": "project-demo-crm-intake",
+    "commitRowMatchesReceipt": true,
+    "compensatingRevertApplied": true
+  },
+  "status": "pass"
+}

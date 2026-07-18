@@ -54,6 +54,7 @@
 48. `44_PHASE_G_3_COMMUNICATIONS_UPGRADE_BACKEND.md` — backend contract для общих каналов, entity/CRM чатов, reactions, emoji, sticker packs/imports, channel-scoped calls и permissioned notifications/audit.
 49. `46_PHASE_G_4_COMMUNICATIONS_SELF_HOSTED_AV_BACKEND.md` — backend media-plane contract: self-hosted LiveKit (livekit/coturn/egress), webhook-authoritative reconcile, per-track Egress recording в Storage, TURN-креды, screen share/in-call chat; отменяет non-scope `docs/43`/`docs/44` про SFU/webhooks/recording.
 50. `47_PHASE_G_5_COMMUNICATIONS_UI_CONTRACT.md` — frontend/product UI contract блока коммуникаций: каналы/треды/композер/уведомления/встречи + call surface, design-v3 lockdown, view-model handoff (`livekit-client` только в `lib/call/*`), 12 Storybook экранов, realtime, a11y и founder-beta/strict-prod split.
+51. `48_AGENT_FIRST_PM_AS_CODE_CONTRACT.md` — продуктово-технический контракт направления agent-first / PM-as-code: агент «Генри Гантт» под RBAC пользователя, propose→review→execute→квитанции, reject-flow сценариев, персистентный тред, реестр инструментов, LLM-провайдеры и fail-closed гарантии.
 
 ## Планы исправлений
 
