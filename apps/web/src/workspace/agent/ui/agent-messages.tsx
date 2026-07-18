@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Bot, Check, Clock3, MessageSquare } from "lucide-react";
 
@@ -14,19 +15,31 @@ import type { AgentMessage, AgentReceipt } from "@/workspace/agent/agent-model";
 export function ChatThread({
   messages,
   thinking,
-  liveSteps
+  liveSteps,
+  historyLoading = false
 }: {
   messages: AgentMessage[];
   thinking: boolean;
   liveSteps: string[];
+  historyLoading?: boolean;
 }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const lastMessageId = messages[messages.length - 1]?.id;
+  // Чат открывается на ПОСЛЕДНЕМ сообщении (гидрация вставляет историю сверху) и
+  // докручивается при новых ходах; префикс «Показать раньше» last id не меняет —
+  // позиция чтения при подгрузке старого не прыгает.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
+  }, [lastMessageId, thinking]);
   return (
     <div
+      ref={containerRef}
       role="log"
       aria-label="Диалог с агентом"
       className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 md:px-6"
     >
-      {messages.length === 0 && !thinking ? <ChatEmpty /> : null}
+      {messages.length === 0 && !thinking && !historyLoading ? <ChatEmpty /> : null}
       {messages.map((message) =>
         message.role === "trace" ? (
           // aria-live=off: шаги уже были озвучены при стриме — повторная вставка
@@ -111,7 +124,7 @@ function ReceiptBlock({ receipt }: { receipt: AgentReceipt }) {
               <span className="mono break-all">{item.planningAuditEventId}</span>
               <Link
                 href={`/projects/${encodeURIComponent(item.projectId)}/commits?commit=${encodeURIComponent(item.planningAuditEventId)}`}
-                className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+                className="font-medium text-[var(--accent)] underline underline-offset-2"
               >
                 Открыть в Коммитах
               </Link>

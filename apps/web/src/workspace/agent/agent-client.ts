@@ -65,7 +65,11 @@ export type AgentThreadTurn = {
   correlationId?: string;
   outcomes?: AgentThreadOutcome[];
 };
-export type AgentThreadHistoryPage = { turns: AgentThreadTurn[]; nextCursor: string | null };
+// rawCount — размер СЫРОГО окна сообщений (до фильтра agent-метки): по нему клиент
+// решает, есть ли более ранняя история (окно короче лимита = истории больше нет).
+export type AgentThreadHistoryPage = { turns: AgentThreadTurn[]; nextCursor: string | null; rawCount: number };
+
+export const AGENT_HISTORY_PAGE_LIMIT = 30;
 
 // Ходы треда — только сообщения с metadata.agent (беседа agent-типа readonly для клиента,
 // но контракт не запрещает будущие системные сообщения — незнакомое пропускаем честно).
@@ -106,7 +110,7 @@ function decodeThreadTurns(value: unknown): AgentThreadHistoryPage {
       ...(outcomes && outcomes.length > 0 ? { outcomes } : {})
     });
   }
-  return { turns, nextCursor: typeof record.nextCursor === "string" ? record.nextCursor : null };
+  return { turns, nextCursor: typeof record.nextCursor === "string" ? record.nextCursor : null, rawCount: messages.length };
 }
 
 // Реплика истории треда (память чата) — отправляется в propose перед текущей целью.
@@ -215,7 +219,9 @@ export function createAgentClient(options: AgentApiClientOptions) {
     },
     // Страница истории треда (существующий messages-роут, membership-доступ).
     async loadThreadHistory(threadId: string, cursor?: string): Promise<AgentThreadHistoryPage> {
-      const query = cursor ? `?limit=30&cursor=${encodeURIComponent(cursor)}` : "?limit=30";
+      const query = cursor
+        ? `?limit=${AGENT_HISTORY_PAGE_LIMIT}&cursor=${encodeURIComponent(cursor)}`
+        : `?limit=${AGENT_HISTORY_PAGE_LIMIT}`;
       const body = await requestJson<unknown>(`/api/workspace/conversations/${encodeURIComponent(threadId)}/messages${query}`);
       return decodeThreadTurns(body);
     },
@@ -257,8 +263,15 @@ export function createAgentClient(options: AgentApiClientOptions) {
       if (!response.ok) {
         const raw = await response.text();
         let err = "request_failed";
-        try { const parsed = JSON.parse(raw) as { error?: string }; if (typeof parsed.error === "string") err = parsed.error; } catch { /* keep */ }
-        throw new DomainApiError(response.status, err, { error: err });
+        let body: Record<string, unknown> = { error: err };
+        try {
+          const parsed = JSON.parse(raw) as Record<string, unknown>;
+          if (parsed && typeof parsed === "object") body = parsed;
+          if (typeof parsed.error === "string") err = parsed.error;
+        } catch { /* keep */ }
+        // Полное тело важно вызывающему: 503 agent_provider_not_configured несёт
+        // threadId/messageIds персистированной сервером квитанции (P1).
+        throw new DomainApiError(response.status, err, body);
       }
       if (!response.body) throw new DomainApiError(500, "stream_unsupported", { error: "stream_unsupported" });
       const reader = response.body.getReader();

@@ -20,6 +20,9 @@ import { createMockAgentFetch } from "./mock-agent-backend";
 
 export type AgentStatus = "loading" | "idle" | "proposing" | "executing";
 export type AgentResult<T> = { ok: true; data: T } | { ok: false; code: string };
+/** Ошибка propose может нести персистированную сервером квитанцию (503 LLM-недоступен). */
+export type AgentProposeError = { ok: false; code: string; persisted?: { threadId: string; messageIds: string[] } };
+export type AgentProposeResult = { ok: true; data: AgentProposeResponse } | AgentProposeError;
 export type AgentExecuteResult =
   | { ok: true; data: AgentExecuteResponse }
   | { ok: false; code: string; status: number | null; uncertain: boolean };
@@ -113,7 +116,7 @@ export function useAgent() {
   );
 
   const proposeStream = useCallback(
-    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = [], threadId?: string): Promise<AgentResult<AgentProposeResponse>> => {
+    async (goal: string, onEvent: (event: AgentStreamEvent) => void, attachmentIds: string[] = [], history: AgentHistoryTurn[] = [], threadId?: string): Promise<AgentProposeResult> => {
       setStatus("proposing");
       setError(null);
       try {
@@ -133,7 +136,14 @@ export function useAgent() {
       } catch (e) {
         const code = e instanceof AgentApiError ? e.code : "request_failed";
         setError(code);
-        return { ok: false, code };
+        // 503 «LLM не настроен» персистится сервером — отдаём ids поверхности для
+        // дедупликации её optimistic-сообщений при последующей гидрации.
+        const body = e instanceof AgentApiError ? e.body : null;
+        const threadId = body && typeof body.threadId === "string" ? body.threadId : undefined;
+        const messageIds = body && Array.isArray(body.messageIds) && body.messageIds.every((id) => typeof id === "string")
+          ? body.messageIds as string[]
+          : undefined;
+        return { ok: false, code, ...(threadId && messageIds ? { persisted: { threadId, messageIds } } : {}) };
       } finally {
         setStatus("idle");
       }
