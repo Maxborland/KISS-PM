@@ -2,9 +2,26 @@ import type { PolicyDecision } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 import type { Context } from "hono";
 
+import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
+import { notifyPlanVersionChanged } from "../planningEventBus";
 import { appendPlanningAuditIfConfigured, errorResponseBody, type PlanningRouteDeps } from "./planningRouteHelpers";
 
 type FailedTransactionResult = { ok: false; status: number; error: string } & Record<string, unknown>;
+
+/**
+ * Пост-write сигналы успешного применения плана: сброс capacity-кэша и realtime-уведомление
+ * о новой версии. Общий для command/batch/scenario apply-хендлеров.
+ */
+export function emitPlanVersionFromBody(
+  tenantId: string,
+  projectId: string,
+  body: { newPlanVersion?: number }
+) {
+  if (typeof body.newPlanVersion === "number") {
+    invalidateCapacityCacheForTenant(tenantId);
+    notifyPlanVersionChanged(tenantId, projectId, body.newPlanVersion);
+  }
+}
 
 /**
  * Единый маппинг проваленного результата транзакции → HTTP-ответ. 409 сохраняет доп-поля
