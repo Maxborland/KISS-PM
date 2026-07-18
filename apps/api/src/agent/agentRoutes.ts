@@ -1089,6 +1089,17 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           results.push({ tool: tool.name, ok: false, status: 400, error: "unsupported_update_field" });
           continue;
         }
+        // Fail-closed по типам значений: молчаливый фолбэк на текущее значение
+        // (numberInput/typeof) выдавал бы success без применения того, что было в карточке.
+        const invalidValue = Object.entries(fields).some(([field, value]) =>
+          field === "plannedWork" || field === "durationWorkingDays"
+            ? typeof value !== "number" || !Number.isFinite(value) || value <= 0
+            : typeof value !== "string"
+        );
+        if (invalidValue) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_update_field_value" });
+          continue;
+        }
         const clientUpdatedAt = typeof preconditionVersions.taskUpdatedAt === "string"
           ? preconditionVersions.taskUpdatedAt
           : undefined;
@@ -1109,8 +1120,11 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           priority: typeof fields.priority === "string" ? fields.priority : task.priority,
           plannedStart: typeof fields.plannedStart === "string" ? fields.plannedStart : task.plannedStart.toISOString().slice(0, 10),
           plannedFinish: typeof fields.plannedFinish === "string" ? fields.plannedFinish : task.plannedFinish.toISOString().slice(0, 10),
-          durationWorkingDays: numberInput(fields.durationWorkingDays, task.durationWorkingDays),
-          plannedWork: numberInput(fields.plannedWork, task.plannedWork),
+          durationWorkingDays: typeof fields.durationWorkingDays === "number" ? fields.durationWorkingDays : task.durationWorkingDays,
+          plannedWork: typeof fields.plannedWork === "number" ? fields.plannedWork : task.plannedWork,
+          // Не затрагиваемые карточкой поля переносим из текущего состояния явно:
+          // парсер PATCH дефолтит отсутствующий requiresAcceptance в false.
+          requiresAcceptance: task.requiresAcceptance,
           participants: task.participants,
           statusId: task.statusId,
           clientUpdatedAt

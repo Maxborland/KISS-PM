@@ -751,6 +751,62 @@ describe("D2/D3: payload-backed карточки offerable-мутаций", () =
     expect(harness.updateTaskInputs).toHaveLength(0);
   });
 
+  it("update_task: requiresAcceptance задачи переживает частичный merge (не дефолтится в false)", async () => {
+    const harness = createHarness();
+    harness.task.requiresAcceptance = true;
+    // Однобуквенное фикстурное название не проходит парсер PATCH — merge синтезирует
+    // полное тело, поэтому текущее название должно быть валидным само по себе.
+    harness.task.title = "Задача с приёмкой";
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { priority: "high" } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((execute.body.results as Array<{ status: string }>)[0]).toMatchObject({ status: "applied" });
+    expect(harness.updateTaskInputs).toHaveLength(1);
+    // Парсер PATCH дефолтит отсутствующий requiresAcceptance в false — merge обязан
+    // переносить его из текущего состояния, иначе одобрение смены приоритета
+    // молча выключало бы приёмку.
+    expect(harness.updateTaskInputs[0]!.requiresAcceptance).toBe(true);
+  });
+
+  it("update_task: невалидное значение поля отвергается, а не фолбэчится молча", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        // Строка вместо числа: раньше numberInput молча подставлял текущее значение,
+        // и квитанция была «applied» без применения показанного в карточке.
+        input: { taskId: "task-a", fields: { plannedWork: "16" } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+      }]
+    });
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
+      status: "failed",
+      error: "invalid_update_field_value"
+    });
+    expect(harness.updateTaskInputs).toHaveLength(0);
+  });
+
+  it("update_task: устаревшая версия — conflict с currentVersions для refresh/retry", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{
+        tool: "update_task",
+        input: { taskId: "task-a", fields: { title: "Устаревшая правка" } },
+        preconditionVersions: { taskUpdatedAt: "2026-06-01T09:00:00.000Z" }
+      }]
+    });
+    expect((execute.body.results as Array<{ status: string; error?: string; currentVersions?: unknown }>)[0]).toMatchObject({
+      status: "conflict",
+      error: "task_version_conflict",
+      currentVersions: { taskUpdatedAt: "2026-06-01T10:00:00.000Z" }
+    });
+    expect(harness.updateTaskInputs).toHaveLength(0);
+  });
+
   it("execute принимает planVersion из preconditionVersions карточки (без серверной подстановки)", async () => {
     const harness = createHarness();
     const overload = createPlanningReadModel(overloadedSnapshot()).resourceLoad.overloads[0]!;
