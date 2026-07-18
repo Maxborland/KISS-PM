@@ -505,10 +505,20 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     const history = parseHistory((body.value as { history?: unknown }).history);
     // threadId опционален (контракт P1): клиент, знающий свой персистентный тред, просит
     // сервер собрать историю из него. Чужой/произвольный id — жёсткий отказ (fail-closed).
+    // Валидация — владением, а не сравнением с детерминированным id: ensureConversation
+    // upsert'ится по (tenant, entityType, entityId, type), и существующий/импортированный
+    // тред может жить под другим id, который GET /agent/thread честно вернул клиенту.
     const threadIdRaw = (body.value as { threadId?: unknown }).threadId;
     const threadId = typeof threadIdRaw === "string" && threadIdRaw.length > 0 ? threadIdRaw : undefined;
     if (threadId !== undefined && threadId !== agentThreadId(actor.id)) {
-      return { ok: false, response: context.json({ error: "agent_thread_forbidden" }, 403) };
+      const conversation = await deps.dataSource.findConversation?.(actor.tenantId, threadId);
+      const ownedAgentThread = conversation
+        && conversation.conversationType === "agent"
+        && conversation.entityType === "agent"
+        && conversation.entityId === actor.id;
+      if (!ownedAgentThread) {
+        return { ok: false, response: context.json({ error: "agent_thread_forbidden" }, 403) };
+      }
     }
     const profile = await deps.getActorProfile(actor);
     return { ok: true, value: { cookie, actor, profile, goal, attachmentIds, history, ...(threadId ? { threadId } : {}) } };

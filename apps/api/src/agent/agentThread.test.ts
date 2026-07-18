@@ -72,6 +72,9 @@ function createHarness(options: { collaboration?: boolean } = {}) {
       conversations.set(input.id, record);
       return record;
     },
+    async findConversation(_tenantId, conversationId) {
+      return conversations.get(conversationId);
+    },
     async addConversationMembers(input) {
       const set = members.get(input.conversationId) ?? new Set<string>();
       for (const userId of input.userIds) set.add(userId);
@@ -216,6 +219,18 @@ describe("propose → персистентность треда", () => {
   it("отвергает чужой threadId (403 agent_thread_forbidden) до запуска LLM", async () => {
     setAgentLlmProviderOverride(liveTestProvider());
     const harness = createHarness();
+    // Чужой agent-тред существует в БД — id известен, но entityId другого пользователя.
+    harness.conversations.set("agent-thread-other-user", {
+      id: "agent-thread-other-user",
+      tenantId: "tenant-1",
+      entityType: "agent",
+      entityId: "other-user",
+      conversationType: "agent",
+      title: "Тред агента",
+      createdByUserId: "other-user",
+      createdAt: new Date("2026-07-18T09:00:00.000Z"),
+      archivedAt: null
+    });
     const propose = await post(harness.app, "/api/workspace/agent/propose", {
       goal: "Зафиксируй статус",
       threadId: "agent-thread-other-user"
@@ -223,6 +238,29 @@ describe("propose → персистентность треда", () => {
     expect(propose.status).toBe(403);
     expect(propose.body).toEqual({ error: "agent_thread_forbidden" });
     expect(harness.messages).toHaveLength(0);
+  });
+
+  it("принимает legacy-id собственного треда: владение проверяется по беседе, а не по детерминированному id", async () => {
+    setAgentLlmProviderOverride(liveTestProvider());
+    const harness = createHarness();
+    // Существующий тред пользователя под недетерминированным id (импорт/ранняя версия):
+    // GET /agent/thread вернул бы его через upsert по tuple — propose обязан его принять.
+    harness.conversations.set("conversation-legacy-42", {
+      id: "conversation-legacy-42",
+      tenantId: "tenant-1",
+      entityType: "agent",
+      entityId: "user-agent",
+      conversationType: "agent",
+      title: "Тред агента",
+      createdByUserId: "user-agent",
+      createdAt: new Date("2026-07-18T09:00:00.000Z"),
+      archivedAt: null
+    });
+    const propose = await post(harness.app, "/api/workspace/agent/propose", {
+      goal: "Зафиксируй статус",
+      threadId: "conversation-legacy-42"
+    });
+    expect(propose.status).toBe(200);
   });
 
   it("с переданным threadId сервер собирает историю из треда, пропуская error-квитанции", async () => {
