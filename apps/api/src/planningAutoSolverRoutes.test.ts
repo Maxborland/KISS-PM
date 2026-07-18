@@ -263,7 +263,10 @@ describe("planning auto-solver API", () => {
                 {
                   type: "risk.accept_overload",
                   payload: {
-                    overloadId: "overload-alpha",
+                    // Формат resourceId:date обязателен: parseAcceptedOverloadId отвергает
+                    // id без двоеточия (ужесточение 79f556a7), и битая команда превращала
+                    // proposal в null → 404 вместо проверяемого здесь 409.
+                    overloadId: "resource-alpha:2026-06-01",
                     acceptedRiskReason: "persisted proposal reason is ignored"
                   }
                 }
