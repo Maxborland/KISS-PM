@@ -1,4 +1,11 @@
-import type { PlanningCommand, PlanningReadModel, ScenarioProposal, ValidationIssue } from "@kiss-pm/domain";
+import type {
+  AutoPlanningSolverMode,
+  AutoPlanningSolverProposal,
+  PlanningCommand,
+  PlanningReadModel,
+  ScenarioProposal,
+  ValidationIssue
+} from "@kiss-pm/domain";
 
 // Канонический тип read-model живёт в @kiss-pm/domain (владелец проекции). planning-client лишь
 // ре-экспортит его, чтобы web и api видели одну форму — раньше здесь был Record<string,unknown>×8,
@@ -44,6 +51,38 @@ export type ScenarioPreviewResponse = {
   planVersion: number;
   engineVersion: string;
   expiresAt: string;
+};
+
+// Wire-контракт авто-солвера (второй источник предложений в «Сценариях»).
+// Сервер (planningAutoSolverRoutes) поверх доменного AutoPlanningSolverProposal
+// добавляет conflictEffect и label; run персистентный, живёт до expiresAt и одноразовый.
+export type AutoSolverWireProposal = AutoPlanningSolverProposal & {
+  conflictEffect: "removed" | "accepted_overload";
+  label: string;
+};
+
+export type AutoSolverRunResponse = {
+  runId: string;
+  mode: AutoPlanningSolverMode;
+  clientPlanVersion: number;
+  engineVersion: string;
+  targetDeadline: string | null;
+  proposalPayloadHash: string;
+  expiresAt: string;
+  appliedProposalId: string | null;
+  proposals: AutoSolverWireProposal[];
+};
+
+// GET одного run дополнительно отдаёт метаданные входного снапшота и факт применения.
+export type AutoSolverRunDetailResponse = AutoSolverRunResponse & {
+  inputSnapshotMetadata: Record<string, unknown>;
+  appliedAt: string | null;
+};
+
+export type AutoSolverRunRequest = {
+  mode: AutoPlanningSolverMode;
+  clientPlanVersion: number;
+  targetDeadline?: string | null;
 };
 
 export type PlanningApplyResponse = {

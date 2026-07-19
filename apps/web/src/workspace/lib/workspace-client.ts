@@ -13,6 +13,8 @@
    боевой роут НЕ кладёт в {task}, поэтому здесь optimistic-concurrency нет.
    ============================================================ */
 
+import type { OrgCapacityTree } from "@kiss-pm/domain";
+
 import { createRequestJson, DomainApiError, type DomainClientOptions } from "../../lib/domain-client";
 
 export type WorkspaceApiClientOptions = DomainClientOptions;
@@ -34,7 +36,17 @@ export type TaskParticipant = { userId: string; role: TaskParticipantRole };
 // Справочные контракты домашних экранов (GET /api/workspace/users, /task-statuses).
 // Боевой ответ — суперсет (tenantId/createdAt/…); структурно совместим.
 export type WorkspaceUser = { id: string; name: string };
-export type WorkspaceTaskStatus = { id: string; name: string; category: TaskStatusCategory; sortOrder: number; isSystem: boolean };
+// status: active|archived — жизненный цикл записи справочника (боевой TaskStatusRecord.status).
+export type WorkspaceTaskStatus = { id: string; name: string; category: TaskStatusCategory; sortOrder: number; isSystem: boolean; status: "active" | "archived" };
+// Тело создания/правки записи справочника статусов (боевой parseCreateTaskStatusBody):
+// id обязателен при создании (слаг генерирует клиент), при PATCH подставляется из URL.
+export type TaskStatusDefinitionInput = {
+  id: string;
+  name: string;
+  category: TaskStatusCategory;
+  sortOrder: number;
+  status?: "active" | "archived";
+};
 
 // Серилизованная задача (persistence.TaskRecord; даты ISO). status === statusCategory (категория системного статуса).
 export type TaskRecord = {
@@ -161,7 +173,27 @@ export function createWorkspaceClient(options: WorkspaceApiClientOptions) {
     // Справочник пользователей (GET /api/workspace/users) — резолв исполнителя/заказчика/владельца.
     listUsers() { return requestJson<{ users: WorkspaceUser[] }>("/api/workspace/users"); },
     // Системные статусы задач (GET /api/workspace/task-statuses) — колонки канбана + селект статуса.
-    listTaskStatuses() { return requestJson<{ taskStatuses: WorkspaceTaskStatus[] }>("/api/workspace/task-statuses"); }
+    listTaskStatuses() { return requestJson<{ taskStatuses: WorkspaceTaskStatus[] }>("/api/workspace/task-statuses"); },
+    // Справочник статусов задач — CRUD поверх taskStatusRoutes (RBAC: tenant.task_statuses.manage).
+    createTaskStatusDefinition(input: TaskStatusDefinitionInput) {
+      return requestJson<{ taskStatus: WorkspaceTaskStatus }>("/api/workspace/task-statuses", { method: "POST", body: JSON.stringify(input) });
+    },
+    updateTaskStatusDefinition(statusId: string, input: Omit<TaskStatusDefinitionInput, "id">) {
+      return requestJson<{ taskStatus: WorkspaceTaskStatus }>(`/api/workspace/task-statuses/${enc(statusId)}`, { method: "PATCH", body: JSON.stringify(input) });
+    },
+    // DELETE — это архив (боевой archiveTaskStatus): системные статусы не архивируются (409 system_task_status_required).
+    archiveTaskStatusDefinition(statusId: string) {
+      return requestJson<{ taskStatus: WorkspaceTaskStatus }>(`/api/workspace/task-statuses/${enc(statusId)}`, { method: "DELETE" });
+    },
+    // Дерево загрузки ресурсов за месяц (GET /api/workspace/capacity/tree?monthIso=YYYY-MM[&projectId=…]).
+    // Ответ — OrgCapacityTree из @kiss-pm/domain как есть (JSON-сериализуемый; недоступные актору
+    // проекты в projectsMixByDate сервер уже замаскировал в __hidden__). RBAC:
+    // tenant.project_resources.read (401/403 — как у остальных ручек), projectId дополнительно
+    // требует tenant.projects.read; невалидный месяц/проект → 400 capacity_invalid_query.
+    getCapacityTree(monthIso: string, projectId?: string | null) {
+      const projectQuery = projectId ? `&projectId=${enc(projectId)}` : "";
+      return requestJson<OrgCapacityTree>(`/api/workspace/capacity/tree?monthIso=${enc(monthIso)}${projectQuery}`);
+    }
   };
 }
 

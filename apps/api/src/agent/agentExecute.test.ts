@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import { reducePlanningCommand, type PlanSnapshot, type TenantUser } from "@kiss-pm/domain";
-import type { AuditEventRecordInput, PlanningScenarioRunRecord, ProjectRecord, TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
+import type { AuditEventRecordInput, DealStageRecord, OpportunityRecord, PlanningScenarioRunRecord, ProjectRecord, TaskRecord, TaskStatusRecord } from "@kiss-pm/persistence";
 
-import type { ApiTenantDataSource } from "../apiTypes";
+import type { ApiTenantDataSource, ClientRecord } from "../apiTypes";
 import { createApp } from "../app";
 import { createPlanningReadModel } from "../planning/planningReadModel";
 import { buildProposalActionMetadata, isAgentToolOfferable } from "./agentRoutes";
@@ -84,6 +84,53 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
     { id: "todo", tenantId: "tenant-1", name: "В работе", category: "in_progress", status: "active" },
     { id: "review", tenantId: "tenant-1", name: "Сверка заказчиком", category: "review", status: "active" }
   ] as TaskStatusRecord[];
+  // Н15: CRM-фикстуры для offerable-мутаций агента (change_opportunity_stage / update_crm_client).
+  const crmTimestamp = new Date("2026-06-01T10:00:00.000Z");
+  const client: ClientRecord = {
+    id: "client-1",
+    tenantId: "tenant-1",
+    name: "ООО Ромашка",
+    description: "Оптовый заказчик",
+    status: "active",
+    createdAt: crmTimestamp,
+    updatedAt: crmTimestamp
+  };
+  const updateClientInputs: Array<Record<string, unknown>> = [];
+  const dealStages = [
+    { id: "stage-new", tenantId: "tenant-1", pipelineId: "pipeline-1", name: "Новая", sortOrder: 1, status: "active", createdAt: crmTimestamp, updatedAt: crmTimestamp },
+    { id: "stage-negotiation", tenantId: "tenant-1", pipelineId: "pipeline-1", name: "Переговоры", sortOrder: 2, status: "active", createdAt: crmTimestamp, updatedAt: crmTimestamp }
+  ] as DealStageRecord[];
+  const opportunity = {
+    id: "opp-1",
+    tenantId: "tenant-1",
+    clientId: "client-1",
+    primaryContactId: null,
+    ownerUserId: null,
+    projectTypeId: null,
+    stageId: "stage-new",
+    pipelineId: "pipeline-1",
+    clientName: "ООО Ромашка",
+    contactName: "",
+    title: "Сделка на смету",
+    projectType: "",
+    description: null,
+    plannedStart: crmTimestamp,
+    plannedFinish: crmTimestamp,
+    contractValue: 100_000,
+    plannedHourlyRate: 0,
+    plannedHours: 0,
+    probability: 50,
+    status: "intake",
+    templateId: null,
+    feasibilityStatus: null,
+    feasibilityResult: null,
+    feasibilityCheckedAt: null,
+    createdAt: crmTimestamp,
+    updatedAt: crmTimestamp,
+    demand: [],
+    customFieldValues: {}
+  } as OpportunityRecord;
+  const stageUpdates: Array<Record<string, unknown>> = [];
   const permissions: AccessProfile["permissions"] = options.permissions ?? [
     "tenant.projects.read",
     "tenant.project_plan.read",
@@ -92,7 +139,9 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
     "tenant.project_resources.manage",
     "tenant.planning_scenarios.preview",
     "tenant.planning_scenarios.apply",
-    "tenant.tasks.edit"
+    "tenant.tasks.edit",
+    "tenant.clients.manage",
+    "tenant.opportunities.manage"
   ];
 
   const dataSource: Partial<ApiTenantDataSource> = {
@@ -157,12 +206,25 @@ function createHarness(options: { permissions?: AccessProfile["permissions"]; au
       updateTaskInputs.push(input as Record<string, unknown>);
       return { ...task, title: (input as { title?: string }).title ?? task.title, updatedAt: new Date("2026-06-01T11:00:00.000Z") };
     },
+    // Н15: CRM-персистентность для governed-роутов клиентов и стадий сделок.
+    async findClientById(_tenantId, clientId) { return clientId === client.id ? client : undefined; },
+    async updateClient(input) {
+      updateClientInputs.push(input as unknown as Record<string, unknown>);
+      return { ...client, ...input, updatedAt: new Date("2026-06-01T11:00:00.000Z") };
+    },
+    async findOpportunityById(_tenantId, opportunityId) { return opportunityId === opportunity.id ? opportunity : undefined; },
+    async findDealStageById(_tenantId, stageId) { return dealStages.find((stage) => stage.id === stageId); },
+    async listStageTransitions() { return []; },
+    async updateOpportunityStage(input) {
+      stageUpdates.push(input as unknown as Record<string, unknown>);
+      return { ...opportunity, stageId: input.stageId, pipelineId: input.pipelineId ?? opportunity.pipelineId };
+    },
     ...(options.auditPersistence === false
       ? {}
       : { async appendAuditEvent(input: AuditEventRecordInput) { auditActionTypes.push(input.actionType); auditEvents.push(input); } })
   };
 
-  return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), dataSource: dataSource as ApiTenantDataSource, task, appliedCommandTypes, auditActionTypes, auditEvents, updateTaskInputs, get planVersion() { return snapshot.planVersion; } };
+  return { app: createApp({ dataSource: dataSource as ApiTenantDataSource }), dataSource: dataSource as ApiTenantDataSource, task, client, opportunity, updateClientInputs, stageUpdates, appliedCommandTypes, auditActionTypes, auditEvents, updateTaskInputs, get planVersion() { return snapshot.planVersion; } };
 }
 
 async function post(app: ReturnType<typeof createApp>, path: string, body: unknown) {
@@ -1018,5 +1080,248 @@ describe("agent /execute → addressable receipt (auditEventId / correlationId)"
     expect(results[0]!.status).toBe("conflict");
     expect(results[0]!.auditEventId).toBeUndefined();
     expect(execute.body.correlationId).toBeUndefined();
+  });
+});
+
+describe("Н15: offerable CRM-мутации агента (change_opportunity_stage / update_crm_client)", () => {
+  const crmActor: TenantUser = { id: "user-planner", tenantId: "tenant-1", name: "Планировщик", accessProfileId: "p" };
+  const crmProfile = {
+    id: "p",
+    permissions: ["tenant.clients.manage", "tenant.opportunities.manage"]
+  } as never;
+  const readerProfile = { id: "reader", permissions: ["tenant.projects.read"] } as never;
+
+  it("оба инструмента стали offerable (payload-backed карточки есть)", () => {
+    const byName = new Map(AGENT_TOOLS.map((tool) => [tool.name, tool]));
+    expect(isAgentToolOfferable(byName.get("change_opportunity_stage")!)).toBe(true);
+    expect(isAgentToolOfferable(byName.get("update_crm_client")!)).toBe(true);
+    // Остальные CRM-мутации по-прежнему вне набора — generic-preview недостаточно честен.
+    expect(isAgentToolOfferable(byName.get("update_crm_opportunity")!)).toBe(false);
+    expect(isAgentToolOfferable(byName.get("create_crm_client")!)).toBe(false);
+  });
+
+  it("change_opportunity_stage: карточка «было → станет» из текущего состояния и честная пометка об отсутствии optimistic-lock", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "stage-negotiation" } }
+    );
+    expect(metadata.title).toBe("Сменить стадию сделки: «Сделка на смету» · сделка opp-1");
+    expect(metadata.preview.before).toBe("стадия: Новая");
+    expect(metadata.preview.after).toContain("стадия: Новая → Переговоры");
+    // Optimistic-lock у сделок отсутствует — карточка честно предупреждает,
+    // preconditionVersions пуст (execute идёт без версии записи).
+    expect(metadata.preview.after).toContain("версия записи не проверяется");
+    expect(metadata.preconditionVersions).toEqual({});
+    expect(metadata.capability).toBeUndefined();
+  });
+
+  it("change_opportunity_stage: карточка честно блокирует несуществующую стадию и невалидный id кодами governed-парсера", async () => {
+    const harness = createHarness();
+    const ghostStage = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "stage-ghost" } }
+    );
+    expect(ghostStage.capability).toEqual({ allowed: false, reason: "deal_stage_not_found" });
+
+    const invalidStageId = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "X!!" } }
+    );
+    expect(invalidStageId.capability).toEqual({ allowed: false, reason: "invalid_deal_stage_id" });
+  });
+
+  it("change_opportunity_stage: без прав карточка не раскрывает данные сделки", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, readerProfile,
+      { tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "stage-negotiation" } }
+    );
+    expect(metadata.preview.before).toBe("Данные сделки недоступны");
+    expect(metadata.title).toBeUndefined();
+    expect(metadata.capability).toEqual({ allowed: false, reason: "opportunity_manage_permission_required" });
+  });
+
+  it("change_opportunity_stage: финальная сделка — карточка честно блокирует переход (opportunity_stage_locked)", async () => {
+    const harness = createHarness();
+    harness.opportunity.status = "won_closed";
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "stage-negotiation" } }
+    );
+    expect(metadata.capability).toEqual({ allowed: false, reason: "opportunity_stage_locked" });
+  });
+
+  it("change_opportunity_stage: execute переотправляет в governed /stage — реальная смена, правила воронки и двойной audit", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "stage-negotiation" } }]
+    });
+
+    expect(execute.status).toBe(200);
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]!.error).toBeUndefined();
+    expect((execute.body.results as Array<{ status: string }>)[0]).toMatchObject({ status: "applied" });
+    expect(harness.stageUpdates).toEqual([
+      { tenantId: "tenant-1", opportunityId: "opp-1", stageId: "stage-negotiation", pipelineId: "pipeline-1" }
+    ]);
+    // Штатный audit governed-роута + отдельное agent-provenance событие.
+    expect(harness.auditActionTypes).toContain("opportunity.stage_updated");
+    expect(harness.auditActionTypes).toContain("agent.change_opportunity_stage.applied");
+    // Честный audit-before: текущая стадия из состояния, а не эхо входа.
+    const agentEvent = harness.auditEvents.find((event) => event.actionType === "agent.change_opportunity_stage.applied");
+    expect(agentEvent?.beforeState).toEqual({ value: "Новая" });
+  });
+
+  it("change_opportunity_stage: невалидный stageId на execute — fail-closed кодом парсера, без переотправки", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "X!!" } }]
+    });
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
+      status: "failed",
+      error: "invalid_deal_stage_id"
+    });
+    expect(harness.stageUpdates).toEqual([]);
+  });
+
+  it("change_opportunity_stage: финальная сделка на execute — конфликт governed-роута (opportunity_stage_locked)", async () => {
+    const harness = createHarness();
+    harness.opportunity.status = "won_closed";
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "stage-negotiation" } }]
+    });
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
+      status: "conflict",
+      error: "opportunity_stage_locked"
+    });
+    expect(harness.stageUpdates).toEqual([]);
+  });
+
+  it("change_opportunity_stage: без права tenant.opportunities.manage — denied с agent-audit", async () => {
+    const harness = createHarness({ permissions: ["tenant.projects.read"] });
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "stage-negotiation" } }]
+    });
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
+      status: "denied",
+      error: "permission_missing"
+    });
+    expect(harness.stageUpdates).toEqual([]);
+    expect(harness.auditActionTypes).toContain("agent.change_opportunity_stage.denied");
+  });
+
+  it("update_crm_client: карточка показывает field-level diff и честную пометку об отсутствии optimistic-lock", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "update_crm_client", input: { clientId: "client-1", fields: { name: "ООО Лютик", status: "archived" } } }
+    );
+    expect(metadata.title).toBe("Изменить клиента: «ООО Ромашка» · клиент client-1");
+    expect(metadata.preview.before).toBe("название: ООО Ромашка; статус: active");
+    expect(metadata.preview.after).toContain("название: ООО Ромашка → ООО Лютик");
+    expect(metadata.preview.after).toContain("статус: active → archived");
+    expect(metadata.preview.after).toContain("версия записи не проверяется");
+    expect(metadata.preconditionVersions).toEqual({});
+    expect(metadata.capability).toBeUndefined();
+  });
+
+  it("update_crm_client: карточка честно блокирует неизвестное поле, нестроковое значение и невалидный enum статуса", async () => {
+    const harness = createHarness();
+    // Поле из старого (нечестного) описания инструмента — в контракте клиента его нет.
+    const unknownField = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "update_crm_client", input: { clientId: "client-1", fields: { website: "https://x" } } }
+    );
+    expect(unknownField.preview.after).toContain("website: не поддерживается");
+    expect(unknownField.capability).toEqual({ allowed: false, reason: "unsupported_update_field" });
+    // Нестроковое значение: getOptionalString парсера молча превратил бы его в null —
+    // типовой гард отказывает fail-closed (урок ревью #257).
+    const nonString = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "update_crm_client", input: { clientId: "client-1", fields: { description: 123 } } }
+    );
+    expect(nonString.capability).toEqual({ allowed: false, reason: "invalid_update_field_value" });
+    // Невалидный enum ловит ТОТ ЖЕ парсер, что и governed PATCH.
+    const badStatus = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "update_crm_client", input: { clientId: "client-1", fields: { status: "paused" } } }
+    );
+    expect(badStatus.capability).toEqual({ allowed: false, reason: "invalid_status" });
+  });
+
+  it("update_crm_client: без прав карточка не раскрывает данные клиента", async () => {
+    const harness = createHarness();
+    const metadata = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, readerProfile,
+      { tool: "update_crm_client", input: { clientId: "client-1", fields: { name: "ООО Лютик" } } }
+    );
+    expect(metadata.preview.before).toBe("Данные клиента недоступны");
+    expect(metadata.title).toBeUndefined();
+    expect(metadata.capability).toEqual({ allowed: false, reason: "client_manage_permission_required" });
+  });
+
+  it("update_crm_client: execute мёржит частичные поля и СОХРАНЯЕТ незатронутые описание и статус", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "update_crm_client", input: { clientId: "client-1", fields: { name: "ООО Лютик" } } }]
+    });
+
+    expect(execute.status).toBe(200);
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]!.error).toBeUndefined();
+    expect((execute.body.results as Array<{ status: string }>)[0]).toMatchObject({ status: "applied" });
+    // Незатронутые поля пришли из текущего состояния, а не сброшены дефолтами парсера.
+    expect(harness.updateClientInputs).toEqual([{
+      id: "client-1",
+      tenantId: "tenant-1",
+      name: "ООО Лютик",
+      description: "Оптовый заказчик",
+      status: "active"
+    }]);
+    expect(harness.auditActionTypes).toContain("client.updated");
+    expect(harness.auditActionTypes).toContain("agent.update_crm_client.applied");
+  });
+
+  it("update_crm_client: неизвестное поле и невалидные значения отвергаются fail-closed до переотправки", async () => {
+    const harness = createHarness();
+    const unknownField = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "update_crm_client", input: { clientId: "client-1", fields: { website: "https://x" } } }]
+    });
+    expect((unknownField.body.results as Array<{ error?: string }>)[0]!.error).toBe("unsupported_update_field");
+
+    const nonString = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "update_crm_client", input: { clientId: "client-1", fields: { description: 123 } } }]
+    });
+    expect((nonString.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_update_field_value");
+
+    const badStatus = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "update_crm_client", input: { clientId: "client-1", fields: { status: "paused" } } }]
+    });
+    expect((badStatus.body.results as Array<{ error?: string }>)[0]!.error).toBe("invalid_status");
+    expect(harness.updateClientInputs).toEqual([]);
+  });
+
+  it("update_crm_client: неизвестный клиент — честный 404 без переотправки", async () => {
+    const harness = createHarness();
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "update_crm_client", input: { clientId: "client-ghost", fields: { name: "ООО Лютик" } } }]
+    });
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
+      status: "failed",
+      error: "client_not_found"
+    });
+    expect(harness.updateClientInputs).toEqual([]);
+  });
+
+  it("update_crm_client: без права tenant.clients.manage — denied с agent-audit", async () => {
+    const harness = createHarness({ permissions: ["tenant.projects.read"] });
+    const execute = await post(harness.app, "/api/workspace/agent/execute", {
+      actions: [{ tool: "update_crm_client", input: { clientId: "client-1", fields: { name: "ООО Лютик" } } }]
+    });
+    expect((execute.body.results as Array<{ status: string; error?: string }>)[0]).toMatchObject({
+      status: "denied",
+      error: "permission_missing"
+    });
+    expect(harness.updateClientInputs).toEqual([]);
+    expect(harness.auditActionTypes).toContain("agent.update_crm_client.denied");
   });
 });

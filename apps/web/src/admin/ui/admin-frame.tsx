@@ -13,7 +13,10 @@ const ADMIN_TAB_HREF: Record<string, string> = {
   "Пользователи": "/admin/users",
   "Роли": "/admin/roles",
   "Безопасность": "/admin/security",
-  "Аудит": "/admin/audit"
+  "Аудит": "/admin/audit",
+  "Отсутствия": "/admin/absences",
+  "Произв. календарь": "/admin/production-calendar",
+  "Фоновые задачи": "/admin/background-jobs"
 };
 
 /**
@@ -22,7 +25,7 @@ const ADMIN_TAB_HREF: Record<string, string> = {
  * WorkspaceShell с активным пунктом «Администрирование».
  * Прототип: переключение табов не подключено (handoff-каркас) — как в CRM/Delivery.
  */
-export const ADMIN_TABS = ["Пользователи", "Роли", "Безопасность", "Аудит"] as const;
+export const ADMIN_TABS = ["Пользователи", "Роли", "Безопасность", "Аудит", "Отсутствия", "Произв. календарь", "Фоновые задачи"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
 
 // Права, любое из которых открывает админку (зеркало гейта пункта навигации).
@@ -35,7 +38,14 @@ const ADMIN_PERMISSIONS = [
   // Вкладка «Безопасность» живёт на правах конфигурации воркспейса — роль
   // только с ними тоже должна попадать в админку (ревью PR #224).
   "tenant.workspace_config.read",
-  "tenant.workspace_config.manage"
+  "tenant.workspace_config.manage",
+  // Операционные вкладки (Н3/Н4): «Отсутствия» — RBAC absencesRoutes,
+  // «Фоновые задачи» — RBAC backgroundJobRoutes; «Произв. календарь» живёт
+  // на workspace_config (см. productionCalendarRoutes).
+  "tenant.absences.read",
+  "tenant.absences.manage",
+  "tenant.background_jobs.read",
+  "tenant.background_jobs.manage"
 ];
 
 export function AdminFrame({

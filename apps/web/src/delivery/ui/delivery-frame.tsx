@@ -31,6 +31,8 @@ const DELIVERY_TAB_SLUGS = {
   "Сценарии": "scenarios",
   "Baseline": "baseline",
   "Коммиты": "commits",
+  "Контур": "control",
+  "Знания": "knowledge",
   "Настройки": "settings"
 } as const;
 

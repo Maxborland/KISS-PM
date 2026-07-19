@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import type { ScenarioProposal } from "@kiss-pm/domain";
-import { Check, Loader2, RefreshCw, Sparkles, TriangleAlert, X } from "lucide-react";
+import type { PlanningCommand, ScenarioProposal } from "@kiss-pm/domain";
+import type { AutoSolverWireProposal } from "@kiss-pm/planning-client";
+import { Check, Loader2, RefreshCw, Sparkles, TriangleAlert, Wand2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,24 @@ const STALE_SCENARIO_CODES = new Set([
   "planning_scenario_engine_mismatch",
   "planning_scenario_target_mismatch"
 ]);
+// Авто-солвер: создание run требует управления планом И ресурсами (guard'ы create-роута);
+// применение — те же права (команды предложений — мутации плана/назначений).
+const SOLVER_PLAN_PERMISSION = "tenant.project_plan.manage";
+const SOLVER_RESOURCES_PERMISSION = "tenant.project_resources.manage";
+// 409/404-коды apply солвера, после которых persisted-run заведомо неприменим —
+// сбрасываем карточку, пользователь пересчитывает заново (RU-тексты в PLANNING_ERROR_MESSAGES)
+const STALE_SOLVER_CODES = new Set([
+  "planning_solver_run_already_applied",
+  "planning_solver_run_expired",
+  "planning_solver_payload_hash_mismatch",
+  "planning_solver_run_not_found",
+  "planning_solver_proposal_not_found",
+  "planning_solver_invalid"
+]);
+const SOLVER_KIND_META: Record<AutoSolverWireProposal["kind"], { label: string; desc: string }> = {
+  no_overlap: { label: "Без перегрузов", desc: "Расписание пересобрано так, чтобы назначения ресурсов не пересекались" },
+  accepted_overload: { label: "С принятием перегруза", desc: "Более ранний финиш за счёт осознанного перегруза — требуется причина риска" }
+};
 const UNAVAILABLE_REASON: Record<Exclude<Proposal["unavailableReason"], null>, string> = {
   target_bucket_not_found: "Целевой день перегруза больше не найден.",
   target_assignment_not_found: "Назначение, создающее перегруз, больше не найдено.",
@@ -72,7 +91,7 @@ const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Dat
 const riskOf = (score: number) => score >= 67 ? { label: "высокий риск", cls: "bg-[var(--danger-soft)] text-[var(--danger-text)]" } : score >= 34 ? { label: "средний риск", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" } : { label: "низкий риск", cls: "bg-[var(--success-soft)] text-[var(--success-text)]" };
 
 export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
-  const { readModel, status, error, reload, previewScenarios, applyScenario, rejectScenario, previewBatch } = usePlanning(projectId);
+  const { readModel, status, error, reload, previewScenarios, applyScenario, rejectScenario, previewBatch, runAutoSolver, applySolverProposal } = usePlanning(projectId);
   const { live } = usePlanningRuntime();
   // SSE план-событий: чужой коммит делает рассчитанные предложения потенциально устаревшими —
   // баннер с «Обновить» (сброс proposals → авто-превью пересчитает), автоперезагрузки нет.
@@ -88,6 +107,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const permissions = sessionUser?.permissions ?? [];
   const canPreviewScenarios = hasPermission(permissions, SCENARIO_PREVIEW_PERMISSION);
   const canApplyScenarios = hasPermission(permissions, SCENARIO_APPLY_PERMISSION);
+  const canUseSolver = hasPermission(permissions, SOLVER_PLAN_PERMISSION) && hasPermission(permissions, SOLVER_RESOURCES_PERMISSION);
   // Фолбэк имени: под ограниченной ролью справочник людей может отдать 403 — резолвер вернёт сырой id.
   // Показываем «Участник xxxx» вместо user-/r-идентификатора (G8-08).
   const resName = (id: string) => { const n = resDir.name(id); return n === id ? `Участник ${id.slice(-4)}` : n; };
@@ -109,8 +129,17 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [scenarioErr, setScenarioErr] = useState<string | null>(null);
   // Квитанция последнего применения этой сессии: auditEventId из ответа apply + ссылка на вкладку «Коммиты».
-  const [lastApplied, setLastApplied] = useState<{ label: string; planVersion: number; auditEventId: string } | null>(null);
+  // source различает формулировку: сценарный профиль vs предложение авто-солвера.
+  const [lastApplied, setLastApplied] = useState<{ label: string; planVersion: number; auditEventId: string; source: "scenario" | "solver" } | null>(null);
   const [compareDetails, setCompareDetails] = useState<CompareDetails | null>(null);
+  // Авто-солвер (второй источник предложений): персистентный run с TTL 30 мин, одноразовый.
+  const [solverRun, setSolverRun] = useState<{ runId: string; proposals: AutoSolverWireProposal[]; expiresAt: string } | null>(null);
+  const [solverBusy, setSolverBusy] = useState(false);
+  const [solverApplyBusy, setSolverApplyBusy] = useState(false);
+  const [solverErr, setSolverErr] = useState<string | null>(null);
+  const [solverExpired, setSolverExpired] = useState(false);
+  const [solverRiskReason, setSolverRiskReason] = useState("");
+  const [solverReasonError, setSolverReasonError] = useState<string | null>(null);
 
   // entity-level последствия: команды выбранного proposal прогоняем через СУЩЕСТВУЮЩИЙ
   // батч-превью (read-only) и берём даты задач до→после из before/after read-model.
@@ -193,6 +222,23 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     return () => clearTimeout(timer);
   }, [previewExpiresAt]);
 
+  // клиентский таймер TTL run солвера: мягкое «истекло» (Применить disabled + подсказка).
+  // Авторитет — серверный 409 planning_solver_run_expired.
+  useEffect(() => {
+    if (!solverRun) { setSolverExpired(false); return; }
+    const msLeft = Date.parse(solverRun.expiresAt) - Date.now();
+    if (Number.isNaN(msLeft)) { setSolverExpired(false); return; }
+    if (msLeft <= 0) { setSolverExpired(true); return; }
+    setSolverExpired(false);
+    // cap 2^31−1: больший интервал переполняет 32-битный setTimeout и сработал бы мгновенно;
+    // по срабатыванию перепроверяем фактическое истечение (боевой TTL 30 мин всегда меньше капа)
+    const timer = setTimeout(
+      () => setSolverExpired(Date.parse(solverRun.expiresAt) - Date.now() <= 0),
+      Math.min(msLeft, 2_147_483_647)
+    );
+    return () => clearTimeout(timer);
+  }, [solverRun]);
+
   // авто-превью для худшего перегруза при загрузке и после применения (planVersion сменился → proposals=null)
   useEffect(() => {
     if (!canPreviewScenarios || !readModel || !target || proposals !== null || previewBusy) return;
@@ -225,10 +271,18 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const dayN = (iso: string | null) => (iso ? isoToDay(iso) : 0);
   const finishDelta = (p: Proposal) => dayN(p.explainability.finishDate) - dayN(model.baseFinish);
   const overloadDelta = (p: Proposal) => p.explainability.overloadMinutes - baseOverloadMin;
-  const deriveDiff = (p: Proposal): DiffRow[] => p.planDelta.commands.map((cmd): DiffRow => {
+  // diff-list — деривация из списка команд; общая для сценарных proposals и предложений авто-солвера
+  const deriveDiff = (commands: PlanningCommand[]): DiffRow[] => commands.map((cmd): DiffRow => {
     // payload дискриминированного PlanningCommand читаем по строковым ключам (diff — деривация для UI)
     const pay = (cmd.payload ?? {}) as Record<string, unknown>;
-    if (cmd.type === "risk.accept_overload") return { wbs: "—", title: target ? `${resName(target.resourceId)} · ${ddmm(target.date)}` : "—", detail: "Перегруз принят как осознанный риск", delta: "+0 дн" };
+    if (cmd.type === "risk.accept_overload") {
+      // канонический overloadId = `${resourceId}:${dateIso}` — самодостаточен (у солвера цель не выбирается в UI)
+      const oid = String(pay.overloadId ?? "");
+      const sep = oid.lastIndexOf(":");
+      const [orid, odate] = sep > 0 ? [oid.slice(0, sep), oid.slice(sep + 1)] : [null, null];
+      const title = orid && odate ? `${resName(orid)} · ${ddmm(odate)}` : target ? `${resName(target.resourceId)} · ${ddmm(target.date)}` : "—";
+      return { wbs: "—", title, detail: "Перегруз принят как осознанный риск", delta: "+0 дн" };
+    }
     const taskId = String(pay.taskId ?? ""); const rid = String(pay.resourceId ?? ""); const wm = Number(pay.workMinutes ?? 0);
     const task = model.taskById.get(taskId);
     const existing = model.asgById.get(String(pay.id ?? ""));
@@ -245,8 +299,9 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     setApplyBusy(false);
     if (res.ok) {
       toast.success(`Сценарий «${PROFILE_META[p.profile].label}» применён · коммит v${res.planVersion}${prototypeNotesEnabled ? ` · scenarioRunId ${res.scenarioRunId}` : ""}`);
-      setLastApplied({ label: PROFILE_META[p.profile].label, planVersion: res.planVersion, auditEventId: res.auditEventId });
+      setLastApplied({ label: PROFILE_META[p.profile].label, planVersion: res.planVersion, auditEventId: res.auditEventId, source: "scenario" });
       setRiskReason(""); setCompareId(null); setProposals(null); // авто-превью пересчитает по новому состоянию
+      setSolverRun(null); setSolverErr(null); // run солвера рассчитан против прежней версии плана — заведомо неприменим
     } else if (res.conflict) { setScenarioErr("Конфликт версий — перезагружено, запросите сценарии заново"); setProposals(null); }
     else if (res.code === "accepted_risk_reason_required") setReasonError("Требуется причина принятия риска");
     // persisted-run больше неприменим (истёк/не найден/уже применён/integrity-mismatch):
@@ -285,6 +340,43 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     }
   };
 
+  // ── Авто-солвер: расчёт (persisted run) и применение предложения ────────────
+  const onRunSolver = async () => {
+    if (!canUseSolver) return;
+    setSolverBusy(true); setSolverErr(null); setSolverRun(null); setSolverReasonError(null);
+    const res = await runAutoSolver("schedule");
+    setSolverBusy(false);
+    if (res.ok) setSolverRun({ runId: res.runId, proposals: res.proposals, expiresAt: res.expiresAt });
+    else setSolverErr(res.conflict ? "Конфликт версий — данные обновлены, рассчитайте заново" : res.message);
+  };
+
+  const onApplySolver = async (p: AutoSolverWireProposal) => {
+    if (!canUseSolver || !solverRun) return;
+    const requiresReason = p.conflictEffect === "accepted_overload";
+    if (requiresReason && !solverRiskReason.trim()) { setSolverReasonError("Укажите причину принятия риска (предложение принимает перегруз)"); return; }
+    setSolverApplyBusy(true); setSolverErr(null); setSolverReasonError(null);
+    const res = await applySolverProposal(solverRun.runId, p.id, requiresReason ? solverRiskReason.trim() : undefined);
+    setSolverApplyBusy(false);
+    if (res.ok) {
+      toast.success(`Предложение авто-солвера применено · коммит v${res.planVersion}`);
+      setLastApplied({ label: SOLVER_KIND_META[p.kind].label, planVersion: res.planVersion, auditEventId: res.auditEventId, source: "solver" });
+      setSolverRiskReason(""); setSolverRun(null);
+      setProposals(null); setCompareId(null); // сценарное авто-превью пересчитает по новому состоянию плана
+    } else if (res.conflict) {
+      setSolverErr("Конфликт версий — данные обновлены, рассчитайте заново");
+      setSolverRun(null);
+    } else if (res.code === "accepted_risk_reason_required") {
+      setSolverReasonError("Требуется причина принятия риска");
+    } else if (res.code && STALE_SOLVER_CODES.has(res.code)) {
+      // run заведомо неприменим (уже применён/истёк/повреждён): RU-текст кода + сброс карточки
+      if (res.code === "planning_solver_run_already_applied") await reload();
+      setSolverErr(res.message);
+      setSolverRun(null);
+    } else {
+      toast.error(`Отклонено: ${res.message}`);
+    }
+  };
+
   const FinishChip = ({ d }: { d: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", d > 0 ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{d > 0 ? `+${d} дн` : "+0 дн"}</span>;
   const OverChip = ({ m }: { m: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", m < 0 ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{m < 0 ? `−${h(-m)} ч` : "0 ч"}</span>;
 
@@ -316,7 +408,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         <PlanUpdatedBanner
           version={remotePlanVersion}
           note="Рассчитанные предложения и предпросмотр могли устареть."
-          onReload={() => { setProposals(null); setCompareId(null); setScenarioErr(null); void reload(); }}
+          onReload={() => { setProposals(null); setCompareId(null); setScenarioErr(null); setSolverRun(null); setSolverErr(null); void reload(); }}
         />
       ) : null}
 
@@ -325,7 +417,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         <div data-testid="scenario-apply-receipt" className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--success-border,var(--border))] bg-[var(--success-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--success-text)]">
           <Check className="size-4 shrink-0" aria-hidden />
           {/* формулировка сознательно отличается от toast («Сценарий … применён»): e2e ловит текст тоста substring-регекспом */}
-          <span>Применён сценарий «{lastApplied.label}» — коммит v{lastApplied.planVersion}.</span>
+          <span>{lastApplied.source === "solver" ? <>Применено предложение авто-солвера «{lastApplied.label}» — коммит v{lastApplied.planVersion}.</> : <>Применён сценарий «{lastApplied.label}» — коммит v{lastApplied.planVersion}.</>}</span>
           <span className="mono text-[length:var(--text-2xs)] text-[var(--muted-strong)]">{lastApplied.auditEventId}</span>
           <Link href={`/projects/${encodeURIComponent(projectId)}/commits?commit=${encodeURIComponent(lastApplied.auditEventId)}`} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">Открыть в Коммитах</Link>
         </div>
@@ -467,7 +559,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                         ) : null}
 
                         {/* diff-list изменений (из planDelta.commands — контрактные данные) */}
-                        {(() => { const diff = deriveDiff(p); return (
+                        {(() => { const diff = deriveDiff(p.planDelta.commands); return (
                         <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)]">
                           <div className="border-b border-[var(--border-subtle)] px-2.5 py-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Изменения ({diff.length})</div>
                           {diff.map((d, i) => (
@@ -496,6 +588,109 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
       )}
 
       {scenarioErr ? <div className="mt-2 rounded-[var(--radius-sm)] border border-[var(--danger)] bg-[var(--danger-soft)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text)]">{scenarioErr}</div> : null}
+
+      {/* ── Авто-солвер: второй источник предложений (Р11/PR7b). Persisted run (mode schedule)
+           с TTL; применение — существующий apply-роут run'а (серверные preview→apply и 409-гарды).
+           В mock-режиме (Storybook) секции нет: у контрола не было бы работающего пути. ── */}
+      {live ? (
+        <section data-testid="solver-section" className="mt-5">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <div>
+              <h3 className="font-[family-name:var(--font-display)] text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">Авто-солвер</h3>
+              <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Полный пересчёт расписания: сервер сохраняет расчёт как предложение с ограниченным сроком; выбранный вариант применяется одной операцией (коммит плана).</p>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              {solverRun ? (
+                solverExpired
+                  ? <span data-testid="solver-ttl-expired" className="inline-flex items-center rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Расчёт истёк — рассчитайте заново</span>
+                  : <span data-testid="solver-ttl" className="inline-flex items-center rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Расчёт действует до {hhmmLocal(solverRun.expiresAt)}</span>
+              ) : null}
+              {canUseSolver ? (
+                <Button data-testid="solver-run" variant="secondary" size="sm" disabled={solverBusy} onClick={() => void onRunSolver()}>
+                  <Wand2 className={cn("size-3.5", solverBusy && "animate-spin")} aria-hidden />{solverRun ? "Рассчитать заново" : "Рассчитать"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          {!canUseSolver ? (
+            <div className="flex h-[88px] items-center justify-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[length:var(--text-sm)] text-[var(--muted)]">Недостаточно прав для запуска авто-солвера: требуется управление планом и ресурсами проекта.</div>
+          ) : solverBusy ? (
+            <div className="flex h-[120px] items-center justify-center gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)]"><Loader2 className="size-4 animate-spin" aria-hidden /> Расчёт плана…</div>
+          ) : solverRun === null ? (
+            <div data-testid="solver-idle" className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">Нажмите «Рассчитать» — солвер предложит варианты расписания по текущему плану, ничего не меняя до применения.</div>
+          ) : solverRun.proposals.length === 0 ? (
+            <div data-testid="solver-empty" className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-6 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">Солвер не нашёл предложений — расписание уже соответствует его критериям.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {solverRun.proposals.map((p, index) => {
+                const kindMeta = SOLVER_KIND_META[p.kind];
+                const risk = riskOf(p.explainability.riskScore);
+                const finishD = dayN(p.explainability.finishDate) - dayN(model.baseFinish);
+                const diff = deriveDiff(p.planDelta.commands);
+                const requiresReason = p.conflictEffect === "accepted_overload";
+                return (
+                  <div key={p.id} data-testid={`solver-card-${p.id}`} className={cn("rounded-[var(--radius-card)] border bg-[var(--panel)] p-3 shadow-[var(--shadow-card)]", index === 0 ? "border-[var(--info)] shadow-[0_0_0_1px_var(--info)]" : "border-[var(--border)]")}>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      <div className="min-w-[200px] flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[length:var(--text-base)] font-bold text-[var(--text-strong)]">{kindMeta.label}</span>
+                          {index === 0 ? <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--info-soft)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold text-[var(--info)]"><Sparkles className="size-3" aria-hidden />рекомендуется</span> : null}
+                        </div>
+                        <div className="mt-0.5 text-[length:var(--text-xs)] text-[var(--muted)]">{kindMeta.desc}</div>
+                        {p.explainability.deadlineDeltaDays > 0 ? <div className="mt-1 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Срыв дедлайна: +{p.explainability.deadlineDeltaDays} дн</div> : null}
+                      </div>
+                      <div className="w-[120px]">
+                        <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Финиш</div>
+                        <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{ddmm(p.explainability.finishDate)}</span><FinishChip d={finishD} /></div>
+                      </div>
+                      <div className="w-[110px]">
+                        <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Перегруз</div>
+                        <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{h(p.explainability.overloadMinutes)} ч</span>{requiresReason ? <span className="rounded-full bg-[var(--warning-soft)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold text-[var(--warning-text)]">принят</span> : null}</div>
+                      </div>
+                      <div className="w-[120px]">
+                        <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Изм. задач</div>
+                        <div className="mt-0.5 flex items-center gap-1"><span className="mono text-[length:var(--text-sm)] text-[var(--text)]">{p.explainability.changedTaskIds.length}</span><span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", risk.cls)}>{risk.label}</span></div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <Button variant="default" size="sm" disabled={solverApplyBusy || solverExpired} title={solverExpired ? "Расчёт истёк — рассчитайте заново" : undefined} onClick={() => void onApplySolver(p)}><Check className="size-3.5" aria-hidden />Применить</Button>
+                      </div>
+                    </div>
+
+                    {/* причина принятия риска — обязательна для предложения с принятым перегрузом */}
+                    {requiresReason ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-2.5 py-1.5">
+                        <span className="text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Причина принятия риска (обязательна):</span>
+                        <input value={solverRiskReason} aria-invalid={solverReasonError ? true : undefined} onChange={(e) => { setSolverReasonError(null); setSolverRiskReason(e.target.value); }} placeholder="напр. согласовано с РП, срок критичнее" className="h-7 min-w-[240px] flex-1 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-sm)] outline-none focus:border-[var(--accent)] aria-[invalid]:border-[var(--danger)]" />
+                        {solverReasonError ? <span role="alert" className="w-full text-[length:var(--text-xs)] font-medium text-[var(--danger-text)]">{solverReasonError}</span> : null}
+                      </div>
+                    ) : null}
+
+                    {/* дельта плана — из контрактного planDelta.commands (тот же diff-рендер, что у сценариев) */}
+                    {diff.length > 0 ? (
+                      <div className="mt-2 rounded-[var(--radius-md)] border border-[var(--border)]">
+                        <div className="border-b border-[var(--border-subtle)] px-2.5 py-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Изменения ({diff.length})</div>
+                        {diff.slice(0, COMPARE_TASK_ROWS_LIMIT).map((d, i) => (
+                          <div key={i} className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2.5 py-1.5 last:border-b-0 text-[length:var(--text-xs)]">
+                            <span className="mono w-[42px] shrink-0 text-[var(--muted)]">{d.wbs}</span>
+                            <span className="min-w-0 flex-1 truncate text-[var(--text)]"><span className="font-medium">{d.title}</span> · {d.detail}</span>
+                            <span className="mono shrink-0 text-[var(--muted-strong)]">{d.delta}</span>
+                          </div>
+                        ))}
+                        {diff.length > COMPARE_TASK_ROWS_LIMIT ? (
+                          <div className="px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--muted)]">…и ещё {diff.length - COMPARE_TASK_ROWS_LIMIT} изменений</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {solverErr ? <div data-testid="solver-error" className="mt-2 rounded-[var(--radius-sm)] border border-[var(--danger)] bg-[var(--danger-soft)] px-2.5 py-1.5 text-[length:var(--text-xs)] text-[var(--danger-text)]">{solverErr}</div> : null}
+        </section>
+      ) : null}
     </DeliveryFrame>
   );
 }

@@ -9,6 +9,7 @@ import {
   normalizeBackgroundJobPriority,
   parseBackgroundJobKind,
   parseBackgroundJobStatus,
+  type BackgroundJobKind,
   type TenantUser
 } from "@kiss-pm/domain";
 import type { Hono } from "hono";
@@ -21,6 +22,17 @@ type BackgroundJobRouteDeps = Pick<
   ApiRouteDeps,
   "dataSource" | "getActorProfile" | "getSessionActorFromHeaders"
 >;
+
+// Boundary-kinds без реализации (см. jobHandlers.ts): их «выполнение» ничего не
+// делает, поэтому постановка в очередь честно отклоняется 501 not_implemented —
+// вместо фиктивного успеха и вечно висящей queued-строки. Дефолтный сид
+// расписаний (ensureDefaultBackgroundJobSchedules) эти kinds не засевает.
+export const NOT_IMPLEMENTED_BACKGROUND_JOB_KINDS: ReadonlySet<BackgroundJobKind> = new Set([
+  "notification.dispatch",
+  "connector.sync",
+  "search.projection_rebuild",
+  "calls.recording_compose"
+]);
 
 export function registerBackgroundJobRoutes(app: Hono, deps: BackgroundJobRouteDeps) {
   app.get("/api/workspace/background-jobs/runs", async (context) => {
@@ -79,6 +91,9 @@ export function registerBackgroundJobRoutes(app: Hono, deps: BackgroundJobRouteD
     if (!body.ok) return context.json({ error: body.error }, body.status);
     const parsed = parseEnqueueBody(body.value);
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    if (NOT_IMPLEMENTED_BACKGROUND_JOB_KINDS.has(parsed.value.kind)) {
+      return context.json({ error: "background_job_kind_not_implemented" }, 501);
+    }
 
     const job = await deps.dataSource.enqueueBackgroundJob({
       id: `background-job-${randomUUID()}`,

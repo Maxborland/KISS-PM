@@ -7,7 +7,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { adminErr } from "@/admin/ui/admin-bits";
@@ -36,11 +35,11 @@ export function AdminSecuritySurface() {
 
   const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : !form ? "loading" : "ready";
 
+  // 2FA/SSO — reserved-поля контракта (Н5): контролов в UI нет, значения не меняются,
+  // поэтому в dirty участвуют только реально редактируемые поля.
   const dirty = useMemo(() => {
     if (!policy || !form) return false;
     return (
-      policy.twoFactorRequired !== form.twoFactorRequired ||
-      policy.ssoSamlEnabled !== form.ssoSamlEnabled ||
       policy.sessionTimeoutHours !== form.sessionTimeoutHours ||
       !sameList(policy.domainAllowlist, form.domainAllowlist)
     );
@@ -95,24 +94,17 @@ export function AdminSecuritySurface() {
             </div>
 
             <div className="flex flex-col divide-y divide-[var(--border-subtle)]">
-              {/* 2FA — капабилити в auth-стеке ещё нет: контрол честно недоступен,
-                  а не делает вид, что применяется (G6-01, no-fake-controls). */}
-              <label className="flex items-center justify-between gap-4 px-4 py-3 opacity-70">
-                <span className="flex flex-col gap-0.5">
-                  <span className={labelCls}>Обязательная двухфакторная аутентификация</span>
-                  <span className={hintCls}>Пока недоступна в этой версии: механизм 2FA ещё не реализован — настройка не применяется и поэтому отключена.</span>
+              {/* 2FA/SSO — механизмов в auth-стеке нет (Н5, решение зафиксировано: не реализуем сейчас).
+                  Вместо вечно-disabled свитчей — честный роадмап-текст БЕЗ псевдо-контролов
+                  (no-fake-controls). Поля twoFactorRequired/ssoSamlEnabled остаются в контракте
+                  как reserved и передаются при сохранении без изменений. */}
+              <div className="flex flex-col gap-0.5 px-4 py-3">
+                <span className={labelCls}>Двухфакторная аутентификация и единый вход (SSO)</span>
+                <span className={hintCls}>
+                  2FA и SSO (SAML) в этой версии не реализованы — настройки появятся здесь после
+                  реализации механизма в подсистеме аутентификации.
                 </span>
-                <Switch checked={form.twoFactorRequired} disabled aria-label="Обязательная двухфакторная аутентификация (недоступно в этой версии)" />
-              </label>
-
-              {/* SSO — аналогично: SAML-интеграции нет, честно недоступен. */}
-              <label className="flex items-center justify-between gap-4 px-4 py-3 opacity-70">
-                <span className="flex flex-col gap-0.5">
-                  <span className={labelCls}>Единый вход (SSO, SAML)</span>
-                  <span className={hintCls}>Пока недоступен в этой версии: SAML-интеграция ещё не реализована — настройка не применяется и поэтому отключена.</span>
-                </span>
-                <Switch checked={form.ssoSamlEnabled} disabled aria-label="Единый вход (SSO, SAML) (недоступно в этой версии)" />
-              </label>
+              </div>
 
               {/* Тайм-аут сессии — применяется при входе (срок жизни новой сессии). */}
               <div className="flex items-center justify-between gap-4 px-4 py-3">

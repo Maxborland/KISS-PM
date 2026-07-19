@@ -38,26 +38,6 @@ const storageAssetCleanup: BackgroundJobHandler = async (job, context) => {
   };
 };
 
-const notificationDispatch: BackgroundJobHandler = async () => ({
-  message: "Notification dispatch boundary completed",
-  metadata: { dispatched: 0, adapter: "in_app_persisted" }
-});
-
-const connectorSync: BackgroundJobHandler = async (job) => ({
-  message: "Connector sync boundary completed",
-  metadata: {
-    connectorType: typeof job.payload.connectorType === "string"
-      ? job.payload.connectorType
-      : "unspecified",
-    synced: 0
-  }
-});
-
-const searchProjectionRebuild: BackgroundJobHandler = async () => ({
-  message: "Search projection rebuild boundary completed",
-  metadata: { rebuilt: 0, projection: "metadata_runtime_v1" }
-});
-
 const capacityCacheWarmup: BackgroundJobHandler = async (job, context) => {
   const monthIso = parseMonthIso(String(job.payload.monthIso ?? ""));
   if (!monthIso) throw new Error("capacity_warmup_month_invalid");
@@ -127,13 +107,6 @@ const callRecordingJanitor: BackgroundJobHandler = async (job, context) => {
   };
 };
 
-// Deferred: mux the per-track recording files into a single MP4 (ffmpeg). v1 keeps
-// the per-track files; this is the registered boundary for the future compose step.
-const callRecordingCompose: BackgroundJobHandler = async () => ({
-  message: "Call recording compose boundary completed",
-  metadata: { composed: 0, note: "per-track files preserved; ffmpeg mux deferred" }
-});
-
 // Purge неприменённых истёкших planning runs (scenario + solver). Grace-период
 // (retentionHours) держит недавно истёкшие для честной диагностики «сценарий истёк»;
 // applied-runs не удаляются никогда — они историческая ссылка apply-квитанций.
@@ -153,27 +126,26 @@ const planningExpiredRunsPurge: BackgroundJobHandler = async (job, context) => {
   };
 };
 
+// Реестр содержит ТОЛЬКО реально реализованные kinds. Boundary-kinds без
+// реализации (notification.dispatch, connector.sync, search.projection_rebuild,
+// calls.recording_compose) намеренно отсутствуют: раньше их хендлеры возвращали
+// фиктивный успех («dispatched: 0») — теперь воркер такие джобы не claim'ит,
+// а постановка в очередь честно отклоняется 501 (см. backgroundJobRoutes.ts,
+// NOT_IMPLEMENTED_BACKGROUND_JOB_KINDS). Дефолтный сид расписаний
+// (ensureDefaultBackgroundJobSchedules) эти kinds и раньше не засевал.
 export function createDefaultBackgroundJobRegistry(): BackgroundJobRegistry {
   return {
     "storage.asset_cleanup": storageAssetCleanup,
-    "notification.dispatch": notificationDispatch,
-    "connector.sync": connectorSync,
-    "search.projection_rebuild": searchProjectionRebuild,
     "capacity.cache_warmup": capacityCacheWarmup,
     "calls.recording_janitor": callRecordingJanitor,
-    "calls.recording_compose": callRecordingCompose,
     "planning.expired_runs_purge": planningExpiredRunsPurge
   };
 }
 
 export const defaultBackgroundJobKinds: BackgroundJobKind[] = [
   "storage.asset_cleanup",
-  "notification.dispatch",
-  "connector.sync",
-  "search.projection_rebuild",
   "capacity.cache_warmup",
   "calls.recording_janitor",
-  "calls.recording_compose",
   "planning.expired_runs_purge"
 ];
 
