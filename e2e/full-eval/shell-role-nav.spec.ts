@@ -17,6 +17,9 @@ const NAV_ITEMS = [
   { label: "Проекты", href: "/projects" },
   { label: "Сделки", href: "/crm/deals" },
   { label: "Дашборд", href: "/dashboard" },
+  // «Загрузка» (/capacity) — пункт группы «Обзор», требует tenant.project_resources.read
+  // (workspace-shell.tsx:55). Добавлен в навигацию за 18 PR после исходной грамматики.
+  { label: "Загрузка", href: "/capacity" },
   { label: "Коммуникации", href: "/communications/chat" },
   { label: "Администрирование", href: "/admin" }
 ] as const;
@@ -89,8 +92,9 @@ const ROLES: RoleCase[] = [
     name: "Роман Ресурсный",
     initials: "РР",
     // tenant.project_resources.read открывает инструменты агента (detect_resource_overloads
-    // и др.) — «Агент» видим любой роли с хотя бы одним рабочим инструментом реестра.
-    visibleNav: ["Агент"]
+    // и др.) — «Агент» видим любой роли с хотя бы одним рабочим инструментом реестра; тот же
+    // грант открывает «Загрузка» (/capacity, workspace-shell.tsx:55).
+    visibleNav: ["Агент", "Загрузка"]
   },
   {
     code: "BADM",
@@ -222,7 +226,10 @@ for (const role of ROLES) {
 
     await capture(page, role, "desktop-nav");
 
-    const search = page.getByRole("combobox", { name: "Глобальный поиск" });
+    // Глобальный поиск — командная палитра (delivery/ui/global-search.tsx): кнопка
+    // «Поиск и команды…» открывает диалог с CommandInput (aria-label «Поиск и команды»);
+    // запрос ≥2 симв. с дебаунсом 300мс уходит в GET /api/workspace/search, результаты —
+    // CommandItem'ы (role=option). Прежний combobox «Глобальный поиск» удалён за 18 PR.
     const searchResponsePromise = page.waitForResponse((response) => {
       const url = new URL(response.url());
       return (
@@ -231,7 +238,14 @@ for (const role of ROLES) {
         url.searchParams.get("q") === "Вектор"
       );
     });
-    await search.fill("Вектор");
+    await page.getByRole("button", { name: "Поиск и команды" }).click();
+    const palette = page.getByRole("dialog", { name: "Поиск и команды" });
+    await expect(palette).toBeVisible();
+    // cmdk CommandInput — контролируемый input; надёжно триггерим onValueChange
+    // реальными нажатиями (pressSequentially), локатор — по уникальному placeholder.
+    const searchInput = palette.getByPlaceholder("Команда, проект, задача, сделка, клиент…");
+    await expect(searchInput).toBeFocused();
+    await searchInput.pressSequentially("Вектор");
     const searchResponse = await searchResponsePromise;
     const searchBody = (await searchResponse.json()) as {
       results: Array<{ title: string; route: string }>;
@@ -245,11 +259,11 @@ for (const role of ROLES) {
           route: role.searchResult.route
         })
       );
-      const result = page.getByRole("button", {
-        name: new RegExp(
-          `^${role.searchResult.typeLabel} ${escapeRegExp(role.searchResult.title)}(?:\\s|$)`
-        )
-      });
+      // «Портал подрядчиков Вектор» есть и в сделках, и в проектах — берём результат из
+      // группы «Проекты» (searchResult.route ведёт на карточку проекта, не сделки).
+      const result = palette
+        .getByRole("group", { name: "Проекты" })
+        .getByRole("option", { name: new RegExp(escapeRegExp(role.searchResult.title)) });
       await expect(result).toBeVisible();
       await result.click();
       await expect(page, `${role.code} search result navigation`).toHaveURL(
@@ -257,8 +271,9 @@ for (const role of ROLES) {
       );
     } else {
       expect(searchBody.results, `${role.code} has no routable Вектор result`).toEqual([]);
-      await expect(page.getByText("Ничего не найдено по «Вектор»")).toBeVisible();
-      await search.press("Escape");
+      await expect(palette.getByText("Ничего не найдено по «Вектор»")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(palette).toBeHidden();
     }
 
     await avatar.click();

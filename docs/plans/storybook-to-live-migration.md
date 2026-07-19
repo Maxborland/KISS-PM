@@ -1,5 +1,13 @@
 # KISS PM — Going Live: Phased Migration Plan (Storybook Contract-Mock → Real Next App on Real API)
 
+> **ЗАКРЫТ (реализовано) — отметка 2026-07-19 (Блок 12, реконсиляция gap-research Д12).**
+> Вердикт «поверхности не смонтированы, `app/page.tsx` — статичная заглушка, нет шелла/навигации/auth»
+> на 2026-07-19 **устарел**: поверхности приземлены в реальные роуты `apps/web/src/app/**` (CRM, проекты,
+> коммуникации, agent, admin), есть auth-shell (`app/(auth)/{login,register,password-reset}`), рабочий
+> shell/навигация (`views/layout/workspace-chrome.tsx`, `shell/app-sidebar.tsx`), а корень `/` теперь
+> auth-aware redirect (не заглушка). Транспортный инвариант (swap `apiOrigin`/`fetchImpl`) остаётся
+> истинным. Остаточные контрактные разрывы отслеживаются в `docs/plans/2026-07-19-gap-research-blocks-8-12.md`.
+
 > Подготовлено: 2026-06-25. Контекст: весь Storybook-слой построен по контракт-мок-паттерну
 > с инвариантом **«переключение на боевой = смена `apiOrigin` + удаление `fetchImpl`, без правок UI»**.
 > Этот документ проверяет, насколько инвариант реален, и описывает конкретный путь вывода
@@ -113,8 +121,8 @@ off-canvas drawer уже есть). `WorkspaceChrome` как обёртка-ша
 `/projects`→projects-list; `/projects/[projectId]`→project-detail; `/projects/[projectId]/{schedule,
 assignments,resources,baseline,calendars,scenarios,commits,settings}`→соответствующие delivery-surface
 (overview на корне делёвери); task-inspector — drawer внутри schedule/detail, не отдельный роут;
-`/crm/{deals,deals/[dealId],clients,contacts,products}`; `/comms/{chat,channels,calls,meetings,
-notifications}`; `/admin/{users,roles}`; `/settings`; `/profile`. Каждый роут — тонкая обёртка,
+`/crm/{deals,deals/[dealId],clients,contacts,products}`; `/communications/{chat,channels,calls,meetings,
+notifications}` (реальный префикс — `/communications`, не `/comms`); `/admin/{users,roles}`; `/settings`; `/profile`. Каждый роут — тонкая обёртка,
 рендерящая surface (surface уже `"use client"`). `globals.css` грузится один раз в `app/layout.tsx`.
 
 **3c. Выбор проекта вместо `MOCK_PROJECT_ID`.** `mock-workspace-backend.ts:46,49` хардкодят

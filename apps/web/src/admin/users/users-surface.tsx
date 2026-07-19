@@ -259,8 +259,12 @@ function EditUserDialog({ user, roles, positions, busy, setBusy, update, disable
   update: ReturnType<typeof useAdmin>["updateUser"];
   disabledReason?: string;
 }) {
-  const [name, setName] = useState(user.name);
-  const [email, setEmail] = useState(user.email);
+  // name/email могут отсутствовать: каталог /api/workspace/users отдаёт приватные поля
+  // только при tenant.users.read (workspaceUserRoutes.ts:80-96). Роль с доступом к
+  // каталогу, но без users.read (например, plan-reader в гонке загрузки сессии до того,
+  // как AdminFrame закроет раздел) получала undefined → name.trim() ронял всю страницу.
+  const [name, setName] = useState(user.name ?? "");
+  const [email, setEmail] = useState(user.email ?? "");
   const [accessProfileId, setAccessProfileId] = useState(user.accessProfileId);
   const [positionId, setPositionId] = useState(user.positionId ?? "");
 
@@ -271,7 +275,7 @@ function EditUserDialog({ user, roles, positions, busy, setBusy, update, disable
       trigger={<Button variant="ghost" size="sm" disabled={Boolean(disabledReason)} title={disabledReason ?? "Изменить"}><Pencil className="size-3.5" aria-hidden /></Button>}
       // при открытии диалога синхронизируем форму с текущей записью
       onOpenChange={(v) => {
-        if (v) { setName(user.name); setEmail(user.email); setAccessProfileId(user.accessProfileId); setPositionId(user.positionId ?? ""); }
+        if (v) { setName(user.name ?? ""); setEmail(user.email ?? ""); setAccessProfileId(user.accessProfileId); setPositionId(user.positionId ?? ""); }
       }}
       submitLabel={<><Pencil className="size-3.5" aria-hidden />Сохранить</>}
       submitDisabled={!valid || busy || Boolean(disabledReason)}

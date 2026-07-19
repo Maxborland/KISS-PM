@@ -81,21 +81,23 @@ Allowed paths:
 
 ### Beta routes that must work
 
-- `/` or `/dashboard` — dashboard attention cockpit.
-- `/deals` — deals pipeline/list.
-- `/deals/:id` — deal detail and next action.
-- `/clients` or client section inside deals — minimal client context required for handoff.
+Пути сверены с `apps/web/src/app/**` на 2026-07-19; plan-time имена `/deals*`, `/clients`, `/projects/:id/timeline`, `/settings/workspace` в рантайме приземлились как `/crm/deals*`, `/crm/clients`, `/projects/:id/schedule`, `/settings`.
+
+- `/` or `/dashboard` — dashboard attention cockpit (`/` — auth-aware redirect на `/login`|`/my-work`).
+- `/crm/deals` — deals pipeline/list (`apps/web/src/app/crm/deals/page.tsx`).
+- `/crm/deals/:id` — deal detail and next action (`apps/web/src/app/crm/deals/[id]/page.tsx`).
+- `/crm/clients`, `/crm/contacts` — живые CRM-справочники (не «client section inside deals»; `apps/web/src/app/crm/{clients,contacts}/page.tsx`).
 - `/projects` — project list.
 - `/projects/:id` — project detail by real ID.
-- `/projects/:id/tasks` or tasks section — task CRUD/status/owner/due/blocker.
-- `/projects/:id/timeline` or Gantt section — deep enough planning screen.
+- `/projects/:id` tasks section — task CRUD/status/owner/due/blocker (отдельного route `/tasks` внутри проекта нет; задачи — на overview/schedule).
+- `/projects/:id/schedule` or Gantt section — deep enough planning screen (route — `schedule`, не `timeline`).
 - `/projects/:id/resources` or resources section — workload/capacity/conflicts.
 - `/my-work` — current user work queue/actions.
 - `/agent` and embedded panel — global workspace agent.
 - `/admin/users` — users.
 - `/admin/roles` — minimal roles/permissions.
 - `/admin/audit` — audit log.
-- `/settings/workspace` — minimal workspace settings if already present; otherwise hide.
+- `/settings` — minimal workspace settings (реальный route — `/settings`, не `/settings/workspace`).
 
 ### Non-beta routes
 
@@ -108,14 +110,14 @@ Any route outside the list above must be one of:
 
 Do not expose decorative/demo sections in runtime navigation.
 
-### Post-beta epic routes (hidden until wired)
+### Post-beta epic routes (Phase G.5 — реализованы; вне founder-beta walkthrough)
 
-The communications self-hosted A/V epic (Phase G.5, contracts `docs/46`/`docs/47`) adds routes that are **out of founder-beta scope**. They stay hidden from navigation (or behind an explicit beta-disabled state) until they reach `wired`, and they do not change the founder-beta route list or the founder walkthrough above:
+The communications self-hosted A/V epic (Phase G.5, contracts `docs/46`/`docs/47`) — **реализован** и приземлён в живые routes (см. ниже). Они не входят в founder-beta walkthrough, но уже не «hidden until wired»; остаточные strict-prod call gates перечислены как deferred в `beta/implementation-backlog.md`:
 
-- `/comms` — channels list.
-- `/comms/:channelId` — channel thread + composer.
-- `/calls/:roomId` — call surface (lobby/active).
-- in-context chat panel — entity-scoped chat embedded on `/projects/:id`, `/deals/:id`, `/my-work`.
+- `/communications/channels`, `/communications/chat` — channels list + thread/composer на `/api/workspace/conversations` (`apps/web/src/app/communications/{channels,chat}/page.tsx`).
+- `/communications/calls`, `/communications/meetings`, `/communications/notifications` — звонки/встречи/уведомления.
+- `/calls/:roomId` — живой LiveKit call surface (lobby/active; `apps/web/src/app/calls/[roomId]/page.tsx`).
+- in-context chat panel — entity-scoped chat embedded on `/projects/:id`, `/crm/deals/:id`, `/my-work` (deep-link `?project=`).
 
 These must not expose fake controls and must not contaminate the beta walkthrough.
 

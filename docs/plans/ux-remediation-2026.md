@@ -2,6 +2,14 @@
 
 ## Статус
 
+> **ЗАКРЫТ (реализовано) — отметка 2026-07-19 (Блок 12, реконсиляция gap-research Д12).**
+> UX-0 «Честность интерфейса» и ядро P0/P1 реализованы: indent/outdent и редактируемый Gantt —
+> `apps/web/src/widgets/gantt/gantt.tsx` + `apps/web/src/delivery/schedule/schedule-surface.tsx`;
+> Task Inspector, mobile-copy, реальные вкладки проекта — в рантайме (PR #226+).
+> **Остаточный scope (перенесён, не в этом плане):** KPI / control-surfaces UI (P2) оставался backend-only
+> вплоть до Блока 11 (PR #262); realtime SSE multi-instance — Блок 10 (PR #261). Dark theme / portfolio Gantt
+> остаются P2-backlog. Дальнейшие пункты вести в `docs/plans/2026-07-19-gap-research-blocks-8-12.md`.
+
 Документ фиксирует полный аудит пользовательских поверхностей и дорожную карту исправлений.
 Дополняет Phase C follow-up (Gantt parity, matrix SSOT, routes split, SSE ADR).
 

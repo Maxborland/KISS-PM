@@ -126,7 +126,10 @@ runtimeTest("project route actions use their existing destinations", async ({ pa
   await expect(
     settings.getByRole("link", { name: "Открыть Календарь", exact: true })
   ).toHaveAttribute("href", projectPath("calendars"));
-  await expect(settings.getByRole("button", { name: "Подключить", exact: true })).toBeDisabled();
+  // Интеграции проекта — честный роадмап-текст без псевдо-кнопки «Подключить»
+  // (Блок 12, Н7): мёртвый disabled-контрол убран, вместо него описание.
+  await expect(settings.getByRole("button", { name: "Подключить", exact: true })).toHaveCount(0);
+  await expect(settings.getByText("Bitrix24", { exact: true })).toBeVisible();
 });
 
 runtimeTest("project tabs remain semantic links while the read model loads", async ({ page }) => {

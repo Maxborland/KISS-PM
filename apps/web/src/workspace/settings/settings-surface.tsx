@@ -1,14 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CreditCard, Plug } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Segmented } from "@/components/ui/segmented";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
-import { demoAction } from "@/views/lib/demo";
 import { authErr } from "@/auth/lib/auth-bits";
 import { ProfileContent } from "@/auth/profile/profile-surface";
 import { NotificationsPrefs } from "@/communications/notifications/notifications-surface";
@@ -28,18 +24,17 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
                  переиспользует NotificationsPrefs из communications/notifications.
    - Справочники → ReferencesTab (workspace/references): CRUD должностей
                  (/api/workspace/positions) и статусов задач (/api/workspace/task-statuses).
-   - Интеграции / Оплата → контракта пока НЕТ → честный EmptyState, кнопка
-                 подключения disabled (demoAction). Не фейковые формы.
+   Вкладки «Интеграции»/«Оплата» скрыты: контракта пока НЕТ, показывать нечего,
+   кроме роадмап-заглушки, — не заводим мёртвые контролы на прод-роуте (честность
+   блока 12). Вернутся вместе с боевым контрактом.
    Переключение на боевой = apiOrigin. Данные in-memory.
    ============================================================ */
 
-type Tab = "profile" | "notifications" | "references" | "integrations" | "billing";
+type Tab = "profile" | "notifications" | "references";
 const TAB_OPTIONS: { value: Tab; label: string }[] = [
   { value: "profile", label: "Профиль" },
   { value: "notifications", label: "Уведомления" },
-  { value: "references", label: "Справочники" },
-  { value: "integrations", label: "Интеграции" },
-  { value: "billing", label: "Оплата" }
+  { value: "references", label: "Справочники" }
 ];
 
 const DEMO_EMAIL = "admin@kiss-pm.local";
@@ -55,7 +50,7 @@ export function SettingsSurface() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Настройки рабочей области</h1>
-            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Профиль, уведомления, справочники, интеграции и оплата</p>
+            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Профиль, уведомления и справочники</p>
           </div>
           <Segmented name="settings-tab" value={tab} onChange={setTab} options={TAB_OPTIONS} />
         </div>
@@ -65,12 +60,8 @@ export function SettingsSurface() {
             <ProfileTab />
           ) : tab === "notifications" ? (
             <NotificationsPrefs />
-          ) : tab === "references" ? (
-            <ReferencesTab />
-          ) : tab === "integrations" ? (
-            <IntegrationsTab />
           ) : (
-            <BillingTab />
+            <ReferencesTab />
           )}
         </div>
       </main>
@@ -133,42 +124,6 @@ function ProfileTab() {
   );
 }
 
-/* Вкладка «Интеграции» — контракта нет → честный EmptyState. */
-function IntegrationsTab() {
-  return (
-    <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] py-10 shadow-[var(--shadow-card)]">
-      <EmptyState
-        title="Интеграции появятся в одном из следующих обновлений"
-        description="Подключение CRM, мессенджеров и календарей — раздел в разработке."
-        action={
-          <Button variant="secondary" size="sm" {...demoAction("подключение интеграции")}>
-            <Plug className="size-3.5" aria-hidden />
-            Подключить интеграцию
-          </Button>
-        }
-      />
-    </div>
-  );
-}
-
-/* Вкладка «Оплата» — контракта нет → честный EmptyState. */
-function BillingTab() {
-  return (
-    <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] py-10 shadow-[var(--shadow-card)]">
-      <EmptyState
-        title="Оплата и тарифы появятся в одном из следующих обновлений"
-        description="Управление подпиской и платёжными данными — раздел в разработке."
-        action={
-          <Button variant="secondary" size="sm" {...demoAction("управление подпиской")}>
-            <CreditCard className="size-3.5" aria-hidden />
-            Перейти к тарифам
-          </Button>
-        }
-      />
-    </div>
-  );
-}
-
 function ProtoBanner() {
   if (!prototypeNotesEnabled) return null;
   return (
@@ -177,7 +132,7 @@ function ProtoBanner() {
       <span>
         Вкладки «Профиль» (GET /api/auth/me + PATCH /api/profile[/theme]), «Уведомления» (PUT /notification-preferences)
         и «Справочники» (CRUD /api/workspace/positions и /api/workspace/task-statuses) — на боевых контрактах через
-        contract-mock. «Интеграции» и «Оплата» — контракта пока нет (честный EmptyState).
+        contract-mock. Интеграции и оплата скрыты до появления контракта.
         Переключение на боевой = apiOrigin; данные in-memory.
       </span>
     </div>

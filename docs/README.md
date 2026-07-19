@@ -58,7 +58,14 @@
 
 ## Планы исправлений
 
-- [`plans/ux-remediation-2026.md`](plans/ux-remediation-2026.md) — полный UI/UX-аудит продукта и дорожная карта (честность affordances, planning parity, reference surfaces, a11y, SSE).
+- [`plans/2026-07-19-gap-research-blocks-8-12.md`](plans/2026-07-19-gap-research-blocks-8-12.md) — **активный** gap-research (60 находок → блоки 8–12). Статус блоков: 8–11 ЗАКРЫТЫ (PR #258/#259/#261/#262), 12 в работе.
+- [`plans/ux-remediation-2026.md`](plans/ux-remediation-2026.md) — **закрыт (реализовано)** полный UI/UX-аудит продукта и дорожная карта (честность affordances, planning parity, reference surfaces, a11y, SSE); остаток KPI/control-surfaces/SSE — блоки 10–11.
+- [`plans/storybook-to-live-migration.md`](plans/storybook-to-live-migration.md) — **закрыт (реализовано)** вывод Storybook-поверхностей в реальные роуты Next на боевом API; поверхности смонтированы, есть auth-shell и навигация.
+- [`plans/persona-journey-fixes-2026-07-13.md`](plans/persona-journey-fixes-2026-07-13.md) — **закрыт (реализовано)** поведенческие фиксы пути персон (вход → работа → возврат → offboarding).
+- [`plans/crm-pipeline-unification.md`](plans/crm-pipeline-unification.md) — **закрыт (реализовано)** унификация двух реализаций CRM-пайплайнов (PR #205); живые `/crm/*` роуты; остаток — конфигурация пайплайнов из UI.
+- [`plans/product-improvement-pr5-plus-2026-07-12.md`](plans/product-improvement-pr5-plus-2026-07-12.md) — **закрыт частично** UI-слайсы PR1–PR7 реализованы; открытый пункт CI/release-gate вынесен в блок 8 (PR #258).
+- [`plans/communications-self-hosted-av-epic.md`](plans/communications-self-hosted-av-epic.md) — эпик собственной A/V-связи (self-hosted LiveKit) + полный блок коммуникаций; control-plane и live-звонок реализованы, пробелы §9 перенесены в `beta/implementation-backlog.md` (deferred).
+- [`plans/KISS PM production plan.md`](plans/KISS%20PM%20production%20plan.md) — production-readiness remediation plan; route-scope сверен с фактическими роутами (`/crm/deals*`, `/projects/:id/schedule`).
 
 ## API
 
