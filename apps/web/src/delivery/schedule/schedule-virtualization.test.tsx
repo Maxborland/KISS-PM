@@ -40,7 +40,9 @@ vi.mock("next/link", () => ({
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 vi.mock("@kiss-pm/planning-client", () => ({
-  buildCompensatingCommandBatch: () => []
+  buildCompensatingCommandBatch: () => [],
+  // SSE-подписка плана: в юнитах не открываем EventSource (сеть) — noop-подписка
+  subscribeToPlanEvents: () => ({ unsubscribe() {} })
 }));
 
 vi.mock("@/delivery/ui/delivery-frame", () => ({

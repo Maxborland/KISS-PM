@@ -39,7 +39,7 @@ export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRoute
     const belongsToTenant = await deps.projectExistsInTenant(actor.tenantId, projectId);
     if (!belongsToTenant) return context.json({ error: "project_not_found" }, 404);
 
-    return streamSSE(context, async (stream) => {
+    const response = streamSSE(context, async (stream) => {
       const send = async (event: PlanRealtimeEvent) => {
         await stream.writeSSE({
           event: event.type,
@@ -62,5 +62,11 @@ export function registerPlanningEventsRoute(app: Hono, deps: PlanningEventsRoute
         unsubscribe();
       }
     });
+    // no-transform ОБЯЗАТЕЛЕН: web-прокси (Next compress и любой gzip-посредник)
+    // иначе сжимает бесконечный event-stream и буферизует кадры до закрытия
+    // соединения — браузер не получает события вовсе. Ставим на готовом Response:
+    // hono streamSSE сам пишет "Cache-Control: no-cache" поверх c.header().
+    response.headers.set("Cache-Control", "no-cache, no-transform");
+    return response;
   });
 }

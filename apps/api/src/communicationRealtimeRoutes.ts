@@ -128,7 +128,14 @@ export function registerCommunicationRealtimeRoutes(app: Hono, deps: ApiRouteDep
       // The active session a second participant joins instead of starting a new one.
       activeSession: activeSession ? serializeCallSession(activeSession) : null,
       events: events.map(serializeCallEvent),
-      recordings: recordings.map(serializeCallRecording)
+      recordings: recordings.map(serializeCallRecording),
+      // Deployment/actor capabilities so the UI can gate call controls honestly instead
+      // of rendering buttons that can only fail (video provider disabled, no egress).
+      capabilities: {
+        videoProviderKind: deps.videoProvider.kind,
+        egressEnabled: deps.egressProvider !== null,
+        canManage: resolved.value.access.manageDecision.allowed
+      }
     });
   });
 

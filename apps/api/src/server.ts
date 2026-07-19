@@ -20,6 +20,11 @@ import {
   isConfigurableHttpServer
 } from "./serverSecurity";
 import { createStorageProviderFromEnv } from "./storageProvider";
+import {
+  bootstrapWorkspaceEventPublisher,
+  InMemoryWorkspaceEventPublisher,
+  setWorkspaceEventPublisher
+} from "./workspaceEventBus";
 
 const runtimeConfig = readServerRuntimeConfig();
 const { port, hostname } = runtimeConfig;
@@ -45,6 +50,13 @@ const readinessChecks = createServerReadinessChecks({
 
 const publisher = await bootstrapPlanningEventPublisher();
 setPlanningEventPublisher(publisher);
+
+// Workspace-шина (чат/уведомления/presence): Redis при >1 реплики, иначе in-memory.
+const workspaceEventsPublisher = await bootstrapWorkspaceEventPublisher();
+setWorkspaceEventPublisher(workspaceEventsPublisher);
+const workspaceEventsBackend =
+  workspaceEventsPublisher instanceof InMemoryWorkspaceEventPublisher ? "memory" : "redis";
+console.log(`KISS PM workspace events backend: ${workspaceEventsBackend}`);
 
 const appOptions: CreateAppOptions = {
   authRateLimiter,
@@ -124,6 +136,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
     await closeHttpServer(server);
     await Promise.allSettled([
       publisher.close?.() ?? Promise.resolve(),
+      workspaceEventsPublisher.close?.() ?? Promise.resolve(),
       authRateLimiter.close?.() ?? Promise.resolve(),
       postgresClient?.end() ?? Promise.resolve()
     ]);

@@ -15,7 +15,8 @@ import {
   Radio,
   Sparkles,
   UserPlus,
-  Video
+  Video,
+  VideoOff
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -242,6 +243,20 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
   const room = data.callRoom;
   // Активная сессия определяется по событиям: последнее session_started без последующего session_ended.
   const activeSessionId = resolveActiveSessionId(data);
+  // Честный capability-гейт (Н10): KISS_PM_VIDEO_PROVIDER=disabled ⇒ подключение к звонку
+  // невозможно — вместо кнопок старта/подключения показываем плашку. Гейт НЕ касается
+  // manual-комнат: их путь не зависит от глобального видео-провайдера (лобби/ручной
+  // сценарий работают и при disabled). null capabilities — «неизвестно», не гейтим.
+  const providerDisabled = room.provider !== "manual" && data.capabilities?.videoProviderKind === "disabled";
+  const providerDisabledNote = (
+    <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--warning-text)]">
+      <VideoOff className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>
+        Видео-провайдер не настроен (KISS_PM_VIDEO_PROVIDER) — подключение к звонку недоступно.
+        История, события и записи звонка остаются доступны.
+      </span>
+    </div>
+  );
 
   async function doStart() {
     setBusy(true); setErrCode(null);
@@ -324,12 +339,18 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
         ) : room.status === "active" && activeSessionId ? (
           <div className="flex flex-wrap items-center gap-2">
             {/* Живой путь: внутренняя комната звонка. Рантайм /calls/{roomId} сам получает
-                join-токен по roomId через API — токен через URL не передаём. */}
-            <Button asChild variant="primary" size="sm" title="Открыть комнату звонка">
-              <Link href={`/calls/${encodeURIComponent(roomId)}`}>
-                <Video className="size-3.5" aria-hidden /> Открыть комнату
-              </Link>
-            </Button>
+                join-токен по roomId через API — токен через URL не передаём.
+                При disabled-провайдере кнопка подключения заменяется честной плашкой (Н10):
+                join-token в таком деплое всегда 501 video_provider_disabled. */}
+            {providerDisabled ? (
+              <div className="w-full">{providerDisabledNote}</div>
+            ) : (
+              <Button asChild variant="primary" size="sm" title="Открыть комнату звонка">
+                <Link href={`/calls/${encodeURIComponent(roomId)}`}>
+                  <Video className="size-3.5" aria-hidden /> Открыть комнату
+                </Link>
+              </Button>
+            )}
             <Button variant="secondary" size="sm" disabled={busy} onClick={() => void doParticipant(activeSessionId, "joined")}>
               <LogIn className="size-3.5" aria-hidden /> Я вошёл
             </Button>
@@ -346,6 +367,10 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
               </Button>
             ) : null}
           </div>
+        ) : providerDisabled ? (
+          /* Н10: старт сессии без настроенного видеопровайдера — тупик (подключиться будет
+             невозможно), поэтому кнопку не рисуем, а честно объясняем причину. */
+          providerDisabledNote
         ) : (
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="primary" size="sm" disabled={busy} onClick={() => void doStart()}>

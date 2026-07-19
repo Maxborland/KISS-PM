@@ -9,8 +9,15 @@ import {
 } from "@kiss-pm/domain";
 
 import type { ApiTenantDataSource } from "./apiTypes";
+import { emitNotificationCreated } from "./workspaceEventBus";
 
 type NotificationDataPort = Pick<ApiTenantDataSource, "createUserNotification">;
+
+// P8 realtime: паритет с mention-путём collaborationRoutes — каждое персистентное
+// уведомление сопровождается notification.created в user-канал получателя (SSE →
+// бейдж/лента обновляются push'ем). Событие — только сигнал инвалидации (userId+type,
+// без тела): даже если вызывающая транзакция откатится, клиент сделает лишний
+// refetch и не увидит ничего нового — фантомных данных не возникает.
 
 export async function persistPlanningNotifications(input: {
   dataSource: NotificationDataPort;
@@ -33,6 +40,7 @@ export async function persistPlanningNotifications(input: {
       tenantId: input.tenantId,
       ...notification
     });
+    emitNotificationCreated(notification.userId, notification.notificationType);
   }
 }
 
@@ -58,5 +66,6 @@ export async function persistControlSignalNotifications(input: {
       tenantId: input.tenantId,
       ...notification
     });
+    emitNotificationCreated(notification.userId, notification.notificationType);
   }
 }

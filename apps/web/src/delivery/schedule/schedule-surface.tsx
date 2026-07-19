@@ -31,6 +31,7 @@ import { mapRows, type Kind, type Mode, type Pred, type Row } from "@/delivery/s
 import { buildFinishDateFillCommands, buildPasteCommands, createTaskTsvId, getScheduleNavigationTarget, parseTaskTsv, resolveFinishFillDrag, shouldRunScheduleUndo } from "@/delivery/schedule/schedule-productivity";
 import { buildMilestoneCommands } from "@/delivery/schedule/schedule-milestone";
 import { ScheduleSavedViews, type ScheduleSavedViewPayload, type ScheduleZoom } from "@/delivery/schedule/schedule-saved-views";
+import { PlanUpdatedBanner, usePlanVersionWatch } from "@/delivery/schedule/use-plan-version-watch";
 import {
   resolveScheduleWorkingTime,
   scheduleFinishDateForDuration,
@@ -458,6 +459,12 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const canManagePlan = canManageScheduleControls({ live, permissions });
   const canManageResources = canManageScheduleResourceControls({ live, permissions });
   const { readModel, setReadModel, status, error, reload, apply, applyBatch } = usePlanning(projectId);
+  // SSE план-событий проекта: чужой коммит → неблокирующий баннер «Обновить» (без автоперезагрузки).
+  const { remotePlanVersion } = usePlanVersionWatch({
+    projectId,
+    enabled: live,
+    clientPlanVersion: readModel?.planVersion ?? null
+  });
   const projectBase = useProjectBase(projectId, PROJECT);
   const resourceDirectory = useResourceDirectory();
   const planningResources = resourceDirectory.list;
@@ -1852,6 +1859,10 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
           <span className="inline-flex items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
           Реальный контракт planning · каждая правка = коммит preview→apply через @kiss-pm/planning-client. Данные in-memory, не сохраняются. Нижняя строка — создать задачу (Enter) · 2× клик — правка ячейки · ПКМ — меню · границы колонок — ширина · бар: тяни тело (сдвиг), края (длительность), точку справа — связь.
         </div>
+      ) : null}
+
+      {remotePlanVersion != null ? (
+        <PlanUpdatedBanner version={remotePlanVersion} onReload={() => void reload()} />
       ) : null}
 
       {errors.size > 0 ? (

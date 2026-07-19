@@ -102,6 +102,71 @@ export async function persistCallMessage(conversationId: string, body: string): 
   });
 }
 
+export type CallRoomCapabilities = {
+  videoProviderKind: CallProvider | "disabled";
+  egressEnabled: boolean;
+  canManage: boolean;
+};
+
+export type CallRecordingContext = {
+  /** true — у актора есть работающий путь управления записью в ЭТОЙ комнате. */
+  available: boolean;
+  /** Группа активной записи (status="recording"), если запись уже идёт. */
+  activeGroupId: string | null;
+};
+
+/**
+ * GET /call-rooms/:roomId → recording capability + active recording state (Н11).
+ * available требует ВСЕ работающие звенья: egress настроен, актор с manage-правом,
+ * комната LiveKit (egress пишет только LiveKit-комнаты — серверный контракт).
+ */
+export async function fetchCallRecordingContext(roomId: string): Promise<CallRecordingContext> {
+  try {
+    const result = await apiFetch<{
+      callRoom: { provider: string };
+      capabilities?: CallRoomCapabilities;
+      recordings?: { recordingGroupId?: string | null; status?: string }[];
+    }>(`/api/workspace/call-rooms/${encodeURIComponent(roomId)}`);
+    const active = (result.recordings ?? []).find((recording) => recording.status === "recording");
+    return {
+      available:
+        result.capabilities?.egressEnabled === true &&
+        result.capabilities.canManage &&
+        result.callRoom.provider === "livekit",
+      activeGroupId: active?.recordingGroupId ?? null
+    };
+  } catch {
+    return { available: false, activeGroupId: null };
+  }
+}
+
+/** POST .../sessions/:sessionId/recordings/start → per-track egress; возвращает группу записи. */
+export async function startCallRecording(
+  roomId: string,
+  sessionId: string
+): Promise<{ recordingGroupId: string }> {
+  const result = await apiFetch<{ recordingGroupId: string }>(
+    `/api/workspace/call-rooms/${encodeURIComponent(roomId)}/sessions/${encodeURIComponent(
+      sessionId
+    )}/recordings/start`,
+    { method: "POST" }
+  );
+  return { recordingGroupId: result.recordingGroupId };
+}
+
+/** POST .../recordings/groups/:groupId/stop → останавливает все egress-ы группы. */
+export async function stopCallRecording(
+  roomId: string,
+  recordingGroupId: string
+): Promise<{ stopped: number; failed: number }> {
+  return apiFetch<{ stopped: number; failed: number }>(
+    `/api/workspace/call-rooms/${encodeURIComponent(roomId)}/recordings/groups/${encodeURIComponent(
+      recordingGroupId
+    )}/stop`,
+    { method: "POST" }
+  );
+}
+
 /** GET /call-rooms/:roomId → the room's active session, when one exists. */
 export async function fetchActiveSession(roomId: string): Promise<CallSessionRef | null> {
   try {

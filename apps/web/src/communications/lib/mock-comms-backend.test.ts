@@ -640,3 +640,21 @@ describe("mock-comms-backend: справочник проектов (scope по�
     expect(projects).toEqual([{ id: "proj-portal", title: "Производственный портал" }]);
   });
 });
+
+describe("mock-comms-backend: стикер-паки (Н11)", () => {
+  it("GET /sticker-packs: сид-пак со стикерами по wire-контракту (downloadUrl пуст — бинарного стора нет)", async () => {
+    const c = createCommsClient({ apiOrigin: "", fetchImpl: createMockCommsFetch() });
+    const { stickerPacks } = await c.listStickerPacks();
+    expect(stickerPacks.length).toBe(1);
+    const pack = stickerPacks[0]!;
+    expect(pack.status).toBe("ready");
+    expect(pack.archivedAt).toBeNull();
+    // Оба сид-ассета (те же id, что принимает POST messages со stickerAssetId).
+    expect(pack.stickers.map((s) => s.id).sort()).toEqual(["sticker-party", "sticker-thumbsup"]);
+    const sticker = pack.stickers.find((s) => s.id === "sticker-thumbsup")!;
+    expect(sticker.emoji).toBe("👍");
+    expect(sticker.status).toBe("ready");
+    // У contract-mock нет бинарного стора: downloadUrl честно пуст, UI рендерит emoji.
+    expect(sticker.downloadUrl).toBe("");
+  });
+});

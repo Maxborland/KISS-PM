@@ -71,7 +71,7 @@ export function registerWorkspaceEventsRoute(app: Hono, deps: WorkspaceEventsRou
       channels.push(conversationChannel(conversationIdRaw));
     }
 
-    return streamSSE(context, async (stream) => {
+    const response = streamSSE(context, async (stream) => {
       const send = async (event: WorkspaceRealtimeEvent) => {
         await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
       };
@@ -112,6 +112,12 @@ export function registerWorkspaceEventsRoute(app: Hono, deps: WorkspaceEventsRou
         cleanup();
       }
     });
+    // no-transform ОБЯЗАТЕЛЕН: web-прокси (Next compress и любой gzip-посредник)
+    // иначе сжимает бесконечный event-stream и буферизует кадры до закрытия
+    // соединения — браузер не получает события вовсе. Ставим на готовом Response:
+    // hono streamSSE сам пишет "Cache-Control: no-cache" поверх c.header().
+    response.headers.set("Cache-Control", "no-cache, no-transform");
+    return response;
   });
 
   // P4.3 — снимок присутствия пользователей тенанта (начальное состояние для индикаторов).

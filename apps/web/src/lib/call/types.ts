@@ -50,6 +50,19 @@ export type CallLocalControls = {
   screenShareOn?: boolean;
   background?: BackgroundMode | undefined;
   backgroundSupported?: boolean | undefined;
+  /**
+   * Честная причина недоступности эффектов фона (Н9): браузер поддерживает
+   * процессоры, но MediaPipe-активы не развёрнуты в сборке. Контрол рендерится
+   * задизейбленным с этим текстом в тултипе; undefined — контрол скрыт/активен
+   * по backgroundSupported.
+   */
+  backgroundUnavailableReason?: string | undefined;
+  /** Серверная запись звонка (Н11): true — у актора есть работающий путь start/stop egress. */
+  recordingAvailable?: boolean | undefined;
+  /** Идёт запись (видно всем участникам, не только управляющему). */
+  recordingOn?: boolean | undefined;
+  /** Запрос start/stop записи в полёте — кнопка временно неактивна. */
+  recordingBusy?: boolean | undefined;
 };
 
 export type CallControlHandlers = {
@@ -57,6 +70,7 @@ export type CallControlHandlers = {
   onToggleCamera: () => void;
   onToggleScreenShare: () => void;
   onCycleBackground?: () => void;
+  onToggleRecording?: () => void;
   onLeave: () => void;
 };
 
