@@ -7,7 +7,8 @@ import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ForbiddenState } from "@/components/ui/forbidden-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
-import { useSessionUser } from "@/shell/use-session-user";
+import { LoadingState } from "@/components/ui/loading-state";
+import { useSessionState } from "@/shell/use-session-user";
 
 const ADMIN_TAB_HREF: Record<string, string> = {
   "Пользователи": "/admin/users",
@@ -23,7 +24,7 @@ const ADMIN_TAB_HREF: Record<string, string> = {
  * AdminFrame — продуктовый каркас области «Администрирование» (зеркало CrmFrame).
  * Сверху — заголовок области и табы [Пользователи, Роли, Безопасность]. Слева — общий
  * WorkspaceShell с активным пунктом «Администрирование».
- * Прототип: переключение табов не подключено (handoff-каркас) — как в CRM/Delivery.
+ * Табы — реальные ссылки Next.js на /admin/<раздел> (ADMIN_TAB_HREF); переключение работает.
  */
 export const ADMIN_TABS = ["Пользователи", "Роли", "Безопасность", "Аудит", "Отсутствия", "Произв. календарь", "Фоновые задачи"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
@@ -62,9 +63,21 @@ export function AdminFrame({
   children: ReactNode;
 }) {
   // Прямой заход не-админа по URL: цельный экран «нет доступа» вместо полного
-  // админ-хрома с ошибкой в каждой вкладке (G8-05). Пока сессия не загрузилась
-  // (null — в т.ч. Storybook), рендерим как обычно.
-  const user = useSessionUser();
+  // админ-хрома с ошибкой в каждой вкладке (G8-05). До загрузки сессии показываем
+  // загрузчик, а НЕ полный админ-хром (Блок 12): иначе не-админ на миг видел бы
+  // админ-контент до применения RBAC-гейта (нечестный flash + флейк e2e).
+  const { user, loaded } = useSessionState();
+  if (!loaded) {
+    return (
+      <WorkspaceShell activeNav="Администрирование">
+        <main className="grid min-h-[60vh] flex-1 place-items-center bg-[var(--canvas)] p-6">
+          <LoadingState label="Проверяем доступ…" />
+        </main>
+      </WorkspaceShell>
+    );
+  }
+  // Реальный не-админ (сессия загружена, есть user, нет админ-права) → forbidden.
+  // Без сессии (loaded && !user — Storybook/демо) рендерим контент как раньше.
   if (user && !ADMIN_PERMISSIONS.some((p) => user.permissions.includes(p))) {
     return (
       <WorkspaceShell activeNav="Администрирование">

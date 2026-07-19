@@ -14,7 +14,7 @@ const CRM_TAB_HREF: Record<string, string> = {
 /**
  * CrmFrame — продуктовый каркас CRM-области (по образцу DeliveryFrame, но не
  * привязан к проекту). Сверху — заголовок области и табы справочников/сделок.
- * Прототип: переключение табов не подключено (handoff-каркас) — как в Project Delivery.
+ * Табы — реальные ссылки Next.js на /crm/<раздел> (CRM_TAB_HREF); переключение работает.
  */
 export const CRM_TABS = ["Сделки", "Клиенты", "Контакты", "Продукты"] as const;
 export type CrmTab = (typeof CRM_TABS)[number];

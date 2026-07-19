@@ -58,7 +58,10 @@ const ROLES = [
 type Role = (typeof ROLES)[number];
 
 const PUBLIC_AUTH_EXPECTATIONS = [
-  { route: "/", finalPath: "/dashboard" },
+  // Корень «/» ведёт авторизованного на «Мои задачи» (proxy.ts:26 + app/page.tsx:20 —
+  // домашний экран сменился с /dashboard на /my-work). /login|/register авторизованного
+  // клиентски уводит login-surface на /dashboard (?from-возврат), поэтому там /dashboard.
+  { route: "/", finalPath: "/my-work" },
   { route: "/login", finalPath: "/dashboard" },
   { route: "/register", finalPath: "/dashboard" },
   { route: "/password-reset", finalPath: "/password-reset" },
@@ -765,7 +768,7 @@ function writeEvidenceReport(input: {
 
 ## Coverage
 
-- AUTH-ROOT: anonymous \`/\` -> \`/login\`; every seeded role \`/\` -> \`/dashboard\`.
+- AUTH-ROOT: anonymous \`/\` -> \`/login\`; every seeded role \`/\` -> \`/my-work\`.
 - AUTH-AUTHED-PUBLIC: five seeded roles across \`/login\`, \`/register\`, \`/password-reset\`, and \`/password-reset/confirm\`, including reload and identity/tenant readback.
 - AUTH-PROTECTED: anonymous traversal of every real protected App Router page. Dynamic routes use known working project, opportunity, and read-only discovered call-room IDs.
 - Protected API leak means any non-\`/api/auth/*\` request emitted while the browser is anonymous. Expected: zero.

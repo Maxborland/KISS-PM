@@ -10,7 +10,9 @@ import {
   type Page
 } from "@playwright/test";
 
-const WEB_ORIGIN = `http://127.0.0.1:${process.env.E2E_WEB_PORT ?? "3180"}`;
+// Дефолт совпадает с playwright.config.ts (E2E_WEB_PORT ?? "3100"): под стандартным
+// раннером web поднят на 3100. Изолированный closeout-харнесс задаёт E2E_WEB_PORT явно.
+const WEB_ORIGIN = `http://127.0.0.1:${process.env.E2E_WEB_PORT ?? "3100"}`;
 const EVIDENCE_DIR = resolve(
   ".superloopy/evidence/auth-shell-2026-07-10/screenshots"
 );

@@ -63,22 +63,22 @@ Every beta screen must satisfy:
 | Screen | Primary roles | Linked stories | Beta status | Required proof |
 | --- | --- | --- | --- | --- |
 | Workspace/Dashboard | CEO, PM | CEO-01, PM-02, AGENT-01 | prototype | Seeded risks appear; no console errors; agent can summarize context |
-| Clients | Sales, PM, Admin | SALES-01 | missing/wired TBD | Create client, duplicate/empty state, permission state |
-| Deals/Pipeline | Sales, CEO | SALES-02, CEO-02 | wired with known gap | Deals read model only requests used data; stage change persists |
-| Deal Detail | Sales, PM, Finance | SALES-03, FIN-01 | missing/wired TBD | Handoff context visible; finance permission behavior |
+| Clients (`/crm/clients`) | Sales, PM, Admin | SALES-01 | wired | Живой route на боевом CRM API (`apps/web/src/app/crm/clients/page.tsx`); create client, duplicate/empty state, permission state |
+| Deals/Pipeline (`/crm/deals`) | Sales, CEO | SALES-02, CEO-02 | wired with known gap | Deals read model only requests used data; stage change persists |
+| Deal Detail (`/crm/deals/:id`) | Sales, PM, Finance | SALES-03, FIN-01 | wired | Route id real (`apps/web/src/app/crm/deals/[id]/page.tsx`); handoff context visible; finance permission behavior |
 | Projects List | PM, CEO, Lead | PM-01, CEO-01 | wired/prototype TBD | Create/open project, filters, empty state |
 | Project Detail | PM, Lead, Specialist | PM-01, PM-02, LEAD-01 | prototype/wired TBD | Add task, update status, blocker visible |
-| Planning / Timeline | PM, Lead | PM-03 | prototype TBD | Task renders on timeline; date/status updates persist |
+| Planning / Schedule (`/projects/:id/schedule`) | PM, Lead | PM-03 | prototype TBD | Route — `schedule`, не `timeline` (`apps/web/src/app/projects/[id]/schedule/page.tsx`); task renders on timeline; date/status updates persist |
 | My Work | Specialist, Lead | SPEC-01, SPEC-02 | missing/wired TBD | Assigned task appears; blocker/status update persists |
 | Resources / Workload | HR, PM, CEO | HR-01, HR-02, LEAD-01 | prototype/missing TBD | Overload and missing role signals from seed data |
 | Finance | Finance, CEO, PM | FIN-01 | deferred unless existing data supports it | Permission test and visible payment/contract status |
 | Agent Chat | PM, CEO, Sales, Lead | AGENT-01, AGENT-02, PM-04, CEO-03 | prototype TBD | Proposal -> confirm -> mutation -> audit; no mutation before confirm |
 | Settings/Admin | Admin, CEO | ADMIN-01, permissions support | wired/prototype TBD | Permission/read-only state and no dead controls |
-| Comms/Channels | PM, Lead, Specialist | (Phase G.5) | deferred | Real channel list/thread/composer on `docs/44` backend; no fake send; Cyrillic copy; loading/empty/error/forbidden states |
-| Comms/Call | PM, Lead, Specialist | (Phase G.5) | deferred | Self-hosted LiveKit lobby/active/screen-share/in-chat/device-settings/reconnecting; accessible mute/leave; axe no critical; 390px; provider-disabled without dead controls |
-| In-context chat panel | PM, Lead, Specialist | (Phase G.5) | deferred | Entity-scoped chat on `/projects/:id` `/deals/:id` `/my-work`; conversation+messages from real backend; no remote-fetch demo data |
+| Comms/Channels (`/communications/channels`, `/communications/chat`) | PM, Lead, Specialist | (Phase G.5) | wired with gaps | Phase G.5 shipped: живой route на `/api/workspace/conversations` (`apps/web/src/app/communications/chat/page.tsx`); realtime по SSE `message.created`. Gap: бинарный sticker-store не подключён |
+| Comms/Call (`/calls/:roomId`, `/communications/calls`) | PM, Lead, Specialist | (Phase G.5) | wired with gaps | Живой LiveKit-рантайм (`apps/web/src/app/calls/[roomId]/page.tsx`, `CallRuntimeView`); запись start/stop и janitor реализованы. Gap: виртуальный фон без MediaPipe-активов; strict-prod call gates (readiness fail-closed, browser matrix, a11y живого видео) не закрыты |
+| In-context chat panel | PM, Lead, Specialist | (Phase G.5) | wired with gaps | Entity-scoped chat on `/projects/:id` `/crm/deals/:id` `/my-work` (deep-link `?project=`); conversation+messages from real backend; no remote-fetch demo data |
 
-> Note: communications (channels, in-context chat, calls/meetings) is a **post-founder-beta epic** (Phase G.5, contracts `docs/46`/`docs/47`). These screens stay `deferred` and outside the founder-beta route scope; they must reach `wired` (real data/actions, real states, QA proof) before joining the founder-beta route scope. Strict-prod call gates (Egress recording, TURN/coturn readiness fail-closed, webhook signature verification, RBAC/audit + recording-attachment isolation, axe-clean 390px call UI, no test/mock call hooks in prod) are required before any public production exposure.
+> Note: communications (channels, in-context chat, calls/meetings) — **Phase G.5 реализован** (контракты `docs/46`/`docs/47`): живые routes `/communications/*` и `/calls/:roomId` на боевом control-plane; статус экранов повышен с `deferred` до `wired with gaps`. До публичной прод-экспозиции всё ещё требуются strict-prod call gates (Egress recording readiness fail-closed, TURN/coturn, webhook signature verification, RBAC/audit + recording-attachment isolation, axe-clean 390px call UI, no test/mock call hooks in prod) — эти пункты перечислены как deferred в `beta/implementation-backlog.md` (перенос §9 AV-эпика).
 
 ## Visual Quality Rubric
 

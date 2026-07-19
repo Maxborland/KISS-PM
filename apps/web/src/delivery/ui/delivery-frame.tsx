@@ -71,7 +71,9 @@ function Pill({ children, tone }: { children: ReactNode; tone?: "info" | "succes
  * Слева — навигация рабочей области, сверху — глобальная панель, ниже —
  * шапка проекта и табы поверхностей. Контент поверхности — children.
  *
- * Прототип: навигация/поиск/аватар не подключены (handoff-каркас).
+ * Навигация рабочей области (WorkspaceShell) и табы проекта — реальные ссылки
+ * Next.js на /projects/[id]/<slug>; ссылка «Чат проекта» — deep-link на
+ * /communications/chat?project=<id> (по праву tenant.communications.read).
  */
 export function DeliveryFrame({
   project,

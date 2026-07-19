@@ -1,5 +1,12 @@
 # План реализации PR5 → конец (UI-модернизация по ресерчу 2026-07-10)
 
+> **ЗАКРЫТ ЧАСТИЧНО (UI-слайсы реализованы, CI-пункт вынесен) — отметка 2026-07-19 (Блок 12, gap-research Д12).**
+> UI-слайсы PR1–PR7 (fulfillment, deals, task-peek, agent truth, Agent Workspace, Planning Cockpit,
+> Scenarios/KISS Delta) реализованы и смерджены (см. таблицу статусов ниже + PR #226–#256).
+> **Открытый пункт — CI/release-gate** (gap-research Б1: GitHub Actions падал startup_failure): передан в
+> Блок 8 (PR #258 «реанимация гейтов»); фактический зелёный статус GitHub Actions вне доки-скоупа и здесь
+> по коду не подтверждается. Остаток ведётся в `docs/plans/2026-07-19-gap-research-blocks-8-12.md`.
+
 Дата: 2026-07-12. База: `master` @ `6a815599` (после merge PR #232).
 
 ## Источники

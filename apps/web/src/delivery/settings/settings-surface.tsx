@@ -16,7 +16,6 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
-import { demoAction } from "@/views/lib/demo";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanningCommand, PlanCalendar } from "@kiss-pm/domain";
@@ -239,12 +238,12 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
             <ProjectClosureSection projectId={projectId} />
           </Section>
 
-          {/* Интеграции — честный роадмап (disabled) */}
-          <Section title="Интеграции" hint="Внешние синхронизации. Подключатся в одном из следующих обновлений.">
+          {/* Интеграции — честный роадмап-текст без псевдо-кнопок (нечего подключать, пока нет контракта) */}
+          <Section title="Интеграции" hint="Внешние синхронизации. Появятся вместе с контрактом.">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {[
-                { name: "Bitrix24", tag: "в планах", desc: "Двусторонняя синхронизация задач и сделок. Появится в одном из следующих обновлений.", btn: "Подключить", what: "интеграция Bitrix24" },
-                { name: "MS Project (MSPDI)", tag: "не планируется", desc: "Импорт и экспорт файлов MS Project не планируется. Используйте API планирования.", btn: "Импорт MSPDI", what: "импорт MSPDI" }
+                { name: "Bitrix24", tag: "в планах", desc: "Двусторонняя синхронизация задач и сделок появится в одном из следующих обновлений." },
+                { name: "MS Project (MSPDI)", tag: "не планируется", desc: "Импорт и экспорт файлов MS Project не планируется. Используйте API планирования." }
               ].map((it) => (
                 <div key={it.name} className="flex flex-col rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel-subtle)] p-3">
                   <div className="mb-1 flex items-center justify-between gap-2">
@@ -252,7 +251,6 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                     <span className="rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-2xs)] font-medium text-[var(--muted-strong)]">{it.tag}</span>
                   </div>
                   <p className="text-[length:var(--text-xs)] text-[var(--muted)]">{it.desc}</p>
-                  <Button variant="secondary" size="sm" className="mt-2.5 self-start" {...demoAction(it.what)}>{it.btn}</Button>
                 </div>
               ))}
             </div>

@@ -12,7 +12,9 @@ import { SettingsSurface } from "@/workspace/settings/settings-surface";
  *   переиспользует ProfileContent (авто-вход демо-кредами на монтаже).
  * - Уведомления → useNotificationPreferences (PUT /notification-preferences),
  *   переиспользует NotificationsPrefs.
- * - Интеграции / Оплата → контракта нет → честный EmptyState (не фейк).
+ * - Справочники → ReferencesTab (CRUD должностей и статусов задач).
+ * Вкладки «Интеграции»/«Оплата» скрыты до контракта — не заводим мёртвые
+ * контролы на прод-роуте (честность блока 12).
  */
 const meta: Meta<typeof SettingsSurface> = {
   title: "Workspace/Settings",

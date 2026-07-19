@@ -12,7 +12,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { IssueResetTokenAction } from "./users-surface";
+import { EditUserDialog, IssueResetTokenAction } from "./users-surface";
 import type { WorkspaceUser } from "@/admin/lib/admin-client";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -149,5 +149,36 @@ describe("IssueResetTokenAction", () => {
 
     expect(host.querySelector('[data-testid="token-dialog"]')).toBeNull();
     expect(toastError).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("EditUserDialog: редактированный каталог (privateFieldsIncluded:false)", () => {
+  it("рендерится без краха для redacted-строки (name/email/accessProfileId undefined)", async () => {
+    // Роль с админ-правом, но без tenant.users.read читает каталог через
+    // project-plan fallback — строки без приватных полей. Диалог не должен падать
+    // на name.trim()/accessProfileId.length (ревью #263).
+    const redacted = {
+      id: "user-x", tenantId: "tenant-alpha",
+      email: undefined, name: undefined, accessProfileId: undefined,
+      positionId: null, positionName: null, phone: null, telegram: null,
+      status: "active", theme: "light", accentColor: "#0f766e"
+    } as unknown as WorkspaceUser;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    // Регресс-гвард: до фикса `valid = name.trim()... accessProfileId.length` бросал
+    // TypeError прямо в рендере — тогда act() ниже зареджектился бы. Успешный
+    // рендер = баг закрыт.
+    let renderError: unknown = null;
+    await act(async () => {
+      try {
+        root.render(<EditUserDialog user={redacted} roles={[]} positions={[]} busy={false} setBusy={vi.fn()} update={vi.fn()} />);
+      } catch (error) {
+        renderError = error;
+      }
+    });
+    expect(renderError).toBeNull();
+    await act(async () => { root.unmount(); });
+    host.remove();
   });
 });

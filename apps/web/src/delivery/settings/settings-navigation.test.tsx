@@ -97,6 +97,28 @@ describe("settings calendar navigation", () => {
   });
 });
 
+describe("settings integrations roadmap (honesty block 12)", () => {
+  beforeEach(() => {
+    permissions = ["tenant.project_plan.read", "tenant.project_plan.manage"];
+  });
+
+  it("shows Bitrix24 and MSPDI roadmap text without pseudo-buttons", () => {
+    const markup = renderSettings();
+
+    // роадмап-текст остаётся
+    expect(markup).toContain("Bitrix24");
+    expect(markup).toContain("в планах");
+    expect(markup).toContain("MS Project (MSPDI)");
+    expect(markup).toContain("не планируется");
+
+    // мёртвых disabled-кнопок, имитирующих действие, больше нет
+    expect(markup).not.toContain(">Подключить<");
+    expect(markup).not.toContain(">Импорт MSPDI<");
+    expect(markup).not.toContain("Демо-прототип: интеграция Bitrix24");
+    expect(markup).not.toContain("Демо-прототип: импорт MSPDI");
+  });
+});
+
 describe("settings source deal navigation", () => {
   beforeEach(() => {
     permissions = ["tenant.project_plan.read"];

@@ -54,18 +54,19 @@
 
  ### Route/product scope for production-track beta
 
- Core route set to make real:
- - / or /dashboard — operational attention cockpit;
- - /deals — real deals pipeline/list;
- - /deals/:id — deal detail, feasibility/handoff/activation;
+ Core route set to make real (пути сверены с `apps/web/src/app/**` на 2026-07-19; исходные plan-time имена `/deals*` и `/projects/:id/timeline` в рантайме приземлились как `/crm/deals*` и `/projects/:id/schedule`):
+ - / or /dashboard — operational attention cockpit (`/` — auth-aware redirect: нет сессии → `/login`, есть → `/my-work`, `apps/web/src/app/page.tsx`; боевой рабочий экран — `/dashboard`);
+ - /crm/deals — real deals pipeline/list (`apps/web/src/app/crm/deals/page.tsx`);
+ - /crm/deals/:id — deal detail, feasibility/handoff/activation (`apps/web/src/app/crm/deals/[id]/page.tsx`);
+ - /crm/clients, /crm/contacts, /crm/products — live CRM directory routes (не «intentionally absent»; `apps/web/src/app/crm/{clients,contacts,products}/page.tsx`);
  - /projects — real projects list;
  - /projects/:id — project overview + task management;
- - /projects/:id/timeline — real Gantt/planning screen;
+ - /projects/:id/schedule — real Gantt/planning screen (route — `schedule`, не `timeline`: `apps/web/src/app/projects/[id]/schedule/page.tsx`);
  - /projects/:id/resources — workload/resource/conflict screen;
  - /my-work — current-user execution queue and actions;
  - /agent — global workspace agent with confirmation/audit;
  - /admin/users, /admin/roles, /admin/audit — minimal real admin/RBAC/audit;
- - /settings/workspace only if real and useful; otherwise hide.
+ - /settings — workspace settings (реальный route — `/settings`, не `/settings/workspace`: `apps/web/src/app/settings/page.tsx`).
 
  All other routes must be hidden, removed, protected behind an explicit unavailable state, or marked deferred without fake controls.
 
@@ -389,7 +390,7 @@
 
  ### Files
 
- - apps/web/src/app/**/deals/**
+ - apps/web/src/app/crm/deals/** (реализованный путь; plan-time было `app/**/deals/**`)
  - apps/web/src/views/blocks/deals-block.tsx
  - apps/api/src/projectIntakeRoutes.ts
  - apps/api/src/projectIntakeService.ts
@@ -398,7 +399,7 @@
 
  ### Change
 
- - Make /deals and /deals/:id real:
+ - Make /crm/deals and /crm/deals/:id real:
      - pipeline/list from GET /api/workspace/opportunities;
      - stage move persists;
      - deal detail shows client/contact/scope/value/dates/owner/next action;
@@ -461,7 +462,7 @@
 
  ### Files
 
- - apps/web/src/app/**/projects/[id]/timeline/**
+ - apps/web/src/app/projects/[id]/schedule/** (реализованный путь; plan-time было `.../[id]/timeline/**`)
  - apps/web/src/views/blocks/gantt-slice-block.tsx
  - apps/web/src/widgets/gantt/**
  - packages/planning-gantt-ui/**
@@ -1044,11 +1045,13 @@
 
  - /
  - /dashboard
- - /deals
- - /deals/:id
+ - /crm/deals
+ - /crm/deals/:id
+ - /crm/clients
+ - /crm/contacts
  - /projects
  - /projects/:id
- - /projects/:id/timeline
+ - /projects/:id/schedule
  - /projects/:id/resources
  - /my-work
  - /agent
