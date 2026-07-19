@@ -2,21 +2,27 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Compass, FolderKanban, Loader2, Plus, Search, SquareCheckBig, Target } from "lucide-react";
+import { Building2, Compass, FolderKanban, Loader2, Package, Plus, Search, SquareCheckBig, Target, UserRound } from "lucide-react";
 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSessionState } from "@/shell/use-session-user";
 import { getPaletteCommands, paletteRouteForSearchResult, type PaletteCommand } from "@/delivery/ui/workspace-commands";
 
-type SearchResultType = "project" | "task" | "opportunity";
+const SEARCH_RESULT_TYPES = ["project", "task", "opportunity", "client", "contact", "product"] as const;
+type SearchResultType = (typeof SEARCH_RESULT_TYPES)[number];
 type SearchResult = { id: string; type: SearchResultType; title: string; subtitle: string; snippet: string; route: string; entityId?: string };
 
-const SEARCH_TYPES = "project,task,opportunity";
+const SEARCH_TYPES = SEARCH_RESULT_TYPES.join(",");
+// Маршруты результатов — серверный searchRouting.ts: сделка/проект — карточка,
+// клиент/контакт — список с подсветкой ?entity=, продукт — список продуктов (Р16).
 const RESULT_GROUPS: Array<{ type: SearchResultType; title: string; icon: typeof FolderKanban }> = [
   { type: "task", title: "Задачи", icon: SquareCheckBig },
   { type: "opportunity", title: "Сделки", icon: Target },
-  { type: "project", title: "Проекты", icon: FolderKanban }
+  { type: "project", title: "Проекты", icon: FolderKanban },
+  { type: "client", title: "Клиенты", icon: Building2 },
+  { type: "contact", title: "Контакты", icon: UserRound },
+  { type: "product", title: "Продукты", icon: Package }
 ];
 
 export function GlobalSearch() {
@@ -127,7 +133,7 @@ export function GlobalSearch() {
       <DialogContent className="max-w-[640px] overflow-hidden p-0" showCloseButton={false} onOpenAutoFocus={(event) => { event.preventDefault(); inputRef.current?.focus(); }}>
         <DialogHeader className="sr-only"><DialogTitle>Поиск и команды</DialogTitle><DialogDescription>Быстрый переход и доступные действия</DialogDescription></DialogHeader>
         <Command className="rounded-none bg-[var(--panel)]">
-          <CommandInput ref={inputRef} value={query} onValueChange={(value) => { setQuery(value); setResults(null); }} placeholder="Команда, проект, задача или сделка…" aria-label="Поиск и команды" />
+          <CommandInput ref={inputRef} value={query} onValueChange={(value) => { setQuery(value); setResults(null); }} placeholder="Команда, проект, задача, сделка, клиент…" aria-label="Поиск и команды" />
           <CommandList className="max-h-[min(60dvh,420px)]">
             {!session.loaded ? <p className="flex items-center justify-center gap-2 px-4 py-8 text-[length:var(--text-sm)] text-[var(--muted)]" role="status"><Loader2 className="size-4 animate-spin" aria-hidden /> Проверяем доступные команды…</p> : !session.user ? <p className="px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted)]" role="status">Сессия недоступна — команды скрыты</p> : <>
               {commandGroup("Навигация", commands.navigation, Compass)}
@@ -148,5 +154,5 @@ export function GlobalSearch() {
 function isSearchResult(value: unknown): value is SearchResult {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const result = value as Record<string, unknown>;
-  return typeof result.id === "string" && (result.type === "project" || result.type === "task" || result.type === "opportunity") && typeof result.title === "string" && typeof result.subtitle === "string" && typeof result.snippet === "string" && typeof result.route === "string" && (result.entityId === undefined || typeof result.entityId === "string");
+  return typeof result.id === "string" && (SEARCH_RESULT_TYPES as readonly string[]).includes(result.type as string) && typeof result.title === "string" && typeof result.subtitle === "string" && typeof result.snippet === "string" && typeof result.route === "string" && (result.entityId === undefined || typeof result.entityId === "string");
 }

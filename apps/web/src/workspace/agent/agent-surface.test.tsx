@@ -224,7 +224,14 @@ describe("AgentSurface production shell contract", () => {
 
     await submitGoal("Проверь проект");
 
-    expect(getTextContent("[role='log']")).toContain("13:37");
+    // Время рендерится toLocaleTimeString в таймзоне раннера (локально +07 это
+    // «13:37», в CI/UTC — «06:37») — ожидание считаем тем же форматтером,
+    // а не литералом, иначе тест падает в любой другой таймзоне.
+    const expectedTime = new Date("2026-07-07T13:37:00+07:00").toLocaleTimeString("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    expect(getTextContent("[role='log']")).toContain(expectedTime);
     expect(getTextContent("[role='log']")).not.toContain("10:41");
     expect(getTextContent("[role='log']")).not.toContain("10:42");
 

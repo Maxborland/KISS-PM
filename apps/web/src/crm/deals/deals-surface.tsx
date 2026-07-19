@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { makeRuError } from "@/lib/error-messages";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { OPPORTUNITY_STATUS_LABEL, money } from "@/crm/ui/crm-bits";
+import { CrmListFilterChip, CrmListParamResolver } from "@/crm/ui/list-url-params";
 import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm, useCrmUsers, type CrmData } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
@@ -102,6 +103,8 @@ export function ProjectDeals() {
   const users = useCrmUsers();
   const [mode, setMode] = useState<Mode>("kanban");
   const [pipelineId, setPipelineId] = useState<string | null>(null);
+  // `?client=<id>` — фильтр сделок по клиенту из счётчика на списке «Клиенты» (Р13).
+  const [clientFilter, setClientFilter] = useState<string | null>(null);
   const [moveTarget, setMoveTarget] = useState<Opportunity | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -109,6 +112,7 @@ export function ProjectDeals() {
   // Триггеры DealPeek по id сделки: клик по телу карточки/строки программно «нажимает»
   // триггер (URL-драйв ?deal= живёт внутри DealPeek) — паттерн schedule-строк.
   const dealPeekTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
+  const clientIdSet = useMemo(() => new Set((data?.clients ?? []).map((c) => c.id)), [data]);
 
   const model = useMemo(() => {
     if (!data) return null;
@@ -122,14 +126,16 @@ export function ProjectDeals() {
     for (const s of stages) byStage.set(s.id, []);
     const inPipeline: Opportunity[] = [];
     const unstaged: Opportunity[] = [];
+    // Активный URL-фильтр по клиенту сужает канбан/список/прогноз (плашка фильтра — в шапке).
     for (const o of data.opportunities) {
+      if (clientFilter && o.clientId !== clientFilter) continue;
       if (!o.stageId) { unstaged.push(o); continue; }
       const arr = byStage.get(o.stageId);
       if (arr) { arr.push(o); inPipeline.push(o); }
     }
     const transitions = data.stageTransitions.filter((t) => selected && t.pipelineId === selected.id);
     return { pipelines, selected, stages, byStage, unstaged, opps: inPipeline, transitions, allStages: data.dealStages };
-  }, [data, pipelineId]);
+  }, [clientFilter, data, pipelineId]);
 
   // Верхнеуровневые loading/error/forbidden — через SurfaceState (внутри CrmFrame).
   // Лестница статусов — общий surfaceStatusOf; reload-с-данными по-прежнему рендерит ready (поведение не меняем).
@@ -277,9 +283,11 @@ export function ProjectDeals() {
 
   return (
     <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={createDealDialog}>
-      {/* Резолв deep-link ?deal= — только в ready-ветке: useSearchParams внутри резолвера
-          не исполняется при prerender страницы (иначе Next требует Suspense-границу). */}
+      {/* Резолв deep-link ?deal=/?client= — только в ready-ветке: useSearchParams внутри
+          резолверов не исполняется при prerender страницы (иначе Next требует Suspense-границу). */}
       <DealDeepLinkResolver data={data} setPipelineId={setPipelineId} />
+      <CrmListParamResolver param="client" knownIds={clientIdSet} setValue={setClientFilter} notFoundMessage="Клиент из фильтра не найден — показаны все сделки" />
+      {clientFilter ? <CrmListFilterChip param="client" label={`Фильтр: клиент «${data.clients.find((c) => c.id === clientFilter)?.name ?? clientFilter}»`} onReset={() => setClientFilter(null)} /> : null}
       {/* мультиворонки: выбор воронки — фильтрует стадии/сделки/переходы */}
       <div className="mb-2 flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Воронка:</span>

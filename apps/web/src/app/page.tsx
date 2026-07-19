@@ -1,15 +1,28 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+import { LoadingState } from "@/components/ui/loading-state";
+import { useSessionState } from "@/shell/use-session-user";
+
+/* Корень «/» — auth-aware redirect по образцу AdminIndexRedirect (Н1):
+   раньше здесь была dev-заглушка «design-v3 foundation» без единой ссылки —
+   тупик для любого, кто открыл корень домена. Сессии нет (или протухла:
+   cookie есть, /api/auth/me → 401) — на вход; есть — на домашний экран
+   рабочей области «Мои задачи». Заголовок вкладки даёт root layout. */
 export default function HomePage() {
+  const { user, loaded } = useSessionState();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loaded) return;
+    router.replace(user ? "/my-work" : "/login");
+  }, [user, loaded, router]);
+
   return (
-    <main className="app-canvas">
-      <div className="app-canvas__panel app-content">
-        <div className="page-intro">
-          <h1 className="page-intro__title display">KISS PM — design-v3 foundation</h1>
-          <p className="page-intro__lead">
-            Phase 1 foundation: токены, BEM, providers и минимальный App Router. Следующие фазы добавят shell,
-            primitives и экраны.
-          </p>
-        </div>
-      </div>
+    <main className="grid min-h-screen place-items-center bg-[var(--canvas)]">
+      <LoadingState label="Открываем рабочую область…" />
     </main>
   );
 }

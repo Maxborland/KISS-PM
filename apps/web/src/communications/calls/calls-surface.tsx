@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   CircleDot,
@@ -40,9 +41,11 @@ import type {
 
 /* ============================================================
    Поверхность «Звонки» блока «Коммуникации».
-   Звонки реализованы ЧЕСТНО БЕЗ WebRTC: только метаданные комнаты,
-   таймлайн событий и контракт join-token. Реального медиа-соединения
-   нет — «Подключиться» лишь получает join-ссылку (demoAction).
+   Метаданные комнаты, таймлайн событий и управление сессией.
+   Живое медиа-соединение — во внутренней комнате /calls/{roomId}
+   (кнопка «Открыть комнату»); рантайм комнаты сам получает
+   join-токен по roomId через API. Сырой контракт join-ссылки —
+   dev-диалог только под prototypeNotesEnabled.
    Scope: реальный проект воркспейса (WithCommsEntityScope).
    ============================================================ */
 
@@ -154,7 +157,7 @@ function CallsSurfaceScoped({ scope }: { scope: ResolvedCommsScope }) {
           <span>
             Реальный контракт: /api/workspace/call-rooms (комнаты, сессии, события, записи). Данные in-memory.
             Realtime-доставка появится в приложении; здесь обновление по действию (ре-фетч после мутации).
-            Медиа честно без WebRTC: «Подключиться» лишь получает join-ссылку — реальное соединение Jitsi/LiveKit устанавливается только в проде.
+            «Открыть комнату» ведёт в живую комнату звонка /calls/{"{roomId}"} (LiveKit); сырой контракт join-ссылки — в dev-кнопке «Данные подключения».
           </span>
         </div>
       ) : null}
@@ -248,7 +251,9 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
     else { setErrCode(res.code ?? null); toast.error(`Отклонено: ${commsErr(res.code, res.message)}`); }
   }
 
-  // ЧЕСТНЫЙ demoAction: получить join-ссылку (реального WebRTC не устанавливаем).
+  // Dev-инспекция контракта join-ссылки (только под prototypeNotesEnabled):
+  // получает VideoJoinContract и показывает его в диалоге. Живой путь подключения —
+  // кнопка «Открыть комнату» (внутренний роут /calls/{roomId}).
   async function doJoin(sessionId: string) {
     setBusy(true); setErrCode(null);
     const res = await joinToken(sessionId);
@@ -318,9 +323,12 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
           </div>
         ) : room.status === "active" && activeSessionId ? (
           <div className="flex flex-wrap items-center gap-2">
-            {/* ЧЕСТНОЕ «Подключиться» — получить join-ссылку, не WebRTC */}
-            <Button variant="primary" size="sm" disabled={busy} onClick={() => void doJoin(activeSessionId)} title="Получить ссылку для подключения к звонку">
-              <LogIn className="size-3.5" aria-hidden /> Подключиться
+            {/* Живой путь: внутренняя комната звонка. Рантайм /calls/{roomId} сам получает
+                join-токен по roomId через API — токен через URL не передаём. */}
+            <Button asChild variant="primary" size="sm" title="Открыть комнату звонка">
+              <Link href={`/calls/${encodeURIComponent(roomId)}`}>
+                <Video className="size-3.5" aria-hidden /> Открыть комнату
+              </Link>
             </Button>
             <Button variant="secondary" size="sm" disabled={busy} onClick={() => void doParticipant(activeSessionId, "joined")}>
               <LogIn className="size-3.5" aria-hidden /> Я вошёл
@@ -331,6 +339,12 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
             <Button variant="destructive-soft" size="sm" disabled={busy} onClick={() => void doEnd(activeSessionId)}>
               <PhoneOff className="size-3.5" aria-hidden /> Завершить сессию
             </Button>
+            {/* Сырой контракт join-ссылки — dev-подсказка, только в Storybook/демо. */}
+            {prototypeNotesEnabled ? (
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => void doJoin(activeSessionId)} title="Показать сырые данные подключения (демо)">
+                <Link2 className="size-3.5" aria-hidden /> Данные подключения
+              </Button>
+            ) : null}
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
@@ -389,8 +403,8 @@ function RoomDetail({ roomId, users }: { roomId: string; users: CommsUsersDir })
         )}
       </section>
 
-      {/* Диалог join-ссылки с честной плашкой */}
-      <JoinDialog open={joinOpen} onOpenChange={setJoinOpen} join={join} />
+      {/* Диалог сырой join-ссылки — достижим только через dev-кнопку под prototypeNotesEnabled. */}
+      {prototypeNotesEnabled ? <JoinDialog open={joinOpen} onOpenChange={setJoinOpen} join={join} /> : null}
     </div>
   );
 }
@@ -405,7 +419,8 @@ function resolveActiveSessionId(data: CallRoomDetail): string | null {
 }
 
 /* ============================================================
-   Диалог join-ссылки: честная плашка про отсутствие WebRTC.
+   Dev-диалог сырого контракта join-ссылки (только prototypeNotesEnabled).
+   Живой путь подключения — «Открыть комнату» → /calls/{roomId}.
    ============================================================ */
 function JoinDialog({ open, onOpenChange, join }: { open: boolean; onOpenChange: (v: boolean) => void; join: VideoJoinContract | null }) {
   return (
@@ -420,13 +435,11 @@ function JoinDialog({ open, onOpenChange, join }: { open: boolean; onOpenChange:
               <div className="flex items-center gap-2"><span className="w-20 text-[var(--muted-soft)]">Токен</span><span className="text-[var(--text)]">{join.token ? "выдан" : "не требуется"}</span></div>
               {join.expiresAt ? <div className="flex items-center gap-2"><span className="w-20 text-[var(--muted-soft)]">Истекает</span><span className="text-[var(--text)]">{new Date(join.expiresAt).toLocaleString("ru-RU")}</span></div> : null}
             </div>
-            {/* Честная плашка про демо — только в Storybook/демо (prototypeNotesEnabled). */}
-            {prototypeNotesEnabled ? (
-              <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--warning-text)]">
-                <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                <span>Демо: реальное WebRTC-соединение не устанавливается. В проде по этой ссылке откроется Jitsi/LiveKit.</span>
-              </div>
-            ) : null}
+            {/* Честная плашка: это dev-инспекция контракта, живой путь — «Открыть комнату». */}
+            <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--warning-text)]">
+              <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>Dev-инспекция контракта join-ссылки. Для реального подключения используйте кнопку «Открыть комнату».</span>
+            </div>
           </div>
         ) : null}
         <DialogFooter>

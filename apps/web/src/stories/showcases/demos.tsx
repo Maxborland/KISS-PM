@@ -457,7 +457,7 @@ export function ShellShowcase() {
         topbar={
           <AppTopbar
             breadcrumbs={
-              <TopbarBreadcrumbs items={[{ label: "Проекты" }, { label: MOCK_PROJECT_CRM, current: true }]} />
+              <TopbarBreadcrumbs items={[{ label: "Проекты", href: "/projects" }, { label: MOCK_PROJECT_CRM, current: true }]} />
             }
           />
         }
@@ -553,7 +553,7 @@ export function ForbiddenStateShowcase() {
 export function BreadcrumbsShowcase() {
   return (
     <ShowcaseFrame title="Breadcrumbs">
-      <TopbarBreadcrumbs items={[{ label: "Проекты" }, { label: MOCK_PROJECT_CRM, current: true }]} />
+      <TopbarBreadcrumbs items={[{ label: "Проекты", href: "/projects" }, { label: MOCK_PROJECT_CRM, current: true }]} />
     </ShowcaseFrame>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Archive, Pencil, Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,8 +10,10 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormDialog } from "@/components/domain/form-dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
+import { cn } from "@/lib/cn";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr, money } from "@/crm/ui/crm-bits";
+import { CrmListParamResolver, highlightRowCls, useHighlightRowRef } from "@/crm/ui/list-url-params";
 import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
@@ -24,6 +27,9 @@ export function ProjectClients() {
   const sessionUser = useSessionUser();
   const createCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.clients.manage" });
   const [busy, setBusy] = useState(false);
+  // Deep-link из глобального поиска: `?entity=<id клиента>` подсвечивает строку (Р12).
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const highlightRowRef = useHighlightRowRef(highlightId);
 
   const model = useMemo(() => {
     if (!data) return null;
@@ -35,6 +41,7 @@ export function ProjectClients() {
     for (const ct of data.contacts) { if (ct.status !== "active") continue; const s = stats.get(ct.clientId); if (s) s.contacts += 1; }
     return { clients: data.clients, stats };
   }, [data]);
+  const clientIds = useMemo(() => new Set((data?.clients ?? []).map((c) => c.id)), [data]);
 
   // Верхнеуровневый статус поверхности: forbidden/error/loading из хука; пустой справочник → empty; иначе ready.
   const surfaceStatus =
@@ -82,6 +89,9 @@ export function ProjectClients() {
         }}
         forbidden={{ title: "Доступ к клиентам ограничен", description: "У вас нет прав на просмотр справочника клиентов." }}
       >
+        {/* Резолв deep-link ?entity= — только в ready-ветке (SurfaceState рендерит children
+            при status==="ready"): useSearchParams вне её требует Suspense при prerender. */}
+        <CrmListParamResolver param="entity" knownIds={clientIds} setValue={setHighlightId} notFoundMessage="Клиент не найден: возможно, он удалён или ссылка устарела" />
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <table className="w-full border-collapse text-[length:var(--text-sm)]">
             <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
@@ -90,12 +100,16 @@ export function ProjectClients() {
             <tbody>
               {(model?.clients ?? []).map((c) => {
                 const s = model?.stats.get(c.id) ?? { deals: 0, sum: 0, contacts: 0 };
+                const highlighted = highlightId === c.id;
+                // Счётчики контактов/сделок — ссылки на списки с фильтром по клиенту (Р13);
+                // ноль — не ссылка: пустой отфильтрованный список не даёт пользы.
+                const countCls = "v4-num rounded-[var(--radius-sm)] text-[var(--accent-text)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]";
                 return (
-                  <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
+                  <tr key={c.id} ref={highlighted ? highlightRowRef : undefined} data-selected={highlighted || undefined} className={cn("v4-row border-b border-[var(--border-subtle)] last:border-0", highlighted && highlightRowCls)}>
                     <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div> : null}</td>
                     <td className="max-w-[280px] truncate px-3 py-2 text-[var(--muted)]">{c.description ?? "—"}</td>
-                    <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.contacts}</td>
-                    <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.deals}</td>
+                    <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.contacts > 0 ? <Link href={`/crm/contacts?client=${encodeURIComponent(c.id)}`} aria-label={`Контакты клиента «${c.name}»`} title="Показать контакты клиента" className={countCls}>{s.contacts}</Link> : s.contacts}</td>
+                    <td className="px-3 py-2 text-right v4-num text-[var(--muted-strong)]">{s.deals > 0 ? <Link href={`/crm/deals?client=${encodeURIComponent(c.id)}`} aria-label={`Сделки клиента «${c.name}»`} title="Показать сделки клиента" className={countCls}>{s.deals}</Link> : s.deals}</td>
                     <td className="px-3 py-2 text-right v4-num font-semibold text-[var(--text-strong)]">{s.sum > 0 ? money(s.sum) : "—"}</td>
                     <td className="px-3 py-2"><StatusChip status={c.status} /></td>
                     <td className="px-3 py-2 text-right">

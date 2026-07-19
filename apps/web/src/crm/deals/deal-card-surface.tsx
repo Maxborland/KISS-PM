@@ -301,8 +301,16 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
     setBusy(true);
     const res = await crm.activate(opp.id, riskReason.trim() ? { acceptedRiskReason: riskReason.trim() } : undefined);
     setBusy(false);
-    if (res.ok) { setRiskReason(""); toast.success(`Создан проект «${res.data.title}» — сделка выиграна`); }
-    else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
+    if (res.ok) {
+      setRiskReason("");
+      // Не обрываем путь на toast'е: сразу даём переход в созданный проект (Р5).
+      toast.success(
+        <span>
+          Создан проект «{res.data.title}» — сделка выиграна.{" "}
+          <Link href={`/projects/${res.data.id}`} className="font-semibold text-[var(--accent-text)] underline underline-offset-2">Открыть проект</Link>
+        </span>
+      );
+    } else toast.error(`Отклонено: ${ruErr(res.code, res.message)}`);
   }
 
   async function finalize(stt: "won_closed" | "lost_rejected") {
@@ -347,7 +355,8 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
         <BemAvatar initials={initials(ownerName(users, opp.ownerUserId))} color={ownerColor(users, opp.ownerUserId)} title={ownerName(users, opp.ownerUserId)} />
         <div className="mr-auto min-w-0">
           <h2 className="truncate text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">{opp.title}</h2>
-          <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{prototypeNotesEnabled ? <><span className="v4-mono">{opp.id}</span> · </> : null}{opp.clientName} · {opp.contactName}</p>
+          {/* Клиент — ссылка на список клиентов с подсветкой строки ?entity= (Р13б/Р12). */}
+          <p className="truncate text-[length:var(--text-xs)] text-[var(--muted)]">{prototypeNotesEnabled ? <><span className="v4-mono">{opp.id}</span> · </> : null}{opp.clientId ? <Link href={`/crm/clients?entity=${encodeURIComponent(opp.clientId)}`} className="rounded-[var(--radius-sm)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]" title={`Найти клиента «${opp.clientName}» в списке`}>{opp.clientName}</Link> : opp.clientName} · {opp.contactName}</p>
         </div>
         <Chip variant="info">{pipelineName}</Chip>
         <Chip variant="violet">{stageName(opp.stageId)}</Chip>
@@ -468,7 +477,8 @@ function DealCardBody({ crm, data, opp, users }: { crm: ReturnType<typeof useCrm
             {projects.length ? (
               <div className="mt-3 border-t border-[var(--border-subtle)] pt-2.5">
                 <div className="mb-1.5 text-[length:var(--text-xs)] font-semibold text-[var(--muted-strong)]">Проекты из сделки</div>
-                <ul className="flex flex-col gap-1">{projects.map((p) => <li key={p.id} className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--text)]"><Rocket className="size-3 shrink-0 text-[var(--success-text)]" aria-hidden /><span className="truncate font-medium">{p.title}</span>{prototypeNotesEnabled ? <span className="v4-mono text-[var(--muted-soft)]">{p.id}</span> : null}<span className="shrink-0 text-[var(--muted-strong)]">· {money(p.contractValue)}</span></li>)}</ul>
+                {/* Названия проектов — ссылки на карточку проекта (Р5), не plain-текст. */}
+                <ul className="flex flex-col gap-1">{projects.map((p) => <li key={p.id} className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--text)]"><Rocket className="size-3 shrink-0 text-[var(--success-text)]" aria-hidden /><Link href={`/projects/${p.id}`} className="truncate rounded-[var(--radius-sm)] font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-[var(--ring-focus)]" title={`Открыть проект «${p.title}»`}>{p.title}</Link>{prototypeNotesEnabled ? <span className="v4-mono text-[var(--muted-soft)]">{p.id}</span> : null}<span className="shrink-0 text-[var(--muted-strong)]">· {money(p.contractValue)}</span></li>)}</ul>
               </div>
             ) : null}
           </section>

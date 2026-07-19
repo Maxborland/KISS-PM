@@ -116,7 +116,7 @@ describe("GlobalSearch command palette", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = new URL(String(fetchMock.mock.calls[0]?.[0]), "http://localhost");
-    expect(url.searchParams.get("types")).toBe("project,task,opportunity");
+    expect(url.searchParams.get("types")).toBe("project,task,opportunity,client,contact,product");
     expect(url.searchParams.get("limit")).toBe("15");
     expect(document.body.textContent).toContain("Ничего не найдено по «вектор»");
   });

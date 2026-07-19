@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useState, type ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { CommsFrame, type CommsTab } from "@/communications/ui/comms-frame";
@@ -139,7 +141,12 @@ export function WithCommsEntityScope({
         >
           <EmptyState
             title="Пока нет проектов"
-            description="Коммуникации привязаны к проекту. Как только в рабочей области появится проект, здесь откроются его беседы, звонки и встречи."
+            description="Коммуникации привязаны к проекту. Проекты появляются активацией сделки из CRM: выиграйте сделку — и здесь откроются её беседы, звонки и встречи."
+            action={
+              <Button asChild variant="default">
+                <Link href="/crm/deals">К сделкам</Link>
+              </Button>
+            }
           />
         </SurfaceState>
       </CommsFrame>

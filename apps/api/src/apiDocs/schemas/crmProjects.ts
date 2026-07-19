@@ -967,9 +967,11 @@ export const crmProjectSchemas = openApiSchemaFragment({
   },
   TaskDetailResponse: {
     type: "object",
-    required: ["task", "activities", "attachmentItems"],
+    required: ["task", "projectId", "projectName", "activities", "attachmentItems"],
     properties: {
       task: schemaRef("Task"),
+      projectId: stringIdSchema,
+      projectName: nullableStringSchema,
       activities: { type: "array", items: schemaRef("TaskActivityItem") },
       attachmentItems: { type: "array", items: schemaRef("EntityAttachment") }
     },

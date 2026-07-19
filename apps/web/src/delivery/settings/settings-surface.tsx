@@ -176,7 +176,16 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
                   </span>
                 </ROValue>
               </Field>
-              <Field label="Источник"><ROValue>{project.sourceType === "opportunity" ? "Сделка CRM" : project.sourceType}{prototypeNotesEnabled && project.sourceOpportunityId ? ` · ${project.sourceOpportunityId}` : ""}</ROValue></Field>
+              <Field label="Источник">
+                <ROValue>
+                  <span className="flex items-center justify-between gap-2">
+                    {project.sourceType === "opportunity" ? "Сделка CRM" : project.sourceType}
+                    {project.sourceOpportunityId ? (
+                      <Link href={`/crm/deals/${project.sourceOpportunityId}`} className="font-medium text-[var(--accent)] transition-colors duration-[var(--duration-fast)] hover:underline">Исходная сделка</Link>
+                    ) : null}
+                  </span>
+                </ROValue>
+              </Field>
               <Field label={prototypeNotesEnabled ? "ID проекта · версия плана" : "Версия плана"}><ROValue mono>{prototypeNotesEnabled ? `${project.id} · ` : ""}v{readModel.planVersion}</ROValue></Field>
               <div className="sm:col-span-2">
                 <Field label="Дедлайн релиза">
