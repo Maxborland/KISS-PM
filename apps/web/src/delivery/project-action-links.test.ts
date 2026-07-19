@@ -31,6 +31,18 @@ describe("project delivery non-schedule action links", () => {
     expect(source).toMatch(/<Link href=\{`\/projects\/\$\{projectId\}\/calendars`\}>Открыть Календарь<\/Link>/);
     expect(source).not.toContain('demoAction("переход на вкладку «Календари»")');
   });
+
+  it("calendars no-calendar empty state links to the project settings route", () => {
+    const source = read("src/delivery/calendars/calendars-surface.tsx");
+
+    expect(source).toMatch(/<Link href=\{`\/projects\/\$\{projectId\}\/settings`\}>Настроить календарь<\/Link>/);
+  });
+
+  it("assignments no-calendar banner links to the project settings route", () => {
+    const source = read("src/delivery/assignments/assignments-surface.tsx");
+
+    expect(source).toMatch(/<Link href=\{`\/projects\/\$\{projectId\}\/settings`\}>Настроить календарь<\/Link>/);
+  });
 });
 
 describe("project schedule toolbar action contract", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { GripVertical, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -213,7 +214,17 @@ export function MyWorkSurface() {
           onRetry={() => void reload()}
           errorFormat={myWorkErr}
           loadingLabel="Загрузка моих задач…"
-          empty={{ title: "Задач пока нет", description: "Вам не назначено ни одной задачи в активных проектах." }}
+          empty={{
+            title: "Задач пока нет",
+            description: "Вам не назначено ни одной задачи в активных проектах. Задачи создаются в расписании проекта.",
+            // Р7б: честный CTA — из пустых «Моих задач» есть путь к поверхности создания
+            // (список проектов → расписание), а не тупик без единой ссылки.
+            action: (
+              <Button asChild variant="default">
+                <Link href="/projects">К проектам</Link>
+              </Button>
+            )
+          }}
         >
           {tasks ? (
             query.trim() && filteredTasks.length === 0 ? (

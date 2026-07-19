@@ -146,7 +146,10 @@ export function ProjectCalendars({ projectId = MOCK_PROJECT_ID }: { projectId?: 
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Календари проекта и ресурсов</h2>
           <div role="status" className="mt-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-4 py-8 text-center text-[length:var(--text-sm)] text-[var(--muted)] shadow-[var(--shadow-card)]">
-            Календарь проекта не настроен. Исключения и отсутствия недоступны до выбора календаря.
+            <p>Календарь проекта не настроен. Исключения и отсутствия недоступны до выбора календаря.</p>
+            <Button asChild variant="secondary" size="sm" className="mt-3">
+              <Link href={`/projects/${projectId}/settings`}>Настроить календарь</Link>
+            </Button>
           </div>
         </div>
       </DeliveryFrame>

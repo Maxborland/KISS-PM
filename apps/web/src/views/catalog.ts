@@ -16,7 +16,7 @@ export type ScreenMeta = {
   storyTitle: string;
   pageTitle: string;
   lead: string;
-  breadcrumb: { label: string; current?: boolean }[];
+  breadcrumb: { label: string; href?: string; current?: boolean }[];
   activeNav?: string;
   variant?: "workspace" | "bare";
 };
@@ -70,7 +70,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "16 KPI проекта",
     pageTitle: mockProjectScreenTitle("KPI"),
     lead: "Показатели и сигналы управления.",
-    breadcrumb: [{ label: "Проекты" }, { label: MOCK_PROJECT_CRM }, { label: "KPI", current: true }],
+    breadcrumb: [{ label: "Проекты", href: "/projects" }, { label: MOCK_PROJECT_CRM }, { label: "KPI", current: true }],
     activeNav: "Отчёты"
   },
   "state-empty": {
@@ -118,7 +118,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "21 Тред",
     pageTitle: "Обсуждение задачи",
     lead: "Сообщения по сущности с ответами и реакциями.",
-    breadcrumb: [{ label: "Чаты" }, { label: "Обсуждение", current: true }],
+    breadcrumb: [{ label: "Чаты", href: "/communications/chat" }, { label: "Обсуждение", current: true }],
     activeNav: "Чаты"
   },
   "comms-composer": {
@@ -126,7 +126,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "22 Поле сообщения",
     pageTitle: "Новое сообщение",
     lead: "Упоминания, реакции и стикеры в одном поле.",
-    breadcrumb: [{ label: "Чаты" }, { label: "Сообщение", current: true }],
+    breadcrumb: [{ label: "Чаты", href: "/communications/chat" }, { label: "Сообщение", current: true }],
     activeNav: "Чаты"
   },
   "comms-notifications": {
@@ -150,7 +150,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "25 Карточка встречи",
     pageTitle: "Планёрка по внедрению",
     lead: "Повестка, заметки, задачи и внешние ссылки.",
-    breadcrumb: [{ label: "Встречи" }, { label: "Планёрка", current: true }],
+    breadcrumb: [{ label: "Встречи", href: "/communications/meetings" }, { label: "Планёрка", current: true }],
     activeNav: "Встречи"
   },
   "call-lobby": {
@@ -158,7 +158,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "26 Лобби звонка",
     pageTitle: "Подключение к звонку",
     lead: "Проверьте камеру и микрофон перед входом.",
-    breadcrumb: [{ label: "Звонки" }, { label: "Лобби", current: true }],
+    breadcrumb: [{ label: "Звонки", href: "/communications/calls" }, { label: "Лобби", current: true }],
     activeNav: "Звонки"
   },
   "call-active": {
@@ -166,7 +166,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "27 Активный звонок",
     pageTitle: "Звонок команды",
     lead: "Сетка участников, демонстрация экрана и запись.",
-    breadcrumb: [{ label: "Звонки" }, { label: "Звонок", current: true }],
+    breadcrumb: [{ label: "Звонки", href: "/communications/calls" }, { label: "Звонок", current: true }],
     activeNav: "Звонки"
   },
   "call-screen-share": {
@@ -174,7 +174,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "28 Демонстрация экрана",
     pageTitle: "Демонстрация экрана",
     lead: "Докладчик показывает экран остальным участникам.",
-    breadcrumb: [{ label: "Звонки" }, { label: "Экран", current: true }],
+    breadcrumb: [{ label: "Звонки", href: "/communications/calls" }, { label: "Экран", current: true }],
     activeNav: "Звонки"
   },
   "call-in-chat": {
@@ -182,7 +182,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "29 Чат звонка",
     pageTitle: "Чат во время звонка",
     lead: "Сообщения участников без выхода из звонка.",
-    breadcrumb: [{ label: "Звонки" }, { label: "Чат", current: true }],
+    breadcrumb: [{ label: "Звонки", href: "/communications/calls" }, { label: "Чат", current: true }],
     activeNav: "Звонки"
   },
   "call-device-settings": {
@@ -190,7 +190,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "30 Настройки устройств",
     pageTitle: "Камера и микрофон",
     lead: "Выбор устройств и виртуального фона.",
-    breadcrumb: [{ label: "Звонки" }, { label: "Устройства", current: true }],
+    breadcrumb: [{ label: "Звонки", href: "/communications/calls" }, { label: "Устройства", current: true }],
     activeNav: "Звонки"
   },
   "call-reconnecting": {
@@ -198,7 +198,7 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     storyTitle: "31 Переподключение",
     pageTitle: "Восстанавливаем связь",
     lead: "Соединение потеряно. Пробуем переподключиться…",
-    breadcrumb: [{ label: "Звонки" }, { label: "Связь", current: true }],
+    breadcrumb: [{ label: "Звонки", href: "/communications/calls" }, { label: "Связь", current: true }],
     activeNav: "Звонки"
   }
 };

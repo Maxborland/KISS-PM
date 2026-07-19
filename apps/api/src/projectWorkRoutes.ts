@@ -113,6 +113,8 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
 
     return context.json({
       task: result.task,
+      projectId: result.projectId,
+      projectName: result.projectName,
       activities: result.activities,
       attachmentItems: result.attachmentItems
     });

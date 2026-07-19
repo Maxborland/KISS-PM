@@ -9,8 +9,10 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { FormDialog } from "@/components/domain/form-dialog";
 import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
+import { cn } from "@/lib/cn";
 import { CrmFrame } from "@/crm/ui/crm-frame";
 import { StatusChip, crmErr } from "@/crm/ui/crm-bits";
+import { CrmListFilterChip, CrmListParamResolver, highlightRowCls, useHighlightRowRef } from "@/crm/ui/list-url-params";
 import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
@@ -26,8 +28,19 @@ export function ProjectContacts() {
   const sessionUser = useSessionUser();
   const createCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.contacts.manage" });
   const [busy, setBusy] = useState(false);
+  // Deep-link из глобального поиска: `?entity=<id контакта>` подсвечивает строку (Р12);
+  // `?client=<id>` — фильтр по клиенту из счётчика на списке «Клиенты» (Р13).
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [clientFilter, setClientFilter] = useState<string | null>(null);
+  const highlightRowRef = useHighlightRowRef(highlightId);
 
   const clientById = useMemo(() => new Map((data?.clients ?? []).map((c) => [c.id, c])), [data]);
+  const contactIds = useMemo(() => new Set((data?.contacts ?? []).map((c) => c.id)), [data]);
+  const clientIds = useMemo(() => new Set((data?.clients ?? []).map((c) => c.id)), [data]);
+  const visibleContacts = useMemo(
+    () => (data?.contacts ?? []).filter((c) => !clientFilter || c.clientId === clientFilter),
+    [clientFilter, data]
+  );
 
   // Верхнеуровневый статус поверхности: forbidden/error/loading из хука; пустой справочник → empty; иначе ready.
   const surfaceStatus =
@@ -77,14 +90,19 @@ export function ProjectContacts() {
         }}
         forbidden={{ title: "Доступ к контактам ограничен", description: "У вас нет прав на просмотр справочника контактов." }}
       >
+        {/* Резолв deep-link ?entity=/?client= — только в ready-ветке (SurfaceState рендерит
+            children при status==="ready"): useSearchParams вне её требует Suspense при prerender. */}
+        <CrmListParamResolver param="entity" knownIds={contactIds} setValue={setHighlightId} notFoundMessage="Контакт не найден: возможно, он удалён или ссылка устарела" />
+        <CrmListParamResolver param="client" knownIds={clientIds} setValue={setClientFilter} notFoundMessage="Клиент из фильтра не найден — показаны все контакты" />
+        {clientFilter ? <CrmListFilterChip param="client" label={`Фильтр: клиент «${clientLabel(clientFilter)}»`} onReset={() => setClientFilter(null)} /> : null}
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
           <table className="w-full border-collapse text-[length:var(--text-sm)]">
             <thead><tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
               <th className="px-3 py-2 font-semibold">Контакт</th><th className="px-3 py-2 font-semibold">Клиент</th><th className="px-3 py-2 font-semibold">Должность</th><th className="px-3 py-2 font-semibold">Email</th><th className="px-3 py-2 font-semibold">Телефон</th><th className="px-3 py-2 font-semibold">Статус</th><th className="px-3 py-2" />
             </tr></thead>
             <tbody>
-              {(data?.contacts ?? []).map((c) => (
-                <tr key={c.id} className="v4-row border-b border-[var(--border-subtle)] last:border-0">
+              {visibleContacts.map((c) => (
+                <tr key={c.id} ref={highlightId === c.id ? highlightRowRef : undefined} data-selected={highlightId === c.id || undefined} className={cn("v4-row border-b border-[var(--border-subtle)] last:border-0", highlightId === c.id && highlightRowCls)}>
                   <td className="px-3 py-2"><div className="font-medium text-[var(--text-strong)]">{c.name}</div>{prototypeNotesEnabled ? <div className="v4-mono text-[length:var(--text-2xs)] text-[var(--muted-soft)]">{c.id}</div> : null}</td>
                   <td className="px-3 py-2 text-[var(--muted-strong)]">{clientLabel(c.clientId)}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{c.role ?? "—"}</td>
@@ -111,6 +129,9 @@ export function ProjectContacts() {
                   </td>
                 </tr>
               ))}
+              {visibleContacts.length === 0 ? (
+                <tr><td colSpan={7} className="px-3 py-6 text-center text-[length:var(--text-xs)] text-[var(--muted-soft)]">У выбранного клиента нет контактов — сбросьте фильтр, чтобы увидеть весь справочник.</td></tr>
+              ) : null}
             </tbody>
           </table>
         </div>

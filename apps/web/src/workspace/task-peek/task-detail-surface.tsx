@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { FormDialog } from "@/components/domain/form-dialog";
@@ -101,7 +102,13 @@ export function TaskDetailSurface({ taskId }: TaskDetailSurfaceProps) {
     <WorkspaceShell activeNav="Мои задачи">
       <main className="min-w-0 flex-1 overflow-auto p-4">
         <div className="mb-3">
-          <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Задача</h1>
+          <Link
+            href="/my-work"
+            className="text-[length:var(--text-sm)] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+          >
+            ← Мои задачи
+          </Link>
+          <h1 className="mt-1 text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Задача</h1>
         </div>
 
         <SurfaceState
@@ -123,7 +130,18 @@ export function TaskDetailSurface({ taskId }: TaskDetailSurfaceProps) {
             <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.7fr)]">
               <article className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
                 <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
-                  <h2 className="min-w-0 text-[length:var(--text-h3)] leading-[var(--lh-h3)] font-semibold text-[var(--text-strong)]">{data.task.title}</h2>
+                  <div className="min-w-0">
+                    <h2 className="text-[length:var(--text-h3)] leading-[var(--lh-h3)] font-semibold text-[var(--text-strong)]">{data.task.title}</h2>
+                    <p className="mt-1 text-[length:var(--text-sm)] text-[var(--muted)]">
+                      Проект:{" "}
+                      <Link
+                        href={`/projects/${encodeURIComponent(data.projectId)}`}
+                        className="font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+                      >
+                        {data.projectName ?? "Открыть проект"}
+                      </Link>
+                    </p>
+                  </div>
                   <FormDialog
                     title="Редактировать задачу"
                     trigger={<Button variant="outline" size="sm" onClick={beginEdit}>Редактировать</Button>}

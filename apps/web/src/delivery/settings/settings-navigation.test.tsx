@@ -5,6 +5,8 @@ import { ProjectSettings } from "./settings-surface";
 
 let permissions: string[] = [];
 let calendarId: string | null = "calendar";
+let sourceType = "manual";
+let sourceOpportunityId: string | null = null;
 let calendars = [{
   id: "calendar",
   workingWeekdays: [1, 2, 3, 4, 5],
@@ -23,8 +25,8 @@ vi.mock("@/delivery/lib/use-planning", () => ({
         plannedStart: "2026-07-01",
         deadline: "2026-07-31",
         calendarId,
-        sourceType: "manual",
-        sourceOpportunityId: null
+        sourceType,
+        sourceOpportunityId
       },
       calendars,
       authored: { tasks: [] },
@@ -58,6 +60,8 @@ describe("settings calendar navigation", () => {
   beforeEach(() => {
     permissions = [];
     calendarId = "calendar";
+    sourceType = "manual";
+    sourceOpportunityId = null;
     calendars = [{
       id: "calendar",
       workingWeekdays: [1, 2, 3, 4, 5],
@@ -90,5 +94,30 @@ describe("settings calendar navigation", () => {
     calendars = [];
 
     expect(renderSettings()).toContain("— (не задан)");
+  });
+});
+
+describe("settings source deal navigation", () => {
+  beforeEach(() => {
+    permissions = ["tenant.project_plan.read"];
+    sourceType = "opportunity";
+    sourceOpportunityId = "opp-42";
+  });
+
+  it("always links the source deal when the project originates from CRM", () => {
+    const markup = renderSettings();
+
+    expect(markup).toContain("Сделка CRM");
+    expect(markup).toContain('href="/crm/deals/opp-42"');
+    expect(markup).toContain(">Исходная сделка</a>");
+  });
+
+  it("renders no deal link without sourceOpportunityId", () => {
+    sourceOpportunityId = null;
+
+    const markup = renderSettings();
+
+    expect(markup).not.toContain("Исходная сделка");
+    expect(markup).not.toContain("/crm/deals/");
   });
 });

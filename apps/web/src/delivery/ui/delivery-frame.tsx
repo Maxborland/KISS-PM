@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
@@ -104,6 +105,14 @@ export function DeliveryFrame({
             Финиш <span className="v4-num text-[var(--muted-strong)]">{project.finish}</span>
           </span>
           {project.variance ? <Pill tone={project.variance.tone}>{project.variance.label}</Pill> : null}
+          {/* Реальный переход в чат проекта: /communications/chat читает ?project= (deep-link entity-scope) */}
+          <Link
+            href={`/communications/chat?project=${projectId}`}
+            className="ml-auto inline-flex items-center gap-1.5 text-[length:var(--text-sm)] font-medium text-[var(--muted)] transition-colors duration-[var(--duration-fast)] hover:text-[var(--text-strong)]"
+          >
+            <MessageSquare className="size-4" aria-hidden />
+            Чат проекта
+          </Link>
         </div>
 
         {/* Tabs — реальные ссылки на /projects/[id]/<slug> */}

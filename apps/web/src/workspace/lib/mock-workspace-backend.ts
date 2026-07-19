@@ -228,6 +228,9 @@ export function createMockWorkspaceFetch(): typeof fetch {
       if (!task) return err("task_not_found", 404);
       return json({
         task,
+        projectId: task.projectId,
+        // Зеркало боевого fail-soft: null, если проект недоступен.
+        projectName: db.projects.find((p) => p.id === task.projectId)?.title ?? null,
         activities: db.activities.filter((activity) => activity.taskId === task.id),
         attachmentItems: []
       });

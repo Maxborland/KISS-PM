@@ -147,7 +147,12 @@ export function DashboardSurface() {
               tasks={{ data: myWork.data?.tasks ?? null, status: srcStatus(myWork), reload: myWork.reload }}
               projects={{
                 data: projects.data
-                  ? { count: projects.data.projects.length, hours: projects.data.projects.reduce((s, p) => s + p.plannedHours, 0) }
+                  ? {
+                      count: projects.data.projects.length,
+                      hours: projects.data.projects.reduce((s, p) => s + p.plannedHours, 0),
+                      // Первый активный проект — прямая цель шага «Создать первую задачу» (его расписание).
+                      firstId: projects.data.projects[0]?.id ?? null
+                    }
                   : null,
                 status: srcStatus(projects),
                 reload: projects.reload
@@ -380,7 +385,7 @@ function DashboardContent({
 }: {
   tasks: SourceView<TaskRecord[]>;
   permissions: string[];
-  projects: SourceView<{ count: number; hours: number }>;
+  projects: SourceView<{ count: number; hours: number; firstId: string | null }>;
   opportunities: SourceView<Opportunity[]>;
 }) {
   // Фильтр — внутри useMemo с зависимостью [tasks.data]: раньше activeTasks строился
@@ -410,7 +415,8 @@ function DashboardContent({
     permissions,
     taskCount: tasks.data?.length ?? null,
     opportunityCount: opportunities.data?.length ?? null,
-    projectCount: projects.data?.count ?? null
+    projectCount: projects.data?.count ?? null,
+    firstProjectId: projects.data?.firstId ?? null
   });
   const showSetup = setupSteps.some((step) => !step.done);
   // Подпись KPI-плитки для недоступного источника: роль — только при forbidden.

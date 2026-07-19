@@ -18,10 +18,12 @@ export function proxy(req: NextRequest): NextResponse {
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   const hasSession = req.cookies.has(SESSION_COOKIE);
 
-  // Корень «/» — не самостоятельная страница: в рабочую область или на вход.
+  // Корень «/» — не самостоятельная страница: на домашний экран рабочей
+  // области «Мои задачи» (согласовано с клиентским фолбэком app/page.tsx,
+  // который ловит тот же кейс при протухшей cookie) или на вход.
   if (pathname === "/") {
     const url = req.nextUrl.clone();
-    url.pathname = hasSession ? "/dashboard" : "/login";
+    url.pathname = hasSession ? "/my-work" : "/login";
     url.search = "";
     return NextResponse.redirect(url);
   }

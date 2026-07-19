@@ -11,18 +11,40 @@ export function buildSetupSteps(input: {
   taskCount: number | null;
   opportunityCount: number | null;
   projectCount: number | null;
+  /** id первого активного проекта — цель прямой ссылки на расписание (null, если проектов нет/не загрузились). */
+  firstProjectId: string | null;
 }): SetupStep[] {
   const permissions = new Set(input.permissions);
   const steps: SetupStep[] = [];
 
-  if (permissions.has("tenant.tasks.create") && input.taskCount !== null) {
-    steps.push({
-      id: "task",
-      label: "Создать первую задачу",
-      description: "Зафиксируйте ближайшее действие и ответственного.",
-      href: "/my-work",
-      done: input.taskCount > 0
-    });
+  /* Р7: раньше шаг вёл на /my-work, где создать задачу НЕЛЬЗЯ (там только
+     работа с назначенными). Фактическая поверхность создания — расписание
+     проекта (/projects/[id]/schedule: строка «Новая задача», контекстное
+     «Создать задачу рядом»). Поэтому:
+     - есть проект → прямо в его расписание (fallback — список проектов);
+     - проектов нет → сначала активировать проект из сделки (/crm/deals),
+       как и предыдущие шаги цепочки; без прав на активацию шаг не обещаем;
+     - проекты не загрузились/недоступны (projectCount === null) — шаг не
+       показываем: честного маршрута к созданию нет. */
+  if (permissions.has("tenant.tasks.create") && input.taskCount !== null && input.projectCount !== null) {
+    const hasProject = input.projectCount > 0;
+    const canActivateProject =
+      permissions.has("tenant.opportunities.manage") && permissions.has("tenant.projects.manage");
+    if (hasProject || canActivateProject) {
+      steps.push({
+        id: "task",
+        label: "Создать первую задачу",
+        description: hasProject
+          ? "Откройте расписание проекта и зафиксируйте ближайшее действие и ответственного."
+          : "Сначала активируйте проект из подтверждённой сделки — задачи создаются в его расписании.",
+        href: hasProject
+          ? input.firstProjectId
+            ? `/projects/${input.firstProjectId}/schedule`
+            : "/projects"
+          : "/crm/deals",
+        done: input.taskCount > 0
+      });
+    }
   }
   if (permissions.has("tenant.opportunities.manage") && input.opportunityCount !== null) {
     steps.push({

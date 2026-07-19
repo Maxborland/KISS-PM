@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -266,8 +267,11 @@ export function ProjectAssignments({ projectId = MOCK_PROJECT_ID }: { projectId?
         </div>
       ) : null}
       {!model.hasProjectCalendar ? (
-        <div role="status" className="mb-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--warning-text)]">
-          Календарь проекта не настроен. Дневное распределение трудозатрат недоступно.
+        <div role="status" className="mb-2 flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--warning)] bg-[var(--warning-soft)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--warning-text)]">
+          <span className="flex-1">Календарь проекта не настроен. Дневное распределение трудозатрат недоступно.</span>
+          <Button asChild variant="secondary" size="sm">
+            <Link href={`/projects/${projectId}/settings`}>Настроить календарь</Link>
+          </Button>
         </div>
       ) : null}
 

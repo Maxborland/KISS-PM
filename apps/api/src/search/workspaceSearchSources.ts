@@ -140,7 +140,7 @@ async function searchClients(input: WorkspaceSearchInput, limit: number): Promis
       snippet: item.description ?? item.status,
       entityType: "client",
       entityId: item.id,
-      route: "/crm/clients",
+      route: routeForEntity("client", item.id),
       updatedAt: item.updatedAt.toISOString(),
       score: score(input.query, item.name, item.description ?? ""),
       source: "clients"
@@ -161,7 +161,7 @@ async function searchContacts(input: WorkspaceSearchInput, limit: number): Promi
       snippet: item.role ?? item.phone ?? "",
       entityType: "contact",
       entityId: item.id,
-      route: "/crm/contacts",
+      route: routeForEntity("contact", item.id),
       updatedAt: item.updatedAt.toISOString(),
       score: score(input.query, item.name, item.email ?? "", item.role ?? ""),
       source: "contacts"

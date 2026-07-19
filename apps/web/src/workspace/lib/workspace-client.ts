@@ -81,6 +81,9 @@ export type TaskActivityRecord = {
 
 export type TaskDetailResponse = {
   task: TaskRecord;
+  projectId: string;
+  // Fail-soft: null, если проект недоступен (карточка задачи остаётся читаемой).
+  projectName: string | null;
   activities: TaskActivityRecord[];
   attachmentItems: unknown[];
 };

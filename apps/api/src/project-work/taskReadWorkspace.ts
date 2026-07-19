@@ -36,6 +36,8 @@ type TaskDetailResult =
   | {
       ok: true;
       task: TaskRecord;
+      projectId: string;
+      projectName: string | null;
       activities: TaskActivityRecord[];
       attachmentItems: SerializedAttachment[];
     }
@@ -164,6 +166,8 @@ async function getTaskDetail(
   return {
     ok: true,
     task,
+    projectId: task.projectId,
+    projectName: await findProjectName(deps.dataSource, input.actor.tenantId, task.projectId),
     activities: await deps.dataSource.listTaskActivities(input.actor.tenantId, task.id),
     attachmentItems: await listSerializedTaskAttachmentItems(deps, input.actor.tenantId, task.id)
   };
@@ -204,6 +208,17 @@ async function listSerializedTaskAttachmentItems(
     entityId: taskId
   })) ?? [];
   return attachmentItems.map((attachment: AttachmentReadModel) => serializeAttachment(attachment));
+}
+
+/** Fail-soft название проекта для карточки задачи: null, если датасорс проектов
+    недоступен или проект не найден (карточка задачи при этом остаётся читаемой). */
+async function findProjectName(
+  dataSource: ApiTenantDataSource,
+  tenantId: string,
+  projectId: string
+): Promise<string | null> {
+  const projects = await dataSource.listProjects?.(tenantId);
+  return projects?.find((project) => project.id === projectId)?.title ?? null;
 }
 
 async function findActiveProject(

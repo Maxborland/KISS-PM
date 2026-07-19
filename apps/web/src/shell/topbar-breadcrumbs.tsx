@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -5,7 +6,12 @@ import { cn } from "@/lib/cn";
 import { DEMO_NAV_TITLE } from "@/views/lib/demo";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
-export type Crumb = { label: string; current?: boolean };
+export type Crumb = {
+  label: string;
+  /** Реальный роут родительского уровня — крошка становится ссылкой. */
+  href?: string;
+  current?: boolean;
+};
 
 export function TopbarBreadcrumbs({ items, className }: { items: Crumb[]; className?: string }) {
   return (
@@ -15,8 +21,12 @@ export function TopbarBreadcrumbs({ items, className }: { items: Crumb[]; classN
           {i > 0 ? <ChevronRight className="crumb-sep size-3.5" aria-hidden /> : null}
           {item.current ? (
             <span className="u-text-strong">{item.label}</span>
+          ) : item.href ? (
+            <Link href={item.href} className="crumb-parent">
+              {item.label}
+            </Link>
           ) : (
-            // Прототип: навигация не подключена — путь как текст, без fake-ссылки.
+            // Родитель без роута — честный текст, без fake-ссылки.
             <span className="crumb-parent" title={prototypeNotesEnabled ? DEMO_NAV_TITLE : undefined}>
               {item.label}
             </span>

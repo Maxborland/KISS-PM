@@ -68,4 +68,13 @@ describe("DeliveryFrame project navigation", () => {
       });
     }
   });
+
+  it("links the project chat via the entity-scope deep-link in the header", () => {
+    const document = renderFrame("Обзор", "project-42");
+    const chatLink = Array.from(document.querySelectorAll("a")).find((link) =>
+      link.textContent?.includes("Чат проекта")
+    );
+
+    expect(chatLink?.getAttribute("href")).toBe("/communications/chat?project=project-42");
+  });
 });
