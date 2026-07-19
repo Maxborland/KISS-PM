@@ -130,52 +130,56 @@ test("план: чужой apply поднимает баннер «План об
   await expect(page.getByText(task!.title).first()).toBeVisible();
   await expect(page.getByTestId("plan-updated-banner")).toHaveCount(0);
 
-  await withSecondUser(browser, async (second) => {
-    const current = await second.request.get(
-      `/api/workspace/projects/${PLAN_PROJECT_ID}/planning/read-model`
-    );
-    expect(current.status()).toBe(200);
-    const { planVersion } = (await current.json()) as { planVersion: number };
-    const apply = await second.request.post(
-      `/api/workspace/projects/${PLAN_PROJECT_ID}/planning/apply-command`,
-      {
-        headers: mutationHeaders(second),
-        data: {
-          clientPlanVersion: planVersion,
-          command: {
-            type: "task.update_identity",
-            payload: { taskId: task!.id, title: `Смоук план-баннер ${Date.now()}` }
+  // Мутация и ассерты — в try, компенсация — в finally (ревью #261): упавший ассерт
+  // баннера не должен оставлять seed-задачу переименованной (сид — один на весь
+  // прогон, битый титул каскадит в другие смоуки и следующий локальный запуск).
+  try {
+    await withSecondUser(browser, async (second) => {
+      const current = await second.request.get(
+        `/api/workspace/projects/${PLAN_PROJECT_ID}/planning/read-model`
+      );
+      expect(current.status()).toBe(200);
+      const { planVersion } = (await current.json()) as { planVersion: number };
+      const apply = await second.request.post(
+        `/api/workspace/projects/${PLAN_PROJECT_ID}/planning/apply-command`,
+        {
+          headers: mutationHeaders(second),
+          data: {
+            clientPlanVersion: planVersion,
+            command: {
+              type: "task.update_identity",
+              payload: { taskId: task!.id, title: `Смоук план-баннер ${Date.now()}` }
+            }
           }
         }
-      }
-    );
-    expect(apply.status()).toBe(200);
-  });
+      );
+      expect(apply.status()).toBe(200);
+    });
 
-  // SSE planVersionChanged → неблокирующий баннер (автоперезагрузки нет).
-  const banner = page.getByTestId("plan-updated-banner");
-  await expect(banner).toBeVisible({ timeout: 10_000 });
-  await banner.getByRole("button", { name: "Обновить" }).click();
-  // reload догоняет planVersion — баннер снимается.
-  await expect(banner).toHaveCount(0, { timeout: 10_000 });
-
-  // Компенсация: возвращаем seed-название задачи — спек повторяем и не ломает
-  // другие смоуки, которые опираются на seed-якоря (block9: карточка задачи).
-  await withSecondUser(browser, async (second) => {
-    const current = await second.request.get(
-      `/api/workspace/projects/${PLAN_PROJECT_ID}/planning/read-model`
-    );
-    const { planVersion } = (await current.json()) as { planVersion: number };
-    const revert = await second.request.post(
-      `/api/workspace/projects/${PLAN_PROJECT_ID}/planning/apply-command`,
-      {
-        headers: mutationHeaders(second),
-        data: {
-          clientPlanVersion: planVersion,
-          command: { type: "task.update_identity", payload: { taskId: task!.id, title: task!.title } }
+    // SSE planVersionChanged → неблокирующий баннер (автоперезагрузки нет).
+    const banner = page.getByTestId("plan-updated-banner");
+    await expect(banner).toBeVisible({ timeout: 10_000 });
+    await banner.getByRole("button", { name: "Обновить" }).click();
+    // reload догоняет planVersion — баннер снимается.
+    await expect(banner).toHaveCount(0, { timeout: 10_000 });
+  } finally {
+    // Возврат seed-названия задачи — спек повторяем при любом исходе ассертов.
+    await withSecondUser(browser, async (second) => {
+      const current = await second.request.get(
+        `/api/workspace/projects/${PLAN_PROJECT_ID}/planning/read-model`
+      );
+      const { planVersion } = (await current.json()) as { planVersion: number };
+      const revert = await second.request.post(
+        `/api/workspace/projects/${PLAN_PROJECT_ID}/planning/apply-command`,
+        {
+          headers: mutationHeaders(second),
+          data: {
+            clientPlanVersion: planVersion,
+            command: { type: "task.update_identity", payload: { taskId: task!.id, title: task!.title } }
+          }
         }
-      }
-    );
-    expect(revert.status()).toBe(200);
-  });
+      );
+      expect(revert.status()).toBe(200);
+    });
+  }
 });
