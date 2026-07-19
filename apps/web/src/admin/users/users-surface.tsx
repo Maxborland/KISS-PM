@@ -253,19 +253,19 @@ function CreateUserDialog({ roles, positions, busy, setBusy, create, disabledRea
   );
 }
 
-function EditUserDialog({ user, roles, positions, busy, setBusy, update, disabledReason }: {
+export function EditUserDialog({ user, roles, positions, busy, setBusy, update, disabledReason }: {
   user: WorkspaceUser; roles: AccessProfile[]; positions: Position[];
   busy: boolean; setBusy: (v: boolean) => void;
   update: ReturnType<typeof useAdmin>["updateUser"];
   disabledReason?: string;
 }) {
-  // name/email могут отсутствовать: каталог /api/workspace/users отдаёт приватные поля
+  // name/email/accessProfileId могут отсутствовать: каталог /api/workspace/users отдаёт приватные поля
   // только при tenant.users.read (workspaceUserRoutes.ts:80-96). Роль с доступом к
   // каталогу, но без users.read (например, plan-reader в гонке загрузки сессии до того,
   // как AdminFrame закроет раздел) получала undefined → name.trim() ронял всю страницу.
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email ?? "");
-  const [accessProfileId, setAccessProfileId] = useState(user.accessProfileId);
+  const [accessProfileId, setAccessProfileId] = useState(user.accessProfileId ?? "");
   const [positionId, setPositionId] = useState(user.positionId ?? "");
 
   const valid = name.trim().length > 0 && email.trim().length > 0 && accessProfileId.length > 0;
@@ -275,7 +275,7 @@ function EditUserDialog({ user, roles, positions, busy, setBusy, update, disable
       trigger={<Button variant="ghost" size="sm" disabled={Boolean(disabledReason)} title={disabledReason ?? "Изменить"}><Pencil className="size-3.5" aria-hidden /></Button>}
       // при открытии диалога синхронизируем форму с текущей записью
       onOpenChange={(v) => {
-        if (v) { setName(user.name ?? ""); setEmail(user.email ?? ""); setAccessProfileId(user.accessProfileId); setPositionId(user.positionId ?? ""); }
+        if (v) { setName(user.name ?? ""); setEmail(user.email ?? ""); setAccessProfileId(user.accessProfileId ?? ""); setPositionId(user.positionId ?? ""); }
       }}
       submitLabel={<><Pencil className="size-3.5" aria-hidden />Сохранить</>}
       submitDisabled={!valid || busy || Boolean(disabledReason)}
