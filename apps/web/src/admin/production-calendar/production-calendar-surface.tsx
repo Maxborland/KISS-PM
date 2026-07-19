@@ -62,7 +62,7 @@ export function AdminProductionCalendarSurface() {
     <AdminFrame
       activeTab="Произв. календарь"
       subtitle="Календарь определяет рабочие дни и часы тенанта: от него считаются ёмкость ресурсов, сроки и осуществимость планов"
-      actions={<AddExceptionDialog busy={busy} setBusy={setBusy} upsert={upsertExceptions} disabledReason={manageDisabledReason} />}
+      actions={<AddExceptionDialog busy={busy} setBusy={setBusy} upsert={upsertExceptions} existing={calendar?.exceptions ?? []} disabledReason={manageDisabledReason} />}
     >
       <div data-testid="production-calendar-page">
         {!live ? (
@@ -154,7 +154,8 @@ export function AdminProductionCalendarSurface() {
   );
 }
 
-function AddExceptionDialog({ busy, setBusy, upsert, disabledReason }: {
+function AddExceptionDialog({ busy, setBusy, upsert, existing, disabledReason }: {
+  existing: Array<{ id: string; date: string; resourceId: string | null }>;
   busy: boolean; setBusy: (v: boolean) => void;
   upsert: ReturnType<typeof useProductionCalendar>["upsertExceptions"];
   disabledReason?: string | undefined;
@@ -180,7 +181,11 @@ function AddExceptionDialog({ busy, setBusy, upsert, disabledReason }: {
         if (disabledReason) return disabledReason;
         if (!valid) return null;
         setBusy(true);
-        const res = await upsert([{ date, workingMinutes: parsedMinutes, reason: reason.trim() || null }]);
+        // Reuse id существующего исключения той же даты (ревью #262): без него
+        // «повторное добавление для уточнения» вставляло бы дубль (сервер апсертит
+        // по (tenantId, id), не по дате). Базовый календарь — resourceId null.
+        const existingId = existing.find((e) => e.date === date && e.resourceId === null)?.id;
+        const res = await upsert([{ ...(existingId ? { id: existingId } : {}), date, workingMinutes: parsedMinutes, reason: reason.trim() || null }]);
         setBusy(false);
         return res.ok ? null : calendarErr(res.code, res.message);
       }}

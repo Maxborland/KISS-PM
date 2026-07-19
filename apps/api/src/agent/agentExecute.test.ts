@@ -1131,6 +1131,21 @@ describe("Н15: offerable CRM-мутации агента (change_opportunity_st
     expect(invalidStageId.capability).toEqual({ allowed: false, reason: "invalid_deal_stage_id" });
   });
 
+  it("change_opportunity_stage: правило перехода воронки блокирует карточку (как governed PATCH, ревью #262)", async () => {
+    const harness = createHarness();
+    // Переход stage-new → stage-negotiation требует подтверждённой реализуемости,
+    // а у сделки feasibilityStatus null — governed-роут отверг бы, значит и карточка.
+    harness.dataSource.listStageTransitions = async () => [
+      { id: "tr-1", tenantId: "tenant-1", pipelineId: "pipeline-1", fromStageId: "stage-new", toStageId: "stage-negotiation", requireFeasibilityOk: true, minProbability: null } as never
+    ];
+    const blocked = await buildProposalActionMetadata(
+      harness.dataSource, crmActor, crmProfile,
+      { tool: "change_opportunity_stage", input: { opportunityId: "opp-1", stageId: "stage-negotiation" } }
+    );
+    expect(blocked.capability?.allowed).toBe(false);
+    expect(blocked.capability?.reason).toBe("condition_feasibility");
+  });
+
   it("change_opportunity_stage: без прав карточка не раскрывает данные сделки", async () => {
     const harness = createHarness();
     const metadata = await buildProposalActionMetadata(

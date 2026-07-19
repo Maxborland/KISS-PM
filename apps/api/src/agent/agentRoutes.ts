@@ -15,6 +15,7 @@ import { createPlanningReadModel } from "../planning/planningReadModel";
 import { canReadPlanningReadModel } from "../planning/planningRouteAuth";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { canEditTaskFields, canParticipateInTaskActivity, canParticipantTransitionTask } from "../project-work/taskCommandGuards";
+import { evaluateOpportunityStageTransition } from "../projectIntakeService/changeOpportunityStageCommand";
 import { isFinalOpportunityStatus } from "../projectIntakeService/opportunityStatus";
 import { parseUpdateTaskBody } from "../projectWorkParsers";
 import { parseClientIdParam, parseOpportunityIdParam } from "../routeParamParsers";
@@ -451,6 +452,28 @@ export async function buildProposalActionMetadata(
     // невалидный id — кодом governed-парсера; финальный статус сделки и
     // несуществующая/архивная стадия — теми же причинами, что и governed-роут.
     const parsedStage = parseDealStageChangeBody({ stageId });
+    // Правила перехода воронки (кросс-воронка, transition-rule, вероятность,
+    // реализуемость) — тем же evaluateOpportunityStageTransition, что и governed
+    // PATCH (ревью #262): иначе карточка звала бы одобрить переход, который
+    // execute отвергнет. Проверяем только когда базовые условия прошли.
+    const baseReason = !parsedStage.ok
+      ? parsedStage.error
+      : isFinalOpportunityStatus(opportunity.status)
+        ? "opportunity_stage_locked"
+        : !targetStage || targetStage.status !== "active"
+          ? "deal_stage_not_found"
+          : null;
+    let transitionReason: string | null = null;
+    if (!baseReason && targetStage && dataSource.listStageTransitions && dataSource.findDealStageById) {
+      const guard = await evaluateOpportunityStageTransition(
+        { findDealStageById: dataSource.findDealStageById, listStageTransitions: dataSource.listStageTransitions },
+        actor.tenantId,
+        opportunity,
+        { id: targetStage.id, pipelineId: targetStage.pipelineId ?? null }
+      );
+      if (!guard.ok) transitionReason = guard.error;
+    }
+    const stageCapReason = baseReason ?? transitionReason;
     return {
       title: `Сменить стадию сделки: «${opportunity.title}» · сделка ${opportunity.id}`,
       preview: {
@@ -458,13 +481,7 @@ export async function buildProposalActionMetadata(
         after: `стадия: ${currentLabel} → ${targetStage?.name ?? stageId}; версия записи не проверяется`
       },
       preconditionVersions: {},
-      ...(!parsedStage.ok
-        ? { capability: { allowed: false, reason: parsedStage.error } }
-        : isFinalOpportunityStatus(opportunity.status)
-          ? { capability: { allowed: false, reason: "opportunity_stage_locked" } }
-          : !targetStage || targetStage.status !== "active"
-            ? { capability: { allowed: false, reason: "deal_stage_not_found" } }
-            : {})
+      ...(stageCapReason ? { capability: { allowed: false, reason: stageCapReason } } : {})
     };
   }
   // D2: payload-backed карточка создания задачи — показывает ВСЁ, что реально будет
