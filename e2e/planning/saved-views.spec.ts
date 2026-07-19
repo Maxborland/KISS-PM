@@ -108,6 +108,7 @@ test("saved WBS views: admin persists once and plan reader applies without mutat
       }, { path: endpoint, name: `${marker} denied` });
       expect(deniedStatus).toBe(403);
     } finally {
+      await reader.context().unrouteAll({ behavior: "ignoreErrors" });
       await reader.context().close();
     }
 
@@ -127,6 +128,8 @@ test("saved WBS views: admin persists once and plan reader applies without mutat
     expect(readbackBody.savedViews.some((view) => view.name === marker)).toBe(false);
   } finally {
     if (viewId && projectId) await cleanupView(admin, projectId, viewId);
+    // Снимаем route-хендлеры до close: in-flight fetch не должен ронять teardown.
+    await admin.context().unrouteAll({ behavior: "ignoreErrors" });
     await admin.context().close();
   }
 });
@@ -141,6 +144,14 @@ async function authenticatedPage(
   if (apiPort) {
     await context.route("**/api/**", async (route) => {
       const target = new URL(route.request().url());
+      // Бесконечные SSE-потоки (realtime/planning events) нельзя тянуть через
+      // route.fetch — хендлер повисает на живом стриме до закрытия контекста и
+      // роняет teardown («Target page … has been closed»); пропускаем их через
+      // штатный Next-прокси без перезаписи хоста.
+      if (target.pathname.endsWith("/events")) {
+        await route.continue();
+        return;
+      }
       target.protocol = "http:";
       target.hostname = "127.0.0.1";
       target.port = apiPort;
