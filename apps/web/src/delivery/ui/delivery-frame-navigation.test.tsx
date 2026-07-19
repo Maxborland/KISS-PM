@@ -11,6 +11,13 @@ vi.mock("@/delivery/ui/workspace-shell", () => ({
 
 vi.mock("@/views/lib/prototype-gate", () => ({ prototypeNotesEnabled: false }));
 
+// Ссылка «Чат проекта» гейтится правом tenant.communications.read (ревью #259) —
+// мокаем сессию с этим правом; отдельный тест проверяет скрытие без права.
+const sessionPermissions: { current: string[] } = { current: ["tenant.communications.read"] };
+vi.mock("@/shell/use-session-user", () => ({
+  useSessionUser: () => ({ permissions: sessionPermissions.current })
+}));
+
 const PROJECT: ProjectMeta = {
   name: "Project",
   code: "PRJ",
@@ -76,5 +83,19 @@ describe("DeliveryFrame project navigation", () => {
     );
 
     expect(chatLink?.getAttribute("href")).toBe("/communications/chat?project=project-42");
+  });
+
+  it("hides the project chat link without tenant.communications.read", () => {
+    sessionPermissions.current = [];
+    try {
+      const document = renderFrame("Обзор", "project-42");
+      const chatLink = Array.from(document.querySelectorAll("a")).find((link) =>
+        link.textContent?.includes("Чат проекта")
+      );
+      // Сайдбар прячет Communications без права — шапка проекта не должна вести в 403.
+      expect(chatLink).toBeUndefined();
+    } finally {
+      sessionPermissions.current = ["tenant.communications.read"];
+    }
   });
 });
