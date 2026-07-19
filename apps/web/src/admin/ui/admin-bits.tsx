@@ -15,6 +15,9 @@ const ERR: Record<string, string> = {
   access_role_id_taken: "Идентификатор роли уже занят",
   access_role_name_taken: "Роль с таким названием уже существует",
   access_role_assigned: "Роль назначена пользователям — сначала переназначьте их",
+  position_id_taken: "Идентификатор должности уже занят",
+  position_name_taken: "Должность с таким названием уже существует",
+  position_assigned: "Должность назначена пользователям — сначала переназначьте их",
   // self-гварды (400)
   self_access_change_forbidden: "Нельзя деактивировать себя или сменить себе роль",
   self_access_role_update_forbidden: "Нельзя править собственную роль",
@@ -37,9 +40,13 @@ const ERR: Record<string, string> = {
   security_policy_invalid: "Некорректные данные политики безопасности",
   security_policy_session_timeout_invalid: "Тайм-аут сессии — целое число от 1 до 8760 часов",
   security_policy_domain_allowlist_invalid: "Список доменов: только строки",
+  // валидация должностей (400)
+  invalid_position_name: "Укажите название должности (до 160 символов)",
+  invalid_position_description: "Описание должности — до 1000 символов",
   // not-found (404)
   user_not_found: "Пользователь не найден",
-  access_role_not_found: "Роль не найдена"
+  access_role_not_found: "Роль не найдена",
+  position_not_found: "Должность не найдена"
   // авторизация (401/403) — BUG-ADM-01/SHELL-06: раньше утекали сырым кодом; теперь из COMMON_ERR
 };
 export const adminErr = makeRuError(ERR, "Не удалось выполнить действие");

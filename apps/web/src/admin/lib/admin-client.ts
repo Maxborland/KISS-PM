@@ -5,6 +5,9 @@
      /api/tenant/current/access-profiles (создание роли)
      /api/workspace/users             (пользователи)
      /api/workspace/positions         (позиции / должности)
+     /api/tenant/current/absences     (отсутствия ресурсов)
+     /api/tenant/current/production-calendar (произв. календарь + исключения)
+     /api/workspace/background-jobs/runs (фоновые задачи, read-only)
 
    Зеркало createCrmClient / createPlanningApiClient: тот же приём с
    инъекцией fetchImpl, теми же заголовками (x-kiss-pm-action:same-origin)
@@ -49,11 +52,18 @@ export function workspaceUserCountsAreKnown(response: WorkspaceUserListResponse)
 }
 // Позиция (должность). Боевой PositionRecord.
 export type Position = { id: string; tenantId: string; name: string; description: string | null };
+// Тело создания должности (POST /api/workspace/positions): id опционален — сервер сгенерирует position-<uuid>.
+export type PositionCreateInput = { id?: string; name: string; description?: string | null };
+// Тело правки должности (PATCH /api/workspace/positions/:positionId) — full-replace, id из URL.
+export type PositionUpdateInput = { name: string; description?: string | null };
 
 // Политика безопасности рабочей области (боевой TenantSecurityPolicy). Один экземпляр на тенант.
 export type SecurityPolicy = {
+  // RESERVED (Н5): механизм 2FA в auth-стеке не реализован — поле контракта сохранено
+  // для совместимости, UI не показывает контрол и передаёт значение без изменений.
   twoFactorRequired: boolean;
   sessionTimeoutHours: number;
+  // RESERVED (Н5): SAML-интеграции нет — поле передаётся как есть, контрола в UI нет.
   ssoSamlEnabled: boolean;
   domainAllowlist: string[];
 };
@@ -67,6 +77,50 @@ export type AuditEvent = {
   actorUserId?: string | null;
   executionResult?: { status?: string } | null;
   sourceEntity?: { type?: string; id?: string } | null;
+};
+
+// Отсутствие ресурса (боевой ResourceAbsenceRecord из absencesRoutes; даты — YYYY-MM-DD).
+export const ABSENCE_TYPES = ["vacation", "admin_leave", "sick_leave", "maternity_leave", "truancy"] as const;
+export type AbsenceType = (typeof ABSENCE_TYPES)[number];
+export type ResourceAbsence = {
+  id: string; tenantId: string; userId: string; type: AbsenceType;
+  dateFrom: string; dateTo: string; status: string; reason: string | null;
+  createdBy: string | null; approvedBy: string | null;
+  createdAt: string; updatedAt: string;
+};
+// Тело создания отсутствия (POST /api/tenant/current/absences): диапазон ≤ 370 дней, reason ≤ 500.
+export type AbsenceCreateInput = {
+  userId: string; type: AbsenceType; dateFrom: string; dateTo: string; reason?: string | null;
+};
+
+// Производственный календарь тенанта (боевой GET /api/tenant/current/production-calendar?year=YYYY —
+// ответ БЕЗ обёртки). Исключение: workingMinutes 0 = выходной, 1..1440 = сокращённый/особый день.
+export type ProductionCalendarException = {
+  id: string; date: string; workingMinutes: number; reason: string | null; resourceId: string | null;
+};
+export type ProductionCalendar = {
+  calendarId: string; year: number; workingWeekdays: number[]; workingMinutesPerDay: number;
+  exceptions: ProductionCalendarException[];
+};
+// Элемент bulk-upsert исключений (POST /bulk): id опционален (сервер сгенерирует), ≤ 500 за запрос.
+export type ProductionCalendarBulkItem = {
+  id?: string; date: string; workingMinutes: number; reason?: string | null; resourceId?: string | null;
+};
+
+// Прогон фоновой задачи (боевой serializeJobRun из backgroundJobRoutes: даты — ISO-строки).
+export type BackgroundJobStatus = "queued" | "running" | "succeeded" | "dead" | "cancelled";
+export type BackgroundJobRun = {
+  id: string; tenantId: string; kind: string; status: BackgroundJobStatus;
+  priority: number; payload: Record<string, unknown>; idempotencyKey: string | null;
+  attempt: number; maxAttempts: number; runAfter: string;
+  lockedBy: string | null; lockedAt: string | null;
+  startedAt: string | null; finishedAt: string | null; lastError: string | null;
+  createdAt: string; updatedAt: string;
+};
+// Событие прогона (GET /runs/:runId/events, максимум 100).
+export type BackgroundJobEvent = {
+  id: string; tenantId: string; jobId: string; eventType: string;
+  message: string; metadata: Record<string, unknown>; createdAt: string;
 };
 
 // Тело создания роли (POST /api/tenant/current/access-profiles). id обязателен (боевой parseAccessProfileCreateBody).
@@ -112,6 +166,10 @@ export function createAdminClient(options: AdminApiClientOptions) {
 
     // позиции (должности) — справочник для назначения пользователю
     listPositions() { return requestJson<{ positions: Position[] }>("/api/workspace/positions"); },
+    createPosition(input: PositionCreateInput) { return requestJson<{ position: Position }>("/api/workspace/positions", { method: "POST", body: JSON.stringify(input) }); },
+    updatePosition(positionId: string, input: PositionUpdateInput) { return requestJson<{ position: Position }>(`/api/workspace/positions/${enc(positionId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
+    // Удаление: 409 position_assigned, если должность назначена пользователям (боевой positionRoutes).
+    deletePosition(positionId: string) { return requestJson<{ status: "deleted" }>(`/api/workspace/positions/${enc(positionId)}`, { method: "DELETE" }); },
 
     // журнал аудита тенанта (GET /api/tenant/current/audit-events?limit=N) — последние события.
     listAuditEvents(limit = 50) { return requestJson<{ auditEvents: AuditEvent[] }>(`/api/tenant/current/audit-events?limit=${limit}`); },
@@ -121,7 +179,32 @@ export function createAdminClient(options: AdminApiClientOptions) {
 
     // политика безопасности тенанта (GET/PUT /api/tenant/current/security-policy)
     getSecurityPolicy() { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy"); },
-    updateSecurityPolicy(input: SecurityPolicy) { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy", { method: "PUT", body: JSON.stringify({ securityPolicy: input }) }); }
+    updateSecurityPolicy(input: SecurityPolicy) { return requestJson<{ securityPolicy: SecurityPolicy }>("/api/tenant/current/security-policy", { method: "PUT", body: JSON.stringify({ securityPolicy: input }) }); },
+
+    // отсутствия (GET требует ОБЯЗАТЕЛЬНЫЙ период fromDate..toDate ≤ 370 дней — боевой absencesRoutes)
+    listAbsences(fromDate: string, toDate: string, userId?: string) {
+      const query = `fromDate=${enc(fromDate)}&toDate=${enc(toDate)}${userId ? `&userId=${enc(userId)}` : ""}`;
+      return requestJson<{ absences: ResourceAbsence[] }>(`/api/tenant/current/absences?${query}`);
+    },
+    createAbsence(input: AbsenceCreateInput) { return requestJson<{ absence: ResourceAbsence }>("/api/tenant/current/absences", { method: "POST", body: JSON.stringify(input) }); },
+    deleteAbsence(absenceId: string) { return requestJson<{ ok: true }>(`/api/tenant/current/absences/${enc(absenceId)}`, { method: "DELETE" }); },
+
+    // производственный календарь (год 2000..2100; ответ без обёртки). Удаления исключения
+    // в боевом API нет — только bulk-upsert (честно отражено в UI).
+    getProductionCalendar(year?: number) { return requestJson<ProductionCalendar>(`/api/tenant/current/production-calendar${year ? `?year=${year}` : ""}`); },
+    bulkUpsertProductionCalendarExceptions(exceptions: ProductionCalendarBulkItem[]) {
+      return requestJson<ProductionCalendar>("/api/tenant/current/production-calendar/bulk", { method: "POST", body: JSON.stringify({ exceptions }) });
+    },
+
+    // фоновые задачи (read-only обзор: список прогонов + события прогона)
+    listBackgroundJobRuns(input: { status?: BackgroundJobStatus; limit?: number } = {}) {
+      const params = new URLSearchParams();
+      if (input.status) params.set("status", input.status);
+      if (input.limit) params.set("limit", String(input.limit));
+      const query = params.toString();
+      return requestJson<{ runs: BackgroundJobRun[] }>(`/api/workspace/background-jobs/runs${query ? `?${query}` : ""}`);
+    },
+    listBackgroundJobEvents(runId: string) { return requestJson<{ events: BackgroundJobEvent[] }>(`/api/workspace/background-jobs/runs/${enc(runId)}/events`); }
   };
 }
 

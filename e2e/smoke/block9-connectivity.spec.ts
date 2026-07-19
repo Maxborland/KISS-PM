@@ -84,6 +84,9 @@ test("calls surface opens the live call room with a pre-join lobby", async ({ pa
   // В диалоге два select («Тип медиа» и «Провайдер») — целимся по опции «Ручной».
   await createDialog.locator("select").filter({ hasText: "Ручной" }).selectOption("manual");
   await createDialog.getByRole("button", { name: "Создать" }).click();
+  // Комнаты прошлых прогонов персистентны (seed их не чистит) — поверхность может
+  // выбрать другую комнату; явно выбираем созданную в списке.
+  await page.getByRole("button", { name: roomTitle }).click();
   await expect(page.getByRole("heading", { name: roomTitle })).toBeVisible();
 
   await page.getByRole("button", { name: "Начать сессию" }).click();

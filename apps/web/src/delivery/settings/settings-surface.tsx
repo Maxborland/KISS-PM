@@ -20,6 +20,7 @@ import { demoAction } from "@/views/lib/demo";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 import { createPlanningCommand } from "@kiss-pm/domain";
 import type { PlanningCommand, PlanCalendar } from "@kiss-pm/domain";
+import { ProjectClosureSection } from "@/delivery/closure/project-closure-section";
 import { ProjectCustomFields } from "./project-custom-fields";
 
 const PROJECT: ProjectMeta = { name: "Производственный портал · Релиз 2", code: "ПР", status: "В работе", statusTone: "info", planVersion: "v17", deadline: "12.07.2026", finish: "14.06.2026", variance: { label: "+2 дня к базовому плану B2", tone: "warning" } };
@@ -231,6 +232,11 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[var(--muted)]" aria-hidden />
               <span>Сводка ролей и пользователей по проекту появится в одном из следующих обновлений. Управлять доступом можно в разделе «Доступ» рабочей области.</span>
             </div>
+          </Section>
+
+          {/* Закрытие проекта — реальный контур closure preview → close (retrospectiveRoutes) */}
+          <Section title="Закрытие проекта" hint="Фиксация итогов: снимок плана, план/факт и уроки ретроспективы. Действие необратимо в интерфейсе.">
+            <ProjectClosureSection projectId={projectId} />
           </Section>
 
           {/* Интеграции — честный роадмап (disabled) */}

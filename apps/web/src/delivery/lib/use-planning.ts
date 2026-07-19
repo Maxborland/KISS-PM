@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlanningCommand, ScenarioProposal } from "@kiss-pm/domain";
 import {
   PlanningApiError,
+  type AutoSolverWireProposal,
   type PlanningPreviewResponse,
   type PlanningReadModel
 } from "@kiss-pm/planning-client";
@@ -38,6 +39,14 @@ export type ScenarioApplyResult =
 export type ScenarioRejectResult =
   | { ok: true; scenarioRunId: string; rejectedAt: string }
   | { ok: false; code?: string; message: string };
+// Авто-солвер (второй источник предложений): расчёт сохраняется на сервере как
+// персистентный run (одноразовый, TTL 30 мин); применение — существующим apply-роутом run.
+export type SolverRunResult =
+  | { ok: true; runId: string; proposals: AutoSolverWireProposal[]; planVersion: number; expiresAt: string }
+  | { ok: false; conflict: boolean; code?: string; message: string };
+export type SolverApplyResult =
+  | { ok: true; planVersion: number; auditEventId: string }
+  | { ok: false; conflict: boolean; code?: string; message: string };
 /**
  * Работает через настоящий @kiss-pm/planning-client. Транспорт —
  * contract-mock (createMockPlanningFetch), отдельный на каждый монтаж
@@ -306,13 +315,63 @@ export function usePlanning(projectId: string) {
     [client, projectId]
   );
 
+  // Авто-солвер: preview-расчёт «schedule» с персистентным run на сервере. Read-only —
+  // план не мутирует, применение идёт отдельным applySolverProposal по кнопке.
+  const runAutoSolver = useCallback(
+    async (mode: "schedule" | "repair" = "schedule", targetDeadline?: string | null): Promise<SolverRunResult> => {
+      if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
+      try {
+        const res = await client.createAutoSolverRun(projectId, {
+          mode,
+          clientPlanVersion: readModel.planVersion,
+          targetDeadline: targetDeadline ?? null
+        });
+        return { ok: true, runId: res.runId, proposals: res.proposals, planVersion: res.clientPlanVersion, expiresAt: res.expiresAt };
+      } catch (e) {
+        if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
+          await load();
+          const mappedError = mapPlanningError(e);
+          return { ok: false, conflict: true, code: mappedError.code, message: mappedError.message };
+        }
+        const mappedError = mapPlanningError(e, "solver_run_failed");
+        return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message };
+      }
+    },
+    [client, projectId, readModel, load]
+  );
+
+  // Применение предложения run авто-солвера: сервер в транзакции гоняет preview→apply,
+  // охраняет 409-кодами already_applied/expired/hash/plan_version_conflict и пишет аудит.
+  const applySolverProposal = useCallback(
+    async (runId: string, proposalId: string, acceptedRiskReason?: string): Promise<SolverApplyResult> => {
+      if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
+      try {
+        const res = await client.applyAutoSolverProposal(projectId, runId, proposalId, {
+          clientPlanVersion: readModel.planVersion,
+          ...(acceptedRiskReason ? { acceptedRiskReason } : {})
+        });
+        setReadModel(res.readModel);
+        return { ok: true, planVersion: res.newPlanVersion, auditEventId: res.auditEventId };
+      } catch (e) {
+        if (e instanceof PlanningApiError && e.code === "plan_version_conflict") {
+          await load();
+          const mappedError = mapPlanningError(e);
+          return { ok: false, conflict: true, code: mappedError.code, message: mappedError.message };
+        }
+        const mappedError = mapPlanningError(e, "apply_solver_failed");
+        return { ok: false, conflict: false, code: mappedError.code, message: mappedError.message };
+      }
+    },
+    [client, projectId, readModel, load]
+  );
+
   // журнал коммитов сессии — через единый шов клиента (mock /planning/commits vs live audit-events).
   // lastApplyRef.current даёт live-адаптеру данные отката последнего применённого этой сессией коммита.
   const loadCommits = useCallback((): Promise<CommitsView> => {
     return client.getCommits(projectId, lastApplyRef.current);
   }, [client, projectId]);
 
-  return { client, readModel, setReadModel, status, error, reload: load, preview, previewBatch, apply, applyBatch, revertLast, previewScenarios, applyScenario, rejectScenario, loadCommits };
+  return { client, readModel, setReadModel, status, error, reload: load, preview, previewBatch, apply, applyBatch, revertLast, previewScenarios, applyScenario, rejectScenario, runAutoSolver, applySolverProposal, loadCommits };
 }
 function planningWriteSignature(planVersion: number, commands: readonly PlanningCommand[]): string {
   return JSON.stringify({ planVersion, commands });

@@ -18,8 +18,8 @@ describe("background job routes", () => {
         "content-type": "application/json"
       },
       body: JSON.stringify({
-        kind: "notification.dispatch",
-        payload: { digest: "daily" },
+        kind: "capacity.cache_warmup",
+        payload: { monthIso: "2026-06" },
         priority: 5
       })
     });
@@ -27,9 +27,9 @@ describe("background job routes", () => {
     expect(enqueue.status).toBe(201);
     await expect(enqueue.json()).resolves.toMatchObject({
       run: {
-        kind: "notification.dispatch",
+        kind: "capacity.cache_warmup",
         status: "queued",
-        payload: { digest: "daily" },
+        payload: { monthIso: "2026-06" },
         priority: 5
       }
     });
@@ -42,11 +42,36 @@ describe("background job routes", () => {
     await expect(list.json()).resolves.toMatchObject({
       runs: [
         {
-          kind: "notification.dispatch",
+          kind: "capacity.cache_warmup",
           status: "queued"
         }
       ]
     });
+  });
+
+  it.each([
+    "notification.dispatch",
+    "connector.sync",
+    "search.projection_rebuild",
+    "calls.recording_compose"
+  ])("honestly refuses to enqueue unimplemented boundary kind %s with 501", async (kind) => {
+    const fixture = createFixture();
+    const app = createApp(fixture);
+
+    const response = await app.request("/api/workspace/background-jobs/runs", {
+      method: "POST",
+      headers: {
+        cookie: "kiss_pm_session=test",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ kind })
+    });
+
+    expect(response.status).toBe(501);
+    await expect(response.json()).resolves.toEqual({
+      error: "background_job_kind_not_implemented"
+    });
+    expect(fixture.jobs).toHaveLength(0);
   });
 
   it("rejects users without background job permission", async () => {

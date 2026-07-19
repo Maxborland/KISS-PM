@@ -111,7 +111,16 @@ const PLANNING_ERROR_MESSAGES: Record<string, string> = {
   planning_scenario_invalid: "Предложение повреждено или устарело — запросите сценарии заново",
   planning_scenario_hash_mismatch: "Данные предложения изменились после расчёта. Запросите сценарии заново",
   planning_scenario_engine_mismatch: "Версия планировщика обновилась. Запросите сценарии заново",
-  planning_scenario_target_mismatch: "Целевой перегруз изменился. Запросите сценарии заново"
+  planning_scenario_target_mismatch: "Целевой перегруз изменился. Запросите сценарии заново",
+  // Авто-солвер: персистентный run одноразовый и с TTL (30 мин); коды ниже — 409/404-гарды
+  // apply в planningAutoSolverRoutes, все означают «расчёт больше неприменим».
+  planning_solver_run_already_applied: "Это предложение авто-солвера уже применено. Данные обновлены",
+  planning_solver_run_expired: "Срок расчёта авто-солвера истёк. Рассчитайте заново",
+  planning_solver_payload_hash_mismatch: "Данные расчёта изменились после сохранения. Рассчитайте заново",
+  planning_solver_run_not_found: "Расчёт авто-солвера не найден. Рассчитайте заново",
+  planning_solver_proposal_not_found: "Предложение авто-солвера не найдено. Рассчитайте заново",
+  planning_solver_invalid: "Некорректный запрос к авто-солверу. Рассчитайте заново",
+  accepted_risk_reason_required: "Требуется причина принятия риска"
 };
 
 const STATUS_ERROR_MESSAGES: Record<number, string> = {
@@ -136,7 +145,9 @@ const FALLBACK_ERROR_MESSAGES: Record<string, string> = {
   apply_failed: "Не удалось применить изменение плана",
   revert_failed: "Не удалось отменить изменение плана",
   preview_failed: "Не удалось рассчитать изменение плана",
-  apply_scenario_failed: "Не удалось применить сценарий"
+  apply_scenario_failed: "Не удалось применить сценарий",
+  solver_run_failed: "Не удалось рассчитать план авто-солвером",
+  apply_solver_failed: "Не удалось применить предложение авто-солвера"
 };
 
 export function mapPlanningError(error: unknown, fallbackCode = "request_failed"): PlanningUiError {

@@ -1,4 +1,7 @@
 import type {
+  AutoSolverRunDetailResponse,
+  AutoSolverRunRequest,
+  AutoSolverRunResponse,
   PlanningApiClientOptions,
   PlanningApplyResponse,
   PlanningCommandBatchRequest,
@@ -125,6 +128,31 @@ export function createPlanningApiClient(options: PlanningApiClientOptions) {
     applyScenario(projectId: string, scenarioId: string, input: { clientPlanVersion: number; acceptedRiskReason?: string }) {
       return requestJson<PlanningApplyResponse & { scenarioRunId: string }>(
         `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/scenarios/${encodeURIComponent(scenarioId)}/apply`,
+        { method: "POST", body: JSON.stringify(input) }
+      );
+    },
+    // Авто-солвер: превью-расчёт сохраняется как персистентный run (одноразовый, с TTL).
+    createAutoSolverRun(projectId: string, input: AutoSolverRunRequest) {
+      return requestJson<AutoSolverRunResponse>(
+        `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/auto-solver-runs`,
+        { method: "POST", body: JSON.stringify(input) }
+      );
+    },
+    getAutoSolverRun(projectId: string, runId: string) {
+      return requestJson<AutoSolverRunDetailResponse>(
+        `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/auto-solver-runs/${encodeURIComponent(runId)}`
+      );
+    },
+    // Применение выбранного предложения run: сервер сам гоняет preview→apply в транзакции
+    // и охраняет 409-кодами already_applied/expired/hash/plan_version_conflict.
+    applyAutoSolverProposal(
+      projectId: string,
+      runId: string,
+      proposalId: string,
+      input: { clientPlanVersion: number; acceptedRiskReason?: string }
+    ) {
+      return requestJson<PlanningApplyResponse>(
+        `/api/workspace/projects/${encodeURIComponent(projectId)}/planning/auto-solver-runs/${encodeURIComponent(runId)}/proposals/${encodeURIComponent(proposalId)}/apply`,
         { method: "POST", body: JSON.stringify(input) }
       );
     },

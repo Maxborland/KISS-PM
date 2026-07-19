@@ -157,3 +157,136 @@ describe("contract-mock workspace backend", () => {
     }
   });
 });
+
+describe("contract-mock capacity tree (GET /api/workspace/capacity/tree)", () => {
+  it("returns an org capacity tree with month days and resource rows", async () => {
+    const c = client();
+    const tree = await c.getCapacityTree("2026-07");
+    expect(tree.monthIso).toBe("2026-07");
+    expect(tree.hierarchyMode).toBe("org");
+    expect(tree.days.length).toBe(31);
+    expect(tree.days[0]).toMatchObject({ date: "2026-07-01", isoWeekday: 3, isWeekend: false });
+    const rows = tree.orgGroups.flatMap((d) => d.units.flatMap((u) => u.positions.flatMap((p) => p.rows)));
+    expect(rows.length).toBe(5);
+    // Рабочий день: ёмкость 480, выходной: 0 (производственный календарь Пн–Пт).
+    const anyRow = rows[0]!;
+    expect(anyRow.days.find((d) => !d.isWeekend)?.capacityMinutes).toBe(480);
+    expect(anyRow.days.find((d) => d.isWeekend)?.capacityMinutes).toBe(0);
+  });
+
+  it("marks the seeded overload story (u-sergeev: 600 > 480) with isOverload and heat 3", async () => {
+    const c = client();
+    const tree = await c.getCapacityTree("2026-07");
+    const rows = tree.orgGroups.flatMap((d) => d.units.flatMap((u) => u.positions.flatMap((p) => p.rows)));
+    const overloaded = rows.find((r) => r.user.id === "u-sergeev")!;
+    const workDay = overloaded.days.find((d) => !d.isWeekend)!;
+    expect(workDay).toMatchObject({ workMinutes: 600, overloadMinutes: 120, isOverload: true, heat: 3 });
+    // Свободный ресурс без нагрузки перегруза не имеет.
+    const free = rows.find((r) => r.user.id === "u-kuznetsov")!;
+    expect(free.days.every((d) => !d.isOverload && d.workMinutes === 0)).toBe(true);
+  });
+
+  it("narrows projectsMix and work minutes with the projectId filter", async () => {
+    const c = client();
+    const full = await c.getCapacityTree("2026-07");
+    const filtered = await c.getCapacityTree("2026-07", "proj-loyalty");
+    const rowOf = (tree: typeof full, userId: string) =>
+      tree.orgGroups.flatMap((d) => d.units.flatMap((u) => u.positions.flatMap((p) => p.rows))).find((r) => r.user.id === userId)!;
+    const fullDay = rowOf(full, "u-sergeev").days.find((d) => !d.isWeekend)!;
+    const filteredDay = rowOf(filtered, "u-sergeev").days.find((d) => !d.isWeekend)!;
+    expect(fullDay.workMinutes).toBe(600);
+    expect(filteredDay.workMinutes).toBe(240); // только proj-loyalty
+    const mix = rowOf(filtered, "u-sergeev").projectsMixByDate?.[filteredDay.date];
+    expect(mix).toEqual([{ projectId: "proj-loyalty", workMinutes: 240 }]);
+  });
+
+  it("rejects a malformed month (400 capacity_invalid_query)", async () => {
+    const c = client();
+    await expect(c.getCapacityTree("2026-13")).rejects.toMatchObject({ status: 400, code: "capacity_invalid_query" });
+    await expect(c.getCapacityTree("июль")).rejects.toMatchObject({ status: 400, code: "capacity_invalid_query" });
+  });
+
+  it("rejects an unknown or malformed project filter (400 capacity_invalid_query)", async () => {
+    const c = client();
+    await expect(c.getCapacityTree("2026-07", "proj-does-not-exist"))
+      .rejects.toMatchObject({ status: 400, code: "capacity_invalid_query" });
+    await expect(c.getCapacityTree("2026-07", "X"))
+      .rejects.toMatchObject({ status: 400, code: "capacity_invalid_query" });
+  });
+});
+
+/* ---- справочник статусов задач: CRUD (зеркало taskStatusRoutes/taskStatusWorkspace; Н12) ---- */
+describe("contract-mock workspace backend: task status definitions CRUD", () => {
+  it("lists the five system statuses as active, sorted by sortOrder", async () => {
+    const c = client();
+    const { taskStatuses } = await c.listTaskStatuses();
+    expect(taskStatuses.map((s) => s.id)).toEqual(["status-new", "status-waiting", "status-in-progress", "status-review", "status-done"]);
+    expect(taskStatuses.every((s) => s.isSystem && s.status === "active")).toBe(true);
+  });
+
+  it("creates a custom status (201) and returns it in the list", async () => {
+    const c = client();
+    const { taskStatus } = await c.createTaskStatusDefinition({ id: "status-approval", name: "Согласование", category: "review", sortOrder: 6 });
+    expect(taskStatus).toMatchObject({ id: "status-approval", name: "Согласование", category: "review", sortOrder: 6, isSystem: false, status: "active" });
+    const { taskStatuses } = await c.listTaskStatuses();
+    expect(taskStatuses.map((s) => s.id)).toContain("status-approval");
+  });
+
+  it("rejects unique conflicts on create: id, name and sortOrder (409, DB-uidx mirror)", async () => {
+    const c = client();
+    await expect(c.createTaskStatusDefinition({ id: "status-new", name: "Дубль id", category: "new", sortOrder: 7 }))
+      .rejects.toMatchObject({ status: 409, code: "task_status_id_taken" });
+    await expect(c.createTaskStatusDefinition({ id: "status-dup-name", name: "Готово", category: "done", sortOrder: 8 }))
+      .rejects.toMatchObject({ status: 409, code: "task_status_name_taken" });
+    await expect(c.createTaskStatusDefinition({ id: "status-dup-sort", name: "Дубль порядка", category: "new", sortOrder: 1 }))
+      .rejects.toMatchObject({ status: 409, code: "task_status_sort_order_taken" });
+  });
+
+  it("validates the body in the parser order (400): id → name → category → sortOrder", async () => {
+    const c = client();
+    await expect(c.createTaskStatusDefinition({ id: "X", name: "Ок имя", category: "new", sortOrder: 9 }))
+      .rejects.toMatchObject({ status: 400, code: "invalid_task_status_id" });
+    await expect(c.createTaskStatusDefinition({ id: "status-x1", name: "a", category: "new", sortOrder: 9 }))
+      .rejects.toMatchObject({ status: 400, code: "invalid_task_status_name" });
+    await expect(c.createTaskStatusDefinition({ id: "status-x2", name: "Ок имя", category: "cancelled" as never, sortOrder: 9 }))
+      .rejects.toMatchObject({ status: 400, code: "invalid_task_status_category" });
+    await expect(c.createTaskStatusDefinition({ id: "status-x3", name: "Ок имя", category: "new", sortOrder: 0 }))
+      .rejects.toMatchObject({ status: 400, code: "invalid_task_status_sort_order" });
+  });
+
+  it("updates a custom status and archives it via DELETE (record stays listed as archived)", async () => {
+    const c = client();
+    await c.createTaskStatusDefinition({ id: "status-hold", name: "Пауза", category: "waiting", sortOrder: 6 });
+    const updated = await c.updateTaskStatusDefinition("status-hold", { name: "Долгая пауза", category: "waiting", sortOrder: 7 });
+    expect(updated.taskStatus).toMatchObject({ id: "status-hold", name: "Долгая пауза", sortOrder: 7 });
+    const archived = await c.archiveTaskStatusDefinition("status-hold");
+    expect(archived.taskStatus.status).toBe("archived");
+    // Повторный архив идемпотентен (боевой archiveTaskStatus возвращает запись как есть).
+    await expect(c.archiveTaskStatusDefinition("status-hold")).resolves.toMatchObject({ taskStatus: { status: "archived" } });
+    const { taskStatuses } = await c.listTaskStatuses();
+    expect(taskStatuses.find((s) => s.id === "status-hold")?.status).toBe("archived");
+  });
+
+  it("protects system statuses: no archive (409 system_task_status_required), no category change (409 …_category_locked)", async () => {
+    const c = client();
+    await expect(c.archiveTaskStatusDefinition("status-done")).rejects.toMatchObject({ status: 409, code: "system_task_status_required" });
+    await expect(c.updateTaskStatusDefinition("status-done", { name: "Готово", category: "review", sortOrder: 5, status: "archived" }))
+      .rejects.toMatchObject({ status: 409, code: "system_task_status_required" });
+    await expect(c.updateTaskStatusDefinition("status-done", { name: "Готово", category: "review", sortOrder: 5 }))
+      .rejects.toMatchObject({ status: 409, code: "system_task_status_category_locked" });
+  });
+
+  it("returns 404 task_status_not_found for unknown ids and blocks task transitions into archived statuses", async () => {
+    const c = client();
+    await expect(c.updateTaskStatusDefinition("status-ghost", { name: "Призрак", category: "new", sortOrder: 9 }))
+      .rejects.toMatchObject({ status: 404, code: "task_status_not_found" });
+    await expect(c.archiveTaskStatusDefinition("status-ghost")).rejects.toMatchObject({ status: 404, code: "task_status_not_found" });
+    // Архивированный кастомный статус недоступен как целевой для смены статуса задачи (как listTaskStatuses.find active).
+    await c.createTaskStatusDefinition({ id: "status-limbo", name: "Лимб", category: "in_progress", sortOrder: 6 });
+    await c.archiveTaskStatusDefinition("status-limbo");
+    const { tasks } = await c.getProjectDetail(MOCK_PROJECT_ID);
+    const task = tasks.find((t) => t.status === "new")!;
+    await expect(c.updateTaskStatus(MOCK_PROJECT_ID, task.id, "status-limbo"))
+      .rejects.toMatchObject({ status: 400, code: "task_status_not_found" });
+  });
+});

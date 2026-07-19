@@ -120,6 +120,14 @@ export function useMyWork() {
   return { data, status, error, reload: load, updateTaskStatus };
 }
 
+// ---- useCapacityTree: дерево загрузки ресурсов за месяц (опц. фильтр по проекту). 403 → forbidden ----
+export function useCapacityTree(monthIso: string, projectId: string | null) {
+  const client = useWorkspaceClient();
+  const loader = useCallback(() => client.getCapacityTree(monthIso, projectId), [client, monthIso, projectId]);
+  const { data, status, error, reload } = useResource(loader);
+  return { data, status, error, reload };
+}
+
 // ---- useWorkspaceUsers: справочник пользователей (исполнитель/заказчик/владелец). mock=WORKSPACE_USERS, live=GET /users ----
 export function useWorkspaceUsers() {
   const client = useWorkspaceClient();

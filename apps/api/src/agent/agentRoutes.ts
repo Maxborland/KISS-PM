@@ -3,18 +3,22 @@ import { randomUUID } from "node:crypto";
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 
-import { canManageProjects, type AccessProfile } from "@kiss-pm/access-control";
+import { canManageClients, canManageOpportunities, canManageProjects, type AccessProfile } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
 
 import type { ApiApp, ApiRouteDeps } from "../routeTypes";
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { createUploadConcurrencyLimiter } from "../attachmentUploadRequest";
+import { parseClientBody, parseDealStageChangeBody } from "../crmParsers";
 import { readLimitedJsonBody } from "../jsonBody";
 import { createPlanningReadModel } from "../planning/planningReadModel";
 import { canReadPlanningReadModel } from "../planning/planningRouteAuth";
 import { createTaskCommandWorkspace } from "../project-work/taskCommandWorkspace";
 import { canEditTaskFields, canParticipateInTaskActivity, canParticipantTransitionTask } from "../project-work/taskCommandGuards";
+import { evaluateOpportunityStageTransition } from "../projectIntakeService/changeOpportunityStageCommand";
+import { isFinalOpportunityStatus } from "../projectIntakeService/opportunityStatus";
 import { parseUpdateTaskBody } from "../projectWorkParsers";
+import { parseClientIdParam, parseOpportunityIdParam } from "../routeParamParsers";
 import { emitMessageCreated } from "../workspaceEventBus";
 import { runAgentLoop, type AgentLoopEvent, type AnalyzeExecutor } from "./agentLoop";
 import {
@@ -56,7 +60,17 @@ const EXECUTABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "cre
 // create_task и apply_resource_resolution стали offerable после появления полных
 // payload-backed карточек (D2/D3); apply_plan_commands остаётся вне набора —
 // его generic-preview («число команд») недостаточно честен для review.
-const OFFERABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution", "update_task"]);
+// Н15: change_opportunity_stage и update_crm_client получили payload-backed
+// карточки «было → станет» из текущего состояния и собственные execute-ветки.
+const OFFERABLE_MUTATIONS = new Set([
+  "change_task_status",
+  "comment_task",
+  "create_task",
+  "apply_resource_resolution",
+  "update_task",
+  "change_opportunity_stage",
+  "update_crm_client"
+]);
 
 // Поля, которые агент может частично обновлять в update_task: остальное (участники,
 // статус) — отдельные инструменты; неизвестное поле в execute — fail-closed 400.
@@ -110,6 +124,71 @@ function buildUpdateTaskPatchBody(
     statusId: task.statusId,
     clientUpdatedAt
   };
+}
+
+// Н15: поля, которые агент может частично обновлять в update_crm_client — ровно те,
+// что читает governed-парсер parseClientBody (name/description/status). Описание
+// инструмента раньше обещало email/phone/website/address — таких полей в контракте
+// клиента НЕТ, execute их отвергает fail-closed (unsupported_update_field).
+// Optimistic-lock у CRM-сущностей отсутствует: governed PATCH /clients/:id и
+// PATCH /opportunities/:id/stage не принимают версию записи (updatedAt), поэтому
+// review-карточка честно пишет «версия записи не проверяется», а execute идёт без
+// preconditionVersions (в отличие от update_task/change_task_status).
+const UPDATE_CLIENT_FIELDS = new Set(["name", "description", "status"]);
+
+// Типовой гард ПРИСУТСТВУЮЩИХ полей (урок ревью #257): getOptionalString в
+// parseClientBody лоялен к нестроковым значениям (молча превращает их в null/дефолт),
+// поэтому без гарда карточка «описание → 123» молча ОЧИЩАЛА бы описание вместо
+// fail-closed отказа. Enum статуса, длины и безопасность текста — зона парсера.
+function invalidClientFieldType(fields: Record<string, unknown>): boolean {
+  return Object.values(fields).some((value) => typeof value !== "string");
+}
+
+// Мёрж частичных fields поверх текущего клиента в ПОЛНОЕ тело governed PATCH.
+// СТРУКТУРНОЕ ОГРАНИЧЕНИЕ (как у buildUpdateTaskPatchBody): parseClientBody дефолтит
+// отсутствующие поля (description → null, status → active), поэтому каждое читаемое
+// парсером поле обязано быть перечислено здесь явно — пропуск молча сбросил бы
+// незатронутое поле в дефолт.
+function buildClientPatchBody(
+  client: { name: string; description: string | null; status: string },
+  fields: Record<string, unknown>
+): Record<string, unknown> {
+  const description = "description" in fields ? fields.description : client.description;
+  return {
+    name: "name" in fields ? fields.name : client.name,
+    ...(description !== null && description !== undefined ? { description } : {}),
+    status: "status" in fields ? fields.status : client.status
+  };
+}
+
+const CLIENT_FIELD_LABELS: Record<string, string> = {
+  name: "название",
+  description: "описание",
+  status: "статус"
+};
+
+// Field-level пары «было/станет» для карточки и audit-превью update_crm_client.
+// Структурные пары, а не парсинг форматированной строки (значение может содержать « → »);
+// hasOwnProperty-гард — против ключей из Object.prototype (прецедент update_task).
+function clientFieldChangePairs(
+  client: { name: string; description: string | null; status: string },
+  fields: Record<string, unknown>
+): Array<{ before: string; after: string }> {
+  const current: Record<string, string> = {
+    name: client.name,
+    description: client.description ?? "—",
+    status: client.status
+  };
+  const capValue = (value: string) => value.length > 120 ? `${value.slice(0, 120)}…` : value;
+  return Object.entries(fields).map(([field, next]) => {
+    if (!Object.prototype.hasOwnProperty.call(CLIENT_FIELD_LABELS, field)) {
+      // Неизвестное поле честно видно в карточке — execute его отвергнет (fail-closed).
+      return { before: `${field}: не поддерживается`, after: `${field}: не поддерживается` };
+    }
+    const label = CLIENT_FIELD_LABELS[field]!;
+    const value = capValue(current[field] ?? "—");
+    return { before: `${label}: ${value}`, after: `${label}: ${value} → ${capValue(String(next))}` };
+  });
 }
 
 export function isAgentToolOfferable(tool: AgentTool): boolean {
@@ -309,6 +388,102 @@ export async function buildProposalActionMetadata(
             : { capability: { allowed: false, reason: parsedBody.error } })
     };
   }
+  // Н15: payload-backed карточка изменения клиента — field-level diff из ТЕКУЩЕГО
+  // состояния. Optimistic-lock у клиентов нет (governed PATCH не принимает версию) —
+  // карточка честно говорит об этом, preconditionVersions пуст.
+  if (action.tool === "update_crm_client") {
+    const clientId = typeof action.input.clientId === "string" ? action.input.clientId : "";
+    const fields = (action.input.fields && typeof action.input.fields === "object" ? action.input.fields : {}) as Record<string, unknown>;
+    const canManage = canManageClients({ actor, profile, targetTenantId: actor.tenantId }).allowed;
+    const client = canManage && clientId ? await dataSource.findClientById?.(actor.tenantId, clientId) : undefined;
+    if (!client) {
+      // «Нет прав» и «не найден» отвечают одинаково — существование клиентов не раскрываем.
+      return {
+        preview: { before: "Данные клиента недоступны", after: `Изменить поля: ${Object.keys(fields).join(", ") || "—"}` },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: "client_manage_permission_required" }
+      };
+    }
+    const changes = clientFieldChangePairs(client, fields);
+    // Карточка не обещает изменение, которое execute гарантированно отвергнет:
+    // мёрж-тело валидируется ТЕМ ЖЕ парсером, что и governed PATCH (длины, enum
+    // статуса, безопасность текста).
+    const unsupportedField = Object.keys(fields).find((field) => !UPDATE_CLIENT_FIELDS.has(field));
+    const invalidFieldType = invalidClientFieldType(fields);
+    const parsedBody = parseClientBody({ ...buildClientPatchBody(client, fields), id: client.id }, actor.tenantId);
+    return {
+      title: `Изменить клиента: «${client.name}» · клиент ${client.id}`,
+      preview: {
+        before: changes.length > 0 ? changes.map((change) => change.before).join("; ") : "Без изменений",
+        after: `${changes.length > 0 ? changes.map((change) => change.after).join("; ") : "Поля не указаны"}; версия записи не проверяется`
+      },
+      preconditionVersions: {},
+      ...(unsupportedField
+        ? { capability: { allowed: false, reason: "unsupported_update_field" } }
+        : invalidFieldType
+          ? { capability: { allowed: false, reason: "invalid_update_field_value" } }
+          : parsedBody.ok
+            ? {}
+            : { capability: { allowed: false, reason: parsedBody.error } })
+    };
+  }
+  // Н15: payload-backed карточка смены стадии сделки — «было → станет» из текущего
+  // состояния сделки и справочника стадий. Optimistic-lock у сделок отсутствует —
+  // карточка честно говорит об этом, preconditionVersions пуст.
+  if (action.tool === "change_opportunity_stage") {
+    const opportunityId = typeof action.input.opportunityId === "string" ? action.input.opportunityId : "";
+    const stageId = typeof action.input.stageId === "string" ? action.input.stageId : "";
+    const canManage = canManageOpportunities({ actor, profile, targetTenantId: actor.tenantId }).allowed;
+    const opportunity = canManage && opportunityId ? await dataSource.findOpportunityById?.(actor.tenantId, opportunityId) : undefined;
+    if (!opportunity) {
+      // «Нет прав» и «не найдена» отвечают одинаково — существование сделок не раскрываем.
+      return {
+        preview: { before: "Данные сделки недоступны", after: `Стадия: ${stageId || "—"}` },
+        preconditionVersions: {},
+        capability: { allowed: false, reason: "opportunity_manage_permission_required" }
+      };
+    }
+    const [currentStage, targetStage] = await Promise.all([
+      opportunity.stageId ? dataSource.findDealStageById?.(actor.tenantId, opportunity.stageId) : undefined,
+      stageId ? dataSource.findDealStageById?.(actor.tenantId, stageId) : undefined
+    ]);
+    const currentLabel = currentStage?.name ?? opportunity.stageId ?? "без стадии";
+    // Карточка не обещает переход, который execute гарантированно отвергнет:
+    // невалидный id — кодом governed-парсера; финальный статус сделки и
+    // несуществующая/архивная стадия — теми же причинами, что и governed-роут.
+    const parsedStage = parseDealStageChangeBody({ stageId });
+    // Правила перехода воронки (кросс-воронка, transition-rule, вероятность,
+    // реализуемость) — тем же evaluateOpportunityStageTransition, что и governed
+    // PATCH (ревью #262): иначе карточка звала бы одобрить переход, который
+    // execute отвергнет. Проверяем только когда базовые условия прошли.
+    const baseReason = !parsedStage.ok
+      ? parsedStage.error
+      : isFinalOpportunityStatus(opportunity.status)
+        ? "opportunity_stage_locked"
+        : !targetStage || targetStage.status !== "active"
+          ? "deal_stage_not_found"
+          : null;
+    let transitionReason: string | null = null;
+    if (!baseReason && targetStage && dataSource.listStageTransitions && dataSource.findDealStageById) {
+      const guard = await evaluateOpportunityStageTransition(
+        { findDealStageById: dataSource.findDealStageById, listStageTransitions: dataSource.listStageTransitions },
+        actor.tenantId,
+        opportunity,
+        { id: targetStage.id, pipelineId: targetStage.pipelineId ?? null }
+      );
+      if (!guard.ok) transitionReason = guard.error;
+    }
+    const stageCapReason = baseReason ?? transitionReason;
+    return {
+      title: `Сменить стадию сделки: «${opportunity.title}» · сделка ${opportunity.id}`,
+      preview: {
+        before: `стадия: ${currentLabel}`,
+        after: `стадия: ${currentLabel} → ${targetStage?.name ?? stageId}; версия записи не проверяется`
+      },
+      preconditionVersions: {},
+      ...(stageCapReason ? { capability: { allowed: false, reason: stageCapReason } } : {})
+    };
+  }
   // D2: payload-backed карточка создания задачи — показывает ВСЁ, что реально будет
   // создано, включая серверные дефолты (даты/работа/участники) из execute-ветки.
   if (action.tool === "create_task") {
@@ -432,6 +607,34 @@ export async function buildActionPreview(
       after: action.tool === "apply_plan_commands"
         ? `Команд плана: ${commandCount}`
         : "Применить проверенный сценарий"
+    };
+  }
+  // Н15: честные before/after для audit-провенанса CRM-мутаций агента —
+  // из текущего состояния, а не generic-эхо входа.
+  if (action.tool === "change_opportunity_stage") {
+    const opportunityId = typeof input.opportunityId === "string" ? input.opportunityId : "";
+    const stageId = typeof input.stageId === "string" ? input.stageId : "";
+    const opportunity = opportunityId ? await dataSource.findOpportunityById?.(tenantId, opportunityId) : undefined;
+    const [currentStage, targetStage] = await Promise.all([
+      opportunity?.stageId ? dataSource.findDealStageById?.(tenantId, opportunity.stageId) : undefined,
+      stageId ? dataSource.findDealStageById?.(tenantId, stageId) : undefined
+    ]);
+    return {
+      before: currentStage?.name ?? opportunity?.stageId ?? opportunityId,
+      after: targetStage?.name ?? stageId
+    };
+  }
+  if (action.tool === "update_crm_client") {
+    const clientId = typeof input.clientId === "string" ? input.clientId : "";
+    const fields = (input.fields && typeof input.fields === "object" ? input.fields : {}) as Record<string, unknown>;
+    const client = clientId ? await dataSource.findClientById?.(tenantId, clientId) : undefined;
+    if (!client) {
+      return { before: "Данные клиента недоступны", after: `Изменить поля: ${Object.keys(fields).join(", ") || "—"}` };
+    }
+    const changes = clientFieldChangePairs(client, fields);
+    return {
+      before: changes.length > 0 ? changes.map((change) => change.before).join("; ") : "Без изменений",
+      after: changes.length > 0 ? changes.map((change) => change.after).join("; ") : "Поля не указаны"
     };
   }
   return {
@@ -1134,6 +1337,71 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
         });
         if (res.status === 200 || res.status === 201) results.push({ tool: tool.name, ok: true, result: res.body });
         else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "create_failed" });
+        continue;
+      }
+
+      // Н15: смена стадии сделки — валидация значений governed-парсерами
+      // (parseOpportunityIdParam + parseDealStageChangeBody) и переотправка в governed
+      // PATCH /opportunities/:id/stage: правила переходов воронки, финальный статус и
+      // audit — там. Ветка стоит ДО generic-binding, чтобы дать честный audit-preview
+      // и единые коды ошибок. Optimistic-lock у сделок отсутствует — execute честно
+      // идёт без preconditionVersions (это видно в review-карточке).
+      if (tool.name === "change_opportunity_stage") {
+        const opportunityId = parseOpportunityIdParam(input.opportunityId);
+        if (!opportunityId.ok) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: opportunityId.error });
+          continue;
+        }
+        const parsedStage = parseDealStageChangeBody({ stageId: input.stageId });
+        if (!parsedStage.ok) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: parsedStage.error });
+          continue;
+        }
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
+        const res = await dispatchInternal(app, cookie, `/api/workspace/opportunities/${opportunityId.value}/stage`, { stageId: parsedStage.value.stageId }, "PATCH");
+        if (res.status === 200) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "stage_change_failed" });
+        continue;
+      }
+
+      // Н15: честный частичный update клиента — governed PATCH требует ПОЛНОЕ тело
+      // (parseClientBody дефолтит отсутствующие поля), поэтому сервер мёржит fields
+      // поверх текущего клиента и валидирует ТЕМ ЖЕ парсером, что и governed-роут.
+      // Optimistic-lock в контракте клиентов нет — версия записи не проверяется
+      // (карточка предупреждает об этом честно).
+      if (tool.name === "update_crm_client") {
+        const clientId = parseClientIdParam(input.clientId);
+        const fields = (input.fields && typeof input.fields === "object" ? input.fields : null) as Record<string, unknown> | null;
+        if (!clientId.ok || !fields || Object.keys(fields).length === 0) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: clientId.ok ? "invalid_action_input" : clientId.error });
+          continue;
+        }
+        // Fail-closed по полям: неизвестное поле не игнорируем молча — пользователь
+        // одобрял карточку, в которой его не было бы видно.
+        const unsupported = Object.keys(fields).find((field) => !UPDATE_CLIENT_FIELDS.has(field));
+        if (unsupported) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "unsupported_update_field" });
+          continue;
+        }
+        if (invalidClientFieldType(fields)) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: "invalid_update_field_value" });
+          continue;
+        }
+        const client = await deps.dataSource.findClientById?.(actor.tenantId, clientId.value);
+        if (!client) {
+          results.push({ tool: tool.name, ok: false, status: 404, error: "client_not_found" });
+          continue;
+        }
+        const patchBody = buildClientPatchBody(client, fields);
+        const parsedClient = parseClientBody({ ...patchBody, id: client.id }, actor.tenantId);
+        if (!parsedClient.ok) {
+          results.push({ tool: tool.name, ok: false, status: 400, error: parsedClient.error });
+          continue;
+        }
+        previews[actionIndex] = await buildActionPreview(deps.dataSource, actor.tenantId, { tool: tool.name, input });
+        const res = await dispatchInternal(app, cookie, `/api/workspace/clients/${clientId.value}`, patchBody, "PATCH");
+        if (res.status === 200) results.push({ tool: tool.name, ok: true, result: res.body });
+        else results.push({ tool: tool.name, ok: false, status: res.status, error: typeof res.body.error === "string" ? res.body.error : "client_update_failed" });
         continue;
       }
 

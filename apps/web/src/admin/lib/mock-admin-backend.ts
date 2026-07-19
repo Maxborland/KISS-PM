@@ -6,7 +6,7 @@
      /api/workspace/access-roles            (GET / PATCH:id / DELETE:id)
      /api/tenant/current/access-profiles    (POST — создание роли)
      /api/workspace/users                   (GET / POST / PATCH:id / DELETE:id)
-     /api/workspace/positions               (GET)
+     /api/workspace/positions               (GET / POST / PATCH:id / DELETE:id)
    Компонент работает через настоящий createAdminClient (с fetchImpl),
    поэтому переключение на боевой API = смена apiOrigin.
 
@@ -17,7 +17,21 @@
    нет; «текущий пользователь» (ACTOR_ID) защищён self-гвардами.
    ============================================================ */
 
-import type { AccessProfile, AuditEvent, Permission, Position, SecurityPolicy, UserStatus, WorkspaceUser } from "./admin-client";
+import {
+  ABSENCE_TYPES,
+  type AbsenceType,
+  type AccessProfile,
+  type AuditEvent,
+  type BackgroundJobEvent,
+  type BackgroundJobRun,
+  type Permission,
+  type Position,
+  type ProductionCalendarException,
+  type ResourceAbsence,
+  type SecurityPolicy,
+  type UserStatus,
+  type WorkspaceUser
+} from "./admin-client";
 import { ALL_PERMISSIONS } from "./permissions-catalog";
 
 // Каталог прав живёт в permissions-catalog (статическая константа домена, не «мок»).
@@ -64,6 +78,25 @@ const parseNullableContact = (v: unknown): string | null | false => {
   if (parsed === null) return typeof v === "string" && v.trim().length === 0 ? null : false;
   return parsed;
 };
+// Управляющие символы multiline (как боевой hasUnsafeMultilineControl): всё, кроме \t \n \r.
+// Без литералов в исходнике — по кодам (charCodeAt), как hasControlSingleLine выше.
+const MAX_DESCRIPTION = 1_000;
+const hasControlMultiline = (v: string): boolean => {
+  for (let i = 0; i < v.length; i += 1) {
+    const c = v.charCodeAt(i);
+    if ((c <= 0x1f && c !== 0x09 && c !== 0x0a && c !== 0x0d) || c === 0x7f) return true;
+  }
+  return false;
+};
+// nullable multiline текст (описание должности): null/undefined/пустая → null; не-строка/длинная/управляющие → false.
+const parseNullableMultiline = (v: unknown, max = MAX_DESCRIPTION): string | null | false => {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "string") return false;
+  const t = v.trim();
+  if (t.length === 0) return null;
+  if (t.length > max || hasControlMultiline(t)) return false;
+  return t;
+};
 
 const nowIso = () => new Date().toISOString();
 
@@ -75,6 +108,10 @@ type Store = {
   users: WorkspaceUser[];
   positions: Position[];
   securityPolicy: SecurityPolicy;
+  absences: ResourceAbsence[];
+  calendarExceptions: ProductionCalendarException[];
+  jobRuns: BackgroundJobRun[];
+  jobEvents: BackgroundJobEvent[];
 };
 
 function seed(): Store {
@@ -140,7 +177,70 @@ function seed(): Store {
     domainAllowlist: ["kiss-pm.dev", "kiss-pm.local"]
   };
 
-  return { accessRoles, users, positions, securityPolicy };
+  // Отсутствия: пара актуальных записей текущего года (даты — вокруг «сегодня»,
+  // чтобы дефолтный период поверхности их показывал).
+  const isoDay = (offsetDays: number): string =>
+    new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
+  const absence = (
+    id: string, userId: string, type: AbsenceType, dateFrom: string, dateTo: string, reason: string | null
+  ): ResourceAbsence => ({
+    id, tenantId: TENANT, userId, type, dateFrom, dateTo,
+    status: "approved", reason, createdBy: ACTOR_ID, approvedBy: null,
+    createdAt: nowIso(), updatedAt: nowIso()
+  });
+  const absences: ResourceAbsence[] = [
+    absence("0b8f6c2a-1111-4aaa-8aaa-000000000001", "user-ivan", "vacation", isoDay(3), isoDay(10), "Ежегодный отпуск"),
+    absence("0b8f6c2a-1111-4aaa-8aaa-000000000002", "user-sergey", "sick_leave", isoDay(-2), isoDay(1), null)
+  ];
+
+  // Исключения производственного календаря (tenant-wide: resourceId = null).
+  const year = new Date().getUTCFullYear();
+  const calendarExceptions: ProductionCalendarException[] = [
+    { id: "pc-new-year", date: `${year}-01-01`, workingMinutes: 0, reason: "Новый год", resourceId: null },
+    { id: "pc-pre-holiday", date: `${year}-03-07`, workingMinutes: 420, reason: "Сокращённый предпраздничный день", resourceId: null }
+  ];
+
+  // Прогоны фоновых задач: реальные kinds с реальными хендлерами, смешанные статусы
+  // (как отдаёт боевой GET /api/workspace/background-jobs/runs — createdAt desc).
+  const jobRun = (
+    id: string, kind: string, status: BackgroundJobRun["status"],
+    over: Partial<BackgroundJobRun> = {}
+  ): BackgroundJobRun => ({
+    id: `background-job-${id}`, tenantId: TENANT, kind, status,
+    priority: 0, payload: {}, idempotencyKey: null, attempt: status === "queued" ? 0 : 1, maxAttempts: 5,
+    runAfter: "2026-01-14T03:00:00.000Z", lockedBy: null, lockedAt: null,
+    startedAt: null, finishedAt: null, lastError: null,
+    createdAt: "2026-01-14T03:00:00.000Z", updatedAt: "2026-01-14T03:00:00.000Z",
+    ...over
+  });
+  const jobRuns: BackgroundJobRun[] = [
+    jobRun("cleanup-1", "storage.asset_cleanup", "succeeded", {
+      startedAt: "2026-01-14T03:00:01.000Z", finishedAt: "2026-01-14T03:00:04.000Z",
+      idempotencyKey: "default:storage.asset_cleanup:2026-01-14T03:00:00.000Z"
+    }),
+    jobRun("janitor-1", "calls.recording_janitor", "dead", {
+      attempt: 5, lastError: "background_job_failed",
+      startedAt: "2026-01-13T22:00:00.000Z", finishedAt: "2026-01-13T22:00:02.000Z",
+      createdAt: "2026-01-13T22:00:00.000Z", updatedAt: "2026-01-13T22:00:02.000Z"
+    }),
+    jobRun("purge-1", "planning.expired_runs_purge", "queued", {
+      runAfter: "2026-01-15T03:00:00.000Z",
+      createdAt: "2026-01-13T03:00:00.000Z", updatedAt: "2026-01-13T03:00:00.000Z"
+    })
+  ];
+  const jobEvent = (id: string, jobId: string, eventType: string, message: string, createdAt: string): BackgroundJobEvent =>
+    ({ id: `job-event-${id}`, tenantId: TENANT, jobId: `background-job-${jobId}`, eventType, message, metadata: {}, createdAt });
+  const jobEvents: BackgroundJobEvent[] = [
+    jobEvent("1", "cleanup-1", "enqueued", "Job enqueued", "2026-01-14T03:00:00.000Z"),
+    jobEvent("2", "cleanup-1", "claimed", "Job claimed by worker", "2026-01-14T03:00:01.000Z"),
+    jobEvent("3", "cleanup-1", "succeeded", "Archived assets cleanup completed", "2026-01-14T03:00:04.000Z"),
+    jobEvent("4", "janitor-1", "enqueued", "Job enqueued", "2026-01-13T22:00:00.000Z"),
+    jobEvent("5", "janitor-1", "failed", "background_job_failed", "2026-01-13T22:00:01.000Z"),
+    jobEvent("6", "janitor-1", "dead", "Max attempts exhausted", "2026-01-13T22:00:02.000Z"),
+    jobEvent("7", "purge-1", "enqueued", "Job enqueued", "2026-01-13T03:00:00.000Z")
+  ];
+
+  return { accessRoles, users, positions, securityPolicy, absences, calendarExceptions, jobRuns, jobEvents };
 }
 
 /* ---- Транспорт: fetchImpl, совместимый с createAdminClient ---- */
@@ -268,10 +368,52 @@ export function createMockAdminFetch(): typeof fetch {
       return json({ status: "deleted" });
     }
 
-    /* ---- positions (позиции) — справочник, read-only сид ---- */
+    /* ---- positions (позиции/должности) — справочник с CRUD (зеркало positionRoutes + parsePositionBody) ---- */
     // Сортировка по name (боевой repositories: orderBy positions.name).
     if (path === "/api/workspace/positions" && method === "GET") {
       return json({ positions: [...db.positions].sort((a, b) => a.name.localeCompare(b.name, "ru")) });
+    }
+    if (path === "/api/workspace/positions" && method === "POST") {
+      // Порядок parsePositionBody: id (дефолт position-<uuid>) → name → description; затем конфликты id → name.
+      const id = typeof body.id === "string" && body.id.trim() ? body.id.trim() : `position-${cryptoRandom()}`;
+      if (!ROUTE_ID_RE.test(id)) return err("invalid_position_id", 400);
+      const name = parseSingleLine(body.name, MAX_NAME);
+      if (name === null) return err("invalid_position_name", 400);
+      const description = parseNullableMultiline(body.description);
+      if (description === false) return err("invalid_position_description", 400);
+      if (db.positions.some((p) => p.id === id)) return err("position_id_taken", 409);
+      if (db.positions.some((p) => p.name === name)) return err("position_name_taken", 409);
+      const position: Position = { id, tenantId: TENANT, name, description };
+      db.positions.push(position);
+      return json({ position }, 201);
+    }
+    const positionPatch = method === "PATCH" ? path.match(/^\/api\/workspace\/positions\/([^/]+)$/) : null;
+    if (positionPatch) {
+      const positionId = decodeURIComponent(positionPatch[1]!);
+      if (!ROUTE_ID_RE.test(positionId)) return err("invalid_position_id", 400);
+      // Боевой порядок: резолв (404) → парсинг тела → конфликт имени с ДРУГОЙ должностью (409).
+      const current = db.positions.find((p) => p.id === positionId);
+      if (!current) return err("position_not_found", 404);
+      const name = parseSingleLine(body.name, MAX_NAME);
+      if (name === null) return err("invalid_position_name", 400);
+      const description = parseNullableMultiline(body.description);
+      if (description === false) return err("invalid_position_description", 400);
+      if (db.positions.some((p) => p.id !== positionId && p.name === name)) return err("position_name_taken", 409);
+      current.name = name; current.description = description;
+      // Смена названия отражается в users.positionName (боевой отдаёт join-поле при следующем чтении).
+      for (const u of db.users) if (u.positionId === positionId) u.positionName = name;
+      return json({ position: current });
+    }
+    const positionDelete = method === "DELETE" ? path.match(/^\/api\/workspace\/positions\/([^/]+)$/) : null;
+    if (positionDelete) {
+      const positionId = decodeURIComponent(positionDelete[1]!);
+      if (!ROUTE_ID_RE.test(positionId)) return err("invalid_position_id", 400);
+      const current = db.positions.find((p) => p.id === positionId);
+      if (!current) return err("position_not_found", 404);
+      // Назначенная должность не удаляется (боевой: listWorkspaceUsers.filter positionId → 409 position_assigned).
+      if (db.users.some((u) => u.positionId === positionId)) return err("position_assigned", 409);
+      db.positions = db.positions.filter((p) => p.id !== positionId);
+      return json({ status: "deleted" });
     }
 
     /* ---- users (пользователи) ---- */
@@ -380,9 +522,182 @@ export function createMockAdminFetch(): typeof fetch {
       return json({ status: "deleted" });
     }
 
+    /* ---- absences (отсутствия) — зеркало absencesRoutes ---- */
+    if (path === "/api/tenant/current/absences" && method === "GET") {
+      const search = new URL(url, "http://x").searchParams;
+      const fromDate = parseAbsenceDate(search.get("fromDate") ?? undefined);
+      const toDate = parseAbsenceDate(search.get("toDate") ?? undefined);
+      if (!fromDate || !toDate || !isValidAbsenceRange(fromDate, toDate)) {
+        return err("resource_absence_invalid_range", 400);
+      }
+      const rawUserId = search.get("userId")?.trim() || undefined;
+      if (rawUserId && !ROUTE_ID_RE.test(rawUserId)) return err("invalid_user_id", 400);
+      // Боевой listAbsences: пересечение периода, сортировка по dateFrom asc.
+      const absences = db.absences
+        .filter((a) => a.dateFrom <= toDate && a.dateTo >= fromDate && (!rawUserId || a.userId === rawUserId))
+        .sort((a, b) => (a.dateFrom < b.dateFrom ? -1 : a.dateFrom > b.dateFrom ? 1 : 0));
+      return json({ absences });
+    }
+    if (path === "/api/tenant/current/absences" && method === "POST") {
+      // Порядок (зеркало parseCreateBody): userId → type/dates → range → reason.
+      const userId = typeof body.userId === "string" ? body.userId.trim() : "";
+      if (!ROUTE_ID_RE.test(userId)) return err("invalid_user_id", 400);
+      const type = typeof body.type === "string" ? body.type.trim() : "";
+      const dateFrom = parseAbsenceDate(typeof body.dateFrom === "string" ? body.dateFrom.trim() : "");
+      const dateTo = parseAbsenceDate(typeof body.dateTo === "string" ? body.dateTo.trim() : "");
+      if (!(ABSENCE_TYPES as readonly string[]).includes(type) || !dateFrom || !dateTo) {
+        return err("resource_absence_invalid", 400);
+      }
+      if (!isValidAbsenceRange(dateFrom, dateTo)) return err("resource_absence_invalid_range", 400);
+      if (body.reason !== null && body.reason !== undefined && typeof body.reason !== "string") {
+        return err("resource_absence_invalid", 400);
+      }
+      const reason = typeof body.reason === "string" ? body.reason.trim() || null : null;
+      if (reason && (reason.length > 500 || hasControlSingleLine(reason))) {
+        return err("resource_absence_invalid", 400);
+      }
+      const created: ResourceAbsence = {
+        id: cryptoRandom(), tenantId: TENANT, userId, type: type as AbsenceType,
+        dateFrom, dateTo, status: "approved", reason, createdBy: ACTOR_ID, approvedBy: null,
+        createdAt: nowIso(), updatedAt: nowIso()
+      };
+      db.absences.push(created);
+      return json({ absence: created }, 201);
+    }
+    const absenceDelete = method === "DELETE" ? path.match(/^\/api\/tenant\/current\/absences\/([^/]+)$/) : null;
+    if (absenceDelete) {
+      // Боевой parseAbsenceIdParam: UUID (lowercased) — иначе 400 invalid_absence_id.
+      const absenceId = decodeURIComponent(absenceDelete[1]!).trim().toLowerCase();
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(absenceId)) {
+        return err("invalid_absence_id", 400);
+      }
+      if (!db.absences.some((a) => a.id === absenceId)) return err("resource_absence_not_found", 404);
+      db.absences = db.absences.filter((a) => a.id !== absenceId);
+      return json({ ok: true });
+    }
+
+    /* ---- production-calendar (произв. календарь) — зеркало productionCalendarRoutes ---- */
+    if (path === "/api/tenant/current/production-calendar" && method === "GET") {
+      const yearRaw = new URL(url, "http://x").searchParams.get("year");
+      const year = parseCalendarYear(yearRaw ?? undefined);
+      if (year === null) return err("production_calendar_invalid", 400);
+      return json(productionCalendarView(db, year));
+    }
+    if (path === "/api/tenant/current/production-calendar/bulk" && method === "POST") {
+      // Зеркало parseBulkBody: exceptions[] ≤ 500; id/date/минуты/reason/resourceId по боевым правилам.
+      if (!Array.isArray(body.exceptions) || body.exceptions.length > 500) {
+        return err("production_calendar_invalid", 400);
+      }
+      const items: ProductionCalendarException[] = [];
+      for (const entry of body.exceptions) {
+        if (!entry || typeof entry !== "object") return err("production_calendar_invalid", 400);
+        const row = entry as Record<string, unknown>;
+        const id = typeof row.id === "string" && row.id.trim() ? row.id.trim() : cryptoRandom().replace(/[^a-z0-9-]/g, "").slice(0, 36) || "pc-generated";
+        const date = typeof row.date === "string" ? row.date.trim() : "";
+        const workingMinutes = typeof row.workingMinutes === "number" ? row.workingMinutes : null;
+        if (
+          !/^[a-z0-9][a-z0-9_-]{2,119}$/.test(id) || !parseAbsenceDate(date) ||
+          workingMinutes === null || !Number.isInteger(workingMinutes) || workingMinutes < 0 || workingMinutes > 1440
+        ) {
+          return err("production_calendar_invalid", 400);
+        }
+        const resourceId = row.resourceId === null || row.resourceId === undefined
+          ? null
+          : typeof row.resourceId === "string" && ROUTE_ID_RE.test(row.resourceId.trim()) ? row.resourceId.trim() : false;
+        if (resourceId === false) return err("production_calendar_invalid", 400);
+        const reasonRaw = row.reason === null || row.reason === undefined ? null : row.reason;
+        if (reasonRaw !== null && typeof reasonRaw !== "string") return err("production_calendar_invalid", 400);
+        const reason = typeof reasonRaw === "string" ? reasonRaw.trim() : null;
+        if (reason !== null && (reason.length > 240 || hasControlSingleLine(reason))) {
+          return err("production_calendar_invalid", 400);
+        }
+        items.push({ id, date, workingMinutes, reason: reason || null, resourceId });
+      }
+      for (const item of items) {
+        const existing = db.calendarExceptions.findIndex((e) => e.id === item.id);
+        if (existing >= 0) db.calendarExceptions[existing] = item;
+        else db.calendarExceptions.push(item);
+      }
+      // Боевой ответ: календарь ТЕКУЩЕГО года (не года правки).
+      return json(productionCalendarView(db, new Date().getUTCFullYear()));
+    }
+
+    /* ---- background jobs (фоновые задачи) — зеркало backgroundJobRoutes, read-only ---- */
+    if (path === "/api/workspace/background-jobs/runs" && method === "GET") {
+      const search = new URL(url, "http://x").searchParams;
+      const statusRaw = search.get("status")?.trim();
+      if (statusRaw && !["queued", "running", "succeeded", "dead", "cancelled"].includes(statusRaw)) {
+        return err("background_job_status_invalid", 400);
+      }
+      const limitRaw = search.get("limit");
+      if (limitRaw && !/^[1-9][0-9]?$|^100$/.test(limitRaw)) return err("background_job_limit_invalid", 400);
+      const limit = limitRaw ? Number(limitRaw) : 50;
+      const runs = db.jobRuns
+        .filter((run) => !statusRaw || run.status === statusRaw)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+        .slice(0, limit);
+      return json({ runs });
+    }
+    const jobEventsMatch = method === "GET" ? path.match(/^\/api\/workspace\/background-jobs\/runs\/([^/]+)\/events$/) : null;
+    if (jobEventsMatch) {
+      const runId = decodeURIComponent(jobEventsMatch[1]!).trim();
+      if (!/^background-job-[A-Za-z0-9._:-]+$/.test(runId)) return err("background_job_id_invalid", 400);
+      const events = db.jobEvents
+        .filter((event) => event.jobId === runId)
+        .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0))
+        .slice(0, 100);
+      return json({ events });
+    }
+
     return err("not_found", 404);
   };
   return mockFetch;
+}
+
+/* ---- Валидаторы отсутствий/календаря (зеркало absencesRoutes/productionCalendarRoutes) ---- */
+
+// YYYY-MM-DD с честной проверкой существования дня (как боевой parseIsoDate/isValidCalendarDate).
+function parseAbsenceDate(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
+  const parsed = new Date(`${normalized}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) return null;
+  return normalized;
+}
+
+// toDate ≥ fromDate и длительность ≤ 370 дней (боевой maxAbsenceRangeDays).
+function isValidAbsenceRange(fromDate: string, toDate: string): boolean {
+  const from = Date.UTC(...isoParts(fromDate));
+  const to = Date.UTC(...isoParts(toDate));
+  if (to < from) return false;
+  return (to - from) / 86_400_000 + 1 <= 370;
+}
+
+function isoParts(value: string): [number, number, number] {
+  const [y, m, d] = value.split("-").map(Number);
+  return [y!, m! - 1, d!];
+}
+
+// Год календаря: отсутствует → текущий; 4 цифры в 2000..2100 (боевой parseYear).
+function parseCalendarYear(value: string | undefined): number | null {
+  if (!value) return new Date().getUTCFullYear();
+  const normalized = value.trim();
+  if (!/^\d{4}$/.test(normalized)) return null;
+  const year = Number.parseInt(normalized, 10);
+  return year >= 2000 && year <= 2100 ? year : null;
+}
+
+// Ответ GET production-calendar: дефолты тенанта + исключения года (date asc, id asc).
+function productionCalendarView(db: Store, year: number) {
+  return {
+    calendarId: "tenant-default",
+    year,
+    workingWeekdays: [1, 2, 3, 4, 5],
+    workingMinutesPerDay: 480,
+    exceptions: db.calendarExceptions
+      .filter((e) => e.date.startsWith(`${year}-`))
+      .sort((a, b) => (a.date === b.date ? (a.id < b.id ? -1 : 1) : a.date < b.date ? -1 : 1))
+  };
 }
 
 // hex(64) для reset-токена мока — та же форма, что боевой randomBytes(32).toString("hex").

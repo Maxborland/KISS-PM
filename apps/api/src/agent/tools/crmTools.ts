@@ -28,7 +28,9 @@ export const CRM_TOOLS: AgentTool[] = [
   // ---- Клиенты ----
   reTool({ name: "list_crm_clients", title: "Клиенты", description: "Список клиентов тенанта (только чтение).", kind: "analyze", canX: canReadClients, method: "GET", path: () => "/api/workspace/clients" }),
   reTool({ name: "create_crm_client", title: "Создать клиента", description: "Создать клиента. fields: name (обяз.), а также email, phone, website, address, status — по необходимости.", kind: "mutation", canX: canManageClients, method: "POST", path: () => "/api/workspace/clients", properties: fields("поля клиента"), required: ["fields"], body: passFields }),
-  reTool({ name: "update_crm_client", title: "Изменить клиента", description: "Изменить клиента по clientId. fields — изменяемые поля (name/email/phone/website/address/status).", kind: "mutation", canX: canManageClients, method: "PATCH", path: (i) => `/api/workspace/clients/${i.clientId}`, properties: { clientId: { type: "string" }, ...fields("изменяемые поля клиента") }, required: ["clientId", "fields"], body: withId("clientId") }),
+  // Н15: offerable-мутация с payload-backed карточкой; поля — ровно контракт governed-парсера
+  // (name/description/status), частичный update мёржится сервером поверх текущего клиента.
+  reTool({ name: "update_crm_client", title: "Изменить клиента", description: "Изменить клиента по clientId. fields — изменяемые поля: name, description, status (active|archived); других полей в контракте клиента нет. Незатронутые поля сохраняются.", kind: "mutation", canX: canManageClients, method: "PATCH", path: (i) => `/api/workspace/clients/${i.clientId}`, properties: { clientId: { type: "string" }, ...fields("изменяемые поля клиента: name, description, status") }, required: ["clientId", "fields"], body: withId("clientId") }),
 
   // ---- Контакты ----
   reTool({ name: "list_crm_contacts", title: "Контакты", description: "Список контактов (только чтение).", kind: "analyze", canX: canReadContacts, method: "GET", path: () => "/api/workspace/contacts" }),

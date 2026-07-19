@@ -32,6 +32,15 @@
    и my-work правдоподобны и не противоречат планировочным.
    ============================================================ */
 
+import {
+  buildMonthDays,
+  computeHeat,
+  rollupOrgCapacityTree,
+  type CapacityDayLoad,
+  type CapacityMatrixRow,
+  type OrgCapacityTree
+} from "@kiss-pm/domain";
+
 import type {
   ProjectRecord,
   TaskActivityRecord,
@@ -57,15 +66,44 @@ const STATUS_ID_RE = /^[a-z0-9][a-z0-9_-]{2,119}$/;
 /* ---- Системные статусы задач (persistence.TaskStatusRecord; категории фиксированы) ----
    Боевой эквивалент: GET /api/workspace/task-statuses. Здесь — фиксированный сид
    системных статусов с категориями, на которые ссылаются задачи и смена статуса. */
-export type WorkspaceTaskStatus = { id: string; name: string; category: TaskStatusCategory; sortOrder: number; isSystem: boolean };
+export type WorkspaceTaskStatus = { id: string; name: string; category: TaskStatusCategory; sortOrder: number; isSystem: boolean; status: "active" | "archived" };
 export const TASK_STATUSES: WorkspaceTaskStatus[] = [
-  { id: "status-new", name: "Новая", category: "new", sortOrder: 1, isSystem: true },
-  { id: "status-waiting", name: "Ожидание", category: "waiting", sortOrder: 2, isSystem: true },
-  { id: "status-in-progress", name: "В работе", category: "in_progress", sortOrder: 3, isSystem: true },
-  { id: "status-review", name: "На проверке", category: "review", sortOrder: 4, isSystem: true },
-  { id: "status-done", name: "Готово", category: "done", sortOrder: 5, isSystem: true }
+  { id: "status-new", name: "Новая", category: "new", sortOrder: 1, isSystem: true, status: "active" },
+  { id: "status-waiting", name: "Ожидание", category: "waiting", sortOrder: 2, isSystem: true, status: "active" },
+  { id: "status-in-progress", name: "В работе", category: "in_progress", sortOrder: 3, isSystem: true, status: "active" },
+  { id: "status-review", name: "На проверке", category: "review", sortOrder: 4, isSystem: true, status: "active" },
+  { id: "status-done", name: "Готово", category: "done", sortOrder: 5, isSystem: true, status: "active" }
 ];
 const statusById = (id: string) => TASK_STATUSES.find((s) => s.id === id);
+// Категории статусов (зеркало taskStatusCategories из projectWorkParsers).
+const TASK_STATUS_CATEGORIES: readonly TaskStatusCategory[] = ["new", "waiting", "in_progress", "review", "done"];
+
+// Управляющие символы single-line (зеркало isSafeSingleLineText): 0x00–0x1F и 0x7F — по кодам, без литералов.
+const hasControlChar = (v: string): boolean => {
+  for (let i = 0; i < v.length; i += 1) {
+    const c = v.charCodeAt(i);
+    if (c <= 0x1f || c === 0x7f) return true;
+  }
+  return false;
+};
+// Тело create/patch справочника статусов (ДОСЛОВНОЕ зеркало parseCreateTaskStatusBody):
+// порядок и коды: id → name (2..80, single-line) → category → sortOrder (int 1..10000) → status.
+type ParsedTaskStatusBody =
+  | { ok: true; value: { id: string; name: string; category: TaskStatusCategory; sortOrder: number; status: "active" | "archived" } }
+  | { ok: false; error: string };
+function parseTaskStatusBody(body: Record<string, unknown>): ParsedTaskStatusBody {
+  const id = typeof body.id === "string" ? body.id.trim() : "";
+  if (!id || !STATUS_ID_RE.test(id)) return { ok: false, error: "invalid_task_status_id" };
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (name.length < 2 || name.length > 80 || hasControlChar(name)) return { ok: false, error: "invalid_task_status_name" };
+  const category = typeof body.category === "string" ? body.category : "";
+  if (!TASK_STATUS_CATEGORIES.includes(category as TaskStatusCategory)) return { ok: false, error: "invalid_task_status_category" };
+  const sortOrder = typeof body.sortOrder === "number" ? body.sortOrder : NaN;
+  if (!Number.isInteger(sortOrder) || sortOrder < 1 || sortOrder > 10000) return { ok: false, error: "invalid_task_status_sort_order" };
+  const status = body.status === undefined ? "active" : body.status;
+  if (status !== "active" && status !== "archived") return { ok: false, error: "invalid_task_status_state" };
+  return { ok: true, value: { id, name, category: category as TaskStatusCategory, sortOrder, status } };
+}
 
 /* ---- Пользователи рабочей области — справочные данные для отображения исполнителя/заказчика.
    Боевой эквивалент: /api/workspace/users. Экспортируем (как RESOURCES/CRM_USERS). ---- */
@@ -86,6 +124,8 @@ type Store = {
   projects: ProjectRecord[];
   tasks: TaskRecord[]; // все задачи всех проектов (фильтруются по проекту / по исполнителю)
   activities: TaskActivityRecord[];
+  // Справочник статусов задач (копия сида на сессию мока): CRUD через /api/workspace/task-statuses.
+  taskStatuses: WorkspaceTaskStatus[];
 };
 
 // Переход разрешён (зеркало isTaskStatusTransitionAllowed из taskCommandGuards).
@@ -190,7 +230,90 @@ function seed(): Store {
     task({ id: "task-bi-etl", projectId: "proj-bi-sales", title: "ETL-конвейер продаж", statusId: "status-new", ownerUserId: "u-sergeev", priority: "normal", plannedStart: "2026-05-11", plannedFinish: "2026-06-19", durationWorkingDays: 30, plannedWork: 200, actualWork: 0, progress: 0 })
   ];
 
-  return { projects, tasks, activities: [] };
+  return { projects, tasks, activities: [], taskStatuses: TASK_STATUSES.map((s) => ({ ...s })) };
+}
+
+/* ---- Загрузка ресурсов (GET /api/workspace/capacity/tree) ----
+   Зеркало registerCapacityRoutes: monthIso обязателен (parseMonthIso), projectId — только
+   активный проект рабочей области, иначе 400 capacity_invalid_query. Дерево собирается
+   боевым rollupOrgCapacityTree из @kiss-pm/domain (тот же код, что на сервере), поэтому
+   форма ответа контрактная: days + orgGroups (направление → отдел → должность → строки). */
+const CAPACITY_POSITIONS = [
+  { id: "backend", name: "Backend-разработка" },
+  { id: "frontend", name: "Frontend-разработка" }
+];
+const CAPACITY_DIRECTIONS = [{ id: "dir-delivery", name: "Производство" }];
+const CAPACITY_UNITS = [{ id: "unit-dev", name: "Разработка", directionId: "dir-delivery" }];
+// Дневная нагрузка (минуты на рабочий день) по проектам. Сюжеты: u-sergeev — стабильный
+// перегруз (600 > 480), u-mikhail — высокая загрузка без перегруза, u-kuznetsov — свободен.
+const CAPACITY_LOAD: Array<{
+  userId: string;
+  positionId: string;
+  daily: Array<{ projectId: string; minutes: number }>;
+}> = [
+  { userId: "u-petrov", positionId: "backend", daily: [{ projectId: MOCK_PROJECT_ID, minutes: 240 }, { projectId: "proj-bi-sales", minutes: 120 }] },
+  { userId: "u-ivanova", positionId: "frontend", daily: [{ projectId: MOCK_PROJECT_ID, minutes: 300 }] },
+  { userId: "u-sergeev", positionId: "backend", daily: [{ projectId: MOCK_PROJECT_ID, minutes: 360 }, { projectId: "proj-loyalty", minutes: 240 }] },
+  { userId: "u-mikhail", positionId: "frontend", daily: [{ projectId: MOCK_PROJECT_ID, minutes: 420 }] },
+  { userId: "u-kuznetsov", positionId: "backend", daily: [] }
+];
+
+// Формат месяца (зеркало capacityService.parseMonthIso: YYYY-MM, месяц 01..12).
+const MONTH_ISO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function buildMockCapacityTree(monthIso: string, projectFilterId: string | null): OrgCapacityTree {
+  const days = buildMonthDays(monthIso);
+  const rows: CapacityMatrixRow[] = CAPACITY_LOAD.map((resource) => {
+    const user = WORKSPACE_USERS.find((u) => u.id === resource.userId)!;
+    const position = CAPACITY_POSITIONS.find((p) => p.id === resource.positionId)!;
+    const projectsMixByDate: NonNullable<CapacityMatrixRow["projectsMixByDate"]> = {};
+    const dayLoads: CapacityDayLoad[] = days.map((day) => {
+      const working = !day.isWeekend && !day.isHoliday;
+      const capacityMinutes = working ? 480 : 0;
+      const mix = working
+        ? resource.daily.filter((d) => projectFilterId === null || d.projectId === projectFilterId)
+        : [];
+      const workMinutes = mix.reduce((sum, d) => sum + d.minutes, 0);
+      if (mix.length > 0) {
+        projectsMixByDate[day.date] = mix.map((d) => ({ projectId: d.projectId, workMinutes: d.minutes }));
+      }
+      const overloadMinutes = Math.max(0, workMinutes - capacityMinutes);
+      return {
+        date: day.date,
+        workMinutes,
+        capacityMinutes,
+        freeMinutes: Math.max(0, capacityMinutes - workMinutes),
+        overloadMinutes,
+        isWeekend: day.isWeekend,
+        isHoliday: day.isHoliday,
+        hasAbsence: false,
+        isFreeDay: capacityMinutes === 0,
+        isException: false,
+        isOverload: overloadMinutes > 0,
+        heat: computeHeat(workMinutes, capacityMinutes)
+      };
+    });
+    return {
+      user: { id: user.id, name: user.name, positionId: position.id, positionName: position.name },
+      days: dayLoads,
+      projectsMixByDate
+    };
+  });
+  return rollupOrgCapacityTree({
+    monthIso,
+    rows,
+    unassignedRows: [],
+    days,
+    workspacePositions: CAPACITY_POSITIONS,
+    directions: CAPACITY_DIRECTIONS,
+    units: CAPACITY_UNITS,
+    placements: CAPACITY_LOAD.map((resource) => ({
+      userId: resource.userId,
+      directionId: "dir-delivery",
+      positionId: resource.positionId,
+      unitId: "unit-dev"
+    }))
+  });
 }
 
 /* ---- Транспорт: fetchImpl, совместимый с createWorkspaceClient ---- */
@@ -292,14 +415,75 @@ export function createMockWorkspaceFetch(): typeof fetch {
       return json({ activity }, 201);
     }
 
+    /* ---- GET /api/workspace/capacity/tree: дерево загрузки за месяц (зеркало registerCapacityRoutes) ---- */
+    if (method === "GET" && path === "/api/workspace/capacity/tree") {
+      const query = new URLSearchParams(url.split("?")[1] ?? "");
+      const monthIso = (query.get("monthIso") ?? "").trim();
+      if (!MONTH_ISO_RE.test(monthIso)) return err("capacity_invalid_query", 400);
+      const projectIdRaw = (query.get("projectId") ?? "").trim();
+      let projectFilterId: string | null = null;
+      if (projectIdRaw) {
+        // Порядок как боевой роут: формат параметра → членство в readableProjectIds
+        // (в моке — активные проекты рабочей области); оба отказа — 400 capacity_invalid_query.
+        if (!ROUTE_ID_RE.test(projectIdRaw)) return err("capacity_invalid_query", 400);
+        if (!db.projects.some((p) => p.id === projectIdRaw && p.status === "active")) {
+          return err("capacity_invalid_query", 400);
+        }
+        projectFilterId = projectIdRaw;
+      }
+      return json(buildMockCapacityTree(monthIso, projectFilterId));
+    }
+
     /* ---- GET /api/workspace/users: справочник пользователей (боевой эквивалент — тот же путь) ---- */
     if (method === "GET" && path === "/api/workspace/users") {
       return json({ users: WORKSPACE_USERS });
     }
 
-    /* ---- GET /api/workspace/task-statuses: системные статусы (боевой эквивалент — тот же путь) ---- */
+    /* ---- Справочник статусов задач: GET/POST/PATCH/DELETE /api/workspace/task-statuses
+       (зеркало taskStatusRoutes + parseCreateTaskStatusBody + taskStatusWorkspace).
+       RBAC-веток нет (актор мока — с полным набором прав), как в остальных хендлерах. ---- */
     if (method === "GET" && path === "/api/workspace/task-statuses") {
-      return json({ taskStatuses: TASK_STATUSES });
+      return json({ taskStatuses: [...db.taskStatuses].sort((a, b) => a.sortOrder - b.sortOrder) });
+    }
+    if (method === "POST" && path === "/api/workspace/task-statuses") {
+      const parsed = parseTaskStatusBody(body);
+      if (!parsed.ok) return err(parsed.error, 400);
+      // Уникальные индексы (23505 → 409): pkey → tenant_name_uidx → tenant_sort_order_uidx.
+      if (db.taskStatuses.some((s) => s.id === parsed.value.id)) return err("task_status_id_taken", 409);
+      if (db.taskStatuses.some((s) => s.name === parsed.value.name)) return err("task_status_name_taken", 409);
+      if (db.taskStatuses.some((s) => s.sortOrder === parsed.value.sortOrder)) return err("task_status_sort_order_taken", 409);
+      const taskStatus: WorkspaceTaskStatus = { ...parsed.value, isSystem: false };
+      db.taskStatuses.push(taskStatus);
+      return json({ taskStatus }, 201);
+    }
+    const taskStatusPatch = method === "PATCH" ? path.match(/^\/api\/workspace\/task-statuses\/([^/]+)$/) : null;
+    if (taskStatusPatch) {
+      const statusId = decodeURIComponent(taskStatusPatch[1]!);
+      if (!ROUTE_ID_RE.test(statusId)) return err("invalid_task_status_id", 400);
+      const parsed = parseTaskStatusBody({ ...body, id: statusId });
+      if (!parsed.ok) return err(parsed.error, 400);
+      const before = db.taskStatuses.find((s) => s.id === statusId);
+      if (!before) return err("task_status_not_found", 404);
+      // Системные гварды (боевой updateTaskStatus): архив системного и смена его категории запрещены.
+      if (before.isSystem && parsed.value.status === "archived") return err("system_task_status_required", 409);
+      if (before.isSystem && before.category !== parsed.value.category) return err("system_task_status_category_locked", 409);
+      if (db.taskStatuses.some((s) => s.id !== statusId && s.name === parsed.value.name)) return err("task_status_name_taken", 409);
+      if (db.taskStatuses.some((s) => s.id !== statusId && s.sortOrder === parsed.value.sortOrder)) return err("task_status_sort_order_taken", 409);
+      before.name = parsed.value.name; before.category = parsed.value.category;
+      before.sortOrder = parsed.value.sortOrder; before.status = parsed.value.status;
+      return json({ taskStatus: before });
+    }
+    const taskStatusDelete = method === "DELETE" ? path.match(/^\/api\/workspace\/task-statuses\/([^/]+)$/) : null;
+    if (taskStatusDelete) {
+      const statusId = decodeURIComponent(taskStatusDelete[1]!);
+      if (!ROUTE_ID_RE.test(statusId)) return err("invalid_task_status_id", 400);
+      const before = db.taskStatuses.find((s) => s.id === statusId);
+      if (!before) return err("task_status_not_found", 404);
+      // DELETE = архив (боевой archiveTaskStatus): системный не архивируется; повторный архив идемпотентен.
+      if (before.isSystem) return err("system_task_status_required", 409);
+      if (before.status === "archived") return json({ taskStatus: before });
+      before.status = "archived";
+      return json({ taskStatus: before });
     }
 
     /* ---- GET /api/workspace/projects/:projectId: проект + его задачи; 404 на чужой/неактивный ---- */
@@ -331,7 +515,7 @@ export function createMockWorkspaceFetch(): typeof fetch {
       const task = db.tasks.find((t) => t.id === taskId && t.projectId === project.id && t.archivedAt === null);
       if (!task) return err("task_not_found", 404);
       // Целевой статус существует и активен (как listTaskStatuses.find active). 400 task_status_not_found.
-      const target = statusById(statusId);
+      const target = db.taskStatuses.find((s) => s.id === statusId && s.status === "active");
       if (!target) return err("task_status_not_found", 400);
       // Правило перехода (как isTaskStatusTransitionAllowed). 409 task_status_transition_not_allowed.
       if (!isTransitionAllowed(task.status, target.category)) return err("task_status_transition_not_allowed", 409);

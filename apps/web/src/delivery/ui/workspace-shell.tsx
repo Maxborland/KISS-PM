@@ -47,9 +47,16 @@ const NAV: NavGroup[] = [
       { label: "Сделки", href: "/crm/deals", requires: ["tenant.opportunities.read"] }
     ]
   },
-  { title: "Аналитика", items: [{ label: "Дашборд", href: "/dashboard", requires: ["tenant.projects.read", "tenant.opportunities.read"] }] },
+  {
+    title: "Аналитика",
+    items: [
+      { label: "Дашборд", href: "/dashboard", requires: ["tenant.projects.read", "tenant.opportunities.read"] },
+      // Гейт = RBAC capacity-роутов (canReadProjectResources в registerCapacityRoutes).
+      { label: "Загрузка", href: "/capacity", requires: ["tenant.project_resources.read"] }
+    ]
+  },
   { title: "Коммуникации", items: [{ label: "Коммуникации", href: "/communications/chat", requires: ["tenant.communications.read"] }] },
-  { title: "Администрирование", items: [{ label: "Администрирование", href: "/admin", requires: ["tenant.access_profiles.read", "tenant.access_profiles.manage", "tenant.users.read", "tenant.users.manage", "tenant.audit_events.read", "tenant.workspace_config.read", "tenant.workspace_config.manage"] }] }
+  { title: "Администрирование", items: [{ label: "Администрирование", href: "/admin", requires: ["tenant.access_profiles.read", "tenant.access_profiles.manage", "tenant.users.read", "tenant.users.manage", "tenant.audit_events.read", "tenant.workspace_config.read", "tenant.workspace_config.manage", "tenant.absences.read", "tenant.absences.manage", "tenant.background_jobs.read", "tenant.background_jobs.manage"] }] }
 ];
 
 function WorkspaceNavigation({

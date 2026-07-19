@@ -21,13 +21,13 @@ export type ScreenMeta = {
   variant?: "workspace" | "bare";
 };
 
-// Экраны 02/03/05/06/07/07b/08/09/12/13/14/15/17/18/19 переведены в функциональные
+// Экраны 02/03/05/06/07/07b/08/09/12/13/14/15/16/17/18/19 переведены в функциональные
 // surface (CRM / Project Delivery / Workspace / Admin / Auth) и удалены отсюда как дубли.
+// 16 (KPI проекта) заменён функциональной поверхностью «Контур» (/projects/[id]/control).
 // Остаются только прототипы без полного функционального аналога.
 export const SCREEN_IDS = [
   "00-space-discipline",
   "04-create-task-modal",
-  "16-project-kpi",
   "state-empty",
   "state-error",
   "state-forbidden",
@@ -64,14 +64,6 @@ export const SCREEN_META: Record<ScreenId, ScreenMeta> = {
     lead: "Модальное создание с stepper и формой.",
     breadcrumb: [{ label: "Задачи", current: true }],
     activeNav: "Задачи"
-  },
-  "16-project-kpi": {
-    id: "16-project-kpi",
-    storyTitle: "16 KPI проекта",
-    pageTitle: mockProjectScreenTitle("KPI"),
-    lead: "Показатели и сигналы управления.",
-    breadcrumb: [{ label: "Проекты", href: "/projects" }, { label: MOCK_PROJECT_CRM }, { label: "KPI", current: true }],
-    activeNav: "Отчёты"
   },
   "state-empty": {
     id: "state-empty",

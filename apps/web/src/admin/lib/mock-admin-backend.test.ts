@@ -246,3 +246,64 @@ describe("contract-mock admin backend", () => {
     }
   });
 });
+
+/* ---- должности: CRUD (зеркало positionRoutes; Н12) ---- */
+describe("contract-mock admin backend: positions CRUD", () => {
+  it("creates a position (201) with a generated id and lists it sorted by name", async () => {
+    const c = client();
+    const { position } = await c.createPosition({ name: "Аналитик", description: "Аналитика требований" });
+    expect(position.id).toMatch(/^position-/);
+    expect(position.name).toBe("Аналитик");
+    expect(position.description).toBe("Аналитика требований");
+    const { positions } = await c.listPositions();
+    expect(positions.map((p) => p.name)).toEqual([...positions.map((p) => p.name)].sort((a, b) => a.localeCompare(b, "ru")));
+    expect(positions.some((p) => p.id === position.id)).toBe(true);
+  });
+
+  it("rejects a duplicate position name on create (409 position_name_taken)", async () => {
+    const c = client();
+    await expect(c.createPosition({ name: "Инженер" })).rejects.toMatchObject({ status: 409, code: "position_name_taken" });
+  });
+
+  it("rejects an empty name (400 invalid_position_name) and a duplicate explicit id (409 position_id_taken)", async () => {
+    const c = client();
+    await expect(c.createPosition({ name: "   " })).rejects.toMatchObject({ status: 400, code: "invalid_position_name" });
+    await expect(c.createPosition({ id: "position-engineer", name: "Другой инженер" })).rejects.toMatchObject({ status: 409, code: "position_id_taken" });
+  });
+
+  it("updates a position (full-replace) and reflects the new name in users.positionName", async () => {
+    const c = client();
+    const { position } = await c.updatePosition("position-engineer", { name: "Ведущий инженер", description: null });
+    expect(position.name).toBe("Ведущий инженер");
+    expect(position.description).toBeNull();
+    const { users } = await c.listUsers();
+    expect(users.find((u) => u.id === "user-sergey")?.positionName).toBe("Ведущий инженер");
+  });
+
+  it("rejects renaming a position into another position's name (409 position_name_taken)", async () => {
+    const c = client();
+    await expect(c.updatePosition("position-engineer", { name: "Менеджер по продажам" })).rejects.toMatchObject({ status: 409, code: "position_name_taken" });
+  });
+
+  it("returns 404 position_not_found for updates/deletes of an unknown position", async () => {
+    const c = client();
+    await expect(c.updatePosition("position-ghost", { name: "Призрак" })).rejects.toMatchObject({ status: 404, code: "position_not_found" });
+    await expect(c.deletePosition("position-ghost")).rejects.toMatchObject({ status: 404, code: "position_not_found" });
+  });
+
+  it("refuses to delete a position assigned to users (409 position_assigned) and deletes an unassigned one", async () => {
+    const c = client();
+    // position-sales назначена user-ivan и user-oleg → честный отказ, а не тихое удаление.
+    await expect(c.deletePosition("position-sales")).rejects.toMatchObject({ status: 409, code: "position_assigned" });
+    const { position } = await c.createPosition({ name: "Временная должность" });
+    await expect(c.deletePosition(position.id)).resolves.toMatchObject({ status: "deleted" });
+    const { positions } = await c.listPositions();
+    expect(positions.some((p) => p.id === position.id)).toBe(false);
+  });
+
+  it("rejects malformed position route ids before resolution (400 invalid_position_id)", async () => {
+    const c = client();
+    await expect(c.updatePosition("Bad..Id", { name: "X-подразделение" })).rejects.toMatchObject({ status: 400, code: "invalid_position_id" });
+    await expect(c.deletePosition("Bad..Id")).rejects.toMatchObject({ status: 400, code: "invalid_position_id" });
+  });
+});

@@ -36,6 +36,8 @@ const EXPECTED_TABS = [
   ["Сценарии", "scenarios"],
   ["Baseline", "baseline"],
   ["Коммиты", "commits"],
+  ["Контур", "control"],
+  ["Знания", "knowledge"],
   ["Настройки", "settings"]
 ] as const satisfies ReadonlyArray<readonly [DeliveryTab, string]>;
 

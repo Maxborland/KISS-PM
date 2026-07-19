@@ -12,6 +12,7 @@ import { demoAction } from "@/views/lib/demo";
 import { authErr } from "@/auth/lib/auth-bits";
 import { ProfileContent } from "@/auth/profile/profile-surface";
 import { NotificationsPrefs } from "@/communications/notifications/notifications-surface";
+import { ReferencesTab } from "@/workspace/references/references-surface";
 import { useAuth } from "@/auth/lib/use-auth";
 import { useAuthRuntime } from "@/auth/lib/auth-runtime";
 import type { WorkspaceUser } from "@/auth/lib/auth-client";
@@ -25,15 +26,18 @@ import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
                  переиспользует ProfileContent из auth/profile.
    - Уведомления → useNotificationPreferences (PUT /notification-preferences),
                  переиспользует NotificationsPrefs из communications/notifications.
+   - Справочники → ReferencesTab (workspace/references): CRUD должностей
+                 (/api/workspace/positions) и статусов задач (/api/workspace/task-statuses).
    - Интеграции / Оплата → контракта пока НЕТ → честный EmptyState, кнопка
                  подключения disabled (demoAction). Не фейковые формы.
    Переключение на боевой = apiOrigin. Данные in-memory.
    ============================================================ */
 
-type Tab = "profile" | "notifications" | "integrations" | "billing";
+type Tab = "profile" | "notifications" | "references" | "integrations" | "billing";
 const TAB_OPTIONS: { value: Tab; label: string }[] = [
   { value: "profile", label: "Профиль" },
   { value: "notifications", label: "Уведомления" },
+  { value: "references", label: "Справочники" },
   { value: "integrations", label: "Интеграции" },
   { value: "billing", label: "Оплата" }
 ];
@@ -51,7 +55,7 @@ export function SettingsSurface() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Настройки рабочей области</h1>
-            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Профиль, уведомления, интеграции и оплата</p>
+            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Профиль, уведомления, справочники, интеграции и оплата</p>
           </div>
           <Segmented name="settings-tab" value={tab} onChange={setTab} options={TAB_OPTIONS} />
         </div>
@@ -61,6 +65,8 @@ export function SettingsSurface() {
             <ProfileTab />
           ) : tab === "notifications" ? (
             <NotificationsPrefs />
+          ) : tab === "references" ? (
+            <ReferencesTab />
           ) : tab === "integrations" ? (
             <IntegrationsTab />
           ) : (
@@ -169,8 +175,9 @@ function ProtoBanner() {
     <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--text-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
       <span>
-        Вкладки «Профиль» (GET /api/auth/me + PATCH /api/profile[/theme]) и «Уведомления» (PUT /notification-preferences) —
-        на боевых контрактах через contract-mock. «Интеграции» и «Оплата» — контракта пока нет (честный EmptyState).
+        Вкладки «Профиль» (GET /api/auth/me + PATCH /api/profile[/theme]), «Уведомления» (PUT /notification-preferences)
+        и «Справочники» (CRUD /api/workspace/positions и /api/workspace/task-statuses) — на боевых контрактах через
+        contract-mock. «Интеграции» и «Оплата» — контракта пока нет (честный EmptyState).
         Переключение на боевой = apiOrigin; данные in-memory.
       </span>
     </div>

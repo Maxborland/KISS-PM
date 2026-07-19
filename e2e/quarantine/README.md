@@ -25,10 +25,16 @@ planning-спеки) сознательно отложено до PR Planning Co
 | `planning/resource-matrix.spec.ts` | `planning-resource-matrix(-nav)`; проект `project-alpha` не сидируется | Переписать на живую матрицу ресурсов + сидированный проект |
 | `planning/cross-project-drilldown.spec.ts` | `resource-day-drawer`, `resource-matrix-cell-*`; `project-alpha` не сидируется | Кросс-проектный drilldown — переписать на живой UI матрицы |
 | `planning/settings.spec.ts` | `planning-settings-pane`, `calendar-preview-summary`; `project-alpha` не сидируется | Переписать на текущие настройки проекта + сидированный проект |
-| `admin/absences.spec.ts` | роут `/settings/absences` не имеет страницы; testid'ы `absences-*` | Вернуть вместе со страницей отсутствий, когда она появится |
-| `admin/org-structure.spec.ts` | роут `/settings/org-structure` не имеет страницы; `org-structure-*` | Вернуть вместе со страницей оргструктуры |
-| `admin/production-calendar.spec.ts` | роут `/settings/production-calendar` не имеет страницы | Вернуть вместе со страницей производственного календаря |
+| `admin/org-structure.spec.ts` | страницы оргструктуры нет и в новой админке (`/admin/*` — Блок 11 добавил отсутствия/произв. календарь/фоновые задачи, оргструктуру — нет); `org-structure-*` (0 совпадений) | Вернуть вместе со страницей оргструктуры |
 | `smoke/crm-activity.spec.ts` | роуты `/opportunities/:id`, `/clients/:id`, `/contacts/:id`, `/products/:id` без страниц; якоря секций (0 совпадений) | Переписать на живые карточки `/crm/deals/:id` и т.д. |
 | `smoke/crm-entity-template.spec.ts` | те же отсутствующие entity-роуты | Переписать на живые CRM-страницы сущностей |
 | `smoke/production-business-flow.spec.ts` | роут `/projects/:id/timeline` отсутствует; кнопки «Подготовить сверку»/«Подготовить предложение» и 5 тостов (0 совпадений где-либо) | Бизнес-флоу ценен — пересобрать по живым роутам поставки |
 | `smoke/task-workspace.spec.ts` | старый v3-UI: кнопка «Моя работа», «+ Добавить задачу», «Создать и открыть», «Включить массовый режим», `.task-kanban-column` (всё 0 совпадений) | Переписать на текущий task-workspace (`/my-work`, канбан задач) |
+
+Возвращены из карантина (Блок 11 — страницы появились в `/admin/*`, спеки переписаны на живые якоря):
+
+- `admin/absences.spec.ts` → `e2e/smoke/admin-absences.spec.ts` — живой роут `/admin/absences`,
+  обязательный выбор сотрудника в форме, удаление через ConfirmDialog (прогон повторяемый).
+- `admin/production-calendar.spec.ts` → `e2e/smoke/admin-production-calendar.spec.ts` — живой роут
+  `/admin/production-calendar`; кнопки «Применить пресет» в живом UI нет (контракт — базовая неделя +
+  исключения), проверяются грид, смена года и открытие формы исключения.
