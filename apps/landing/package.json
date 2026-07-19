@@ -16,9 +16,9 @@
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
-    "@astrojs/mdx": "^4.0.0",
-    "@astrojs/node": "^9.0.0",
-    "@astrojs/react": "^4.1.0",
+    "@astrojs/mdx": "^7.0.3",
+    "@astrojs/node": "^11.0.2",
+    "@astrojs/react": "^6.0.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
@@ -29,7 +29,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.184.1",
-    "astro": "^5.13.0",
+    "astro": "^7.1.1",
     "better-sqlite3": "^11.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -45,8 +45,8 @@
     "@storybook/react": "^8.6.18",
     "@storybook/react-vite": "^8.6.18",
     "@storybook/test": "^8.6.18",
-    "happy-dom": "^15.11.7",
+    "happy-dom": "^20.11.0",
     "storybook": "^8.6.18",
-    "vitest": "^3.1.4"
+    "vitest": "^3.2.7"
   }
 }

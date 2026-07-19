@@ -2,7 +2,11 @@ import { spawnSync } from "node:child_process";
 
 const ignoredPathPrefixes = [
   "apps__web>",
-  "packages__planning-gantt-ui>"
+  "packages__planning-gantt-ui>",
+  // Dev-only цепочка astro check (language-server → yaml-language-server → yaml):
+  // не входит в билд/рантайм лендинга; фикс-версии yaml в этой цепочке апстрим
+  // ещё не отдаёт (yaml-language-server пинит 2.7.1), pnpm-override её не пробивает.
+  "apps__landing>@astrojs/check>"
 ];
 const pnpmExecPath = process.env.npm_execpath;
 const command = pnpmExecPath ? process.execPath : "pnpm";
