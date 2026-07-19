@@ -82,7 +82,7 @@ if (dataSource && runtimeConfig.backgroundJobsEnabled) {
     const seeded = await ensureDefaultBackgroundJobSchedules({ dataSource });
     if (seeded.status === "seeded") {
       console.log(
-        `KISS PM background job schedules seeded: ${seeded.schedules} schedules across ${seeded.tenants} tenants`
+        `KISS PM background job schedules seeded: ${seeded.created} created, ${seeded.existing} preserved across ${seeded.tenants} tenants`
       );
     }
   } catch (error) {

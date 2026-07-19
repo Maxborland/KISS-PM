@@ -21,37 +21,41 @@ export function defaultBackgroundJobScheduleKey(kind: BackgroundJobKind): string
 }
 
 export type EnsureDefaultBackgroundJobSchedulesResult =
-  | { status: "seeded"; tenants: number; schedules: number }
+  | { status: "seeded"; tenants: number; created: number; existing: number }
   | { status: "skipped"; reason: "background_job_seed_data_source_incomplete" };
 
-// Идемпотентный сид per-tenant дефолтных расписаний maintenance-джоб. Вызывается
-// в server.ts перед первым poll воркера. upsertBackgroundJobSchedule конфликтует
-// по (tenant_id, schedule_key) — повторный старт не плодит дубли, а стабильный
-// id `sched-<tenantId>-<kind>` используется только при первой вставке (id — text
-// без ограничения длины, PK (tenant_id, id)). nextRunAt = now: первый тик
-// воркера выполняет maintenance сразу.
+// Идемпотентный сид per-tenant дефолтных расписаний maintenance-джоб.
+// Вызывается в server.ts перед первым poll воркера и из регистрации workspace
+// (tenantIds = [новый тенант]) — тенанты, созданные после старта, не остаются
+// без maintenance до рестарта. Вставка — insertBackgroundJobScheduleIfMissing
+// (ON CONFLICT DO NOTHING по (tenant_id, schedule_key)): существующие строки
+// НЕ трогаются — выключенное или отложенное оператором расписание переживает
+// рестарт. nextRunAt = now только для НОВЫХ строк: их первый тик — сразу.
 export async function ensureDefaultBackgroundJobSchedules(input: {
   dataSource: Partial<BackgroundJobScheduleSeedDataPort>;
+  tenantIds?: readonly string[];
   now?: Date;
   warn?: (message: string) => void;
 }): Promise<EnsureDefaultBackgroundJobSchedulesResult> {
   const warn = input.warn ?? ((message: string) => console.warn(message));
-  const { listTenants, upsertBackgroundJobSchedule } = input.dataSource;
-  if (!listTenants || !upsertBackgroundJobSchedule) {
+  const { listTenants, insertBackgroundJobScheduleIfMissing } = input.dataSource;
+  if (!insertBackgroundJobScheduleIfMissing || (!input.tenantIds && !listTenants)) {
     // Fail-soft: Partial-датасорс без нужных методов — воркер стартует без
     // сида, maintenance-расписания придётся завести иным путём.
-    warn("background_jobs_seed_skipped: data source lacks listTenants/upsertBackgroundJobSchedule");
+    warn("background_jobs_seed_skipped: data source lacks listTenants/insertBackgroundJobScheduleIfMissing");
     return { status: "skipped", reason: "background_job_seed_data_source_incomplete" };
   }
 
   const now = input.now ?? new Date();
-  const tenants = await listTenants.call(input.dataSource);
-  let schedules = 0;
-  for (const tenant of tenants) {
+  const tenantIds =
+    input.tenantIds ?? (await listTenants!.call(input.dataSource)).map((tenant) => tenant.id);
+  let created = 0;
+  let existing = 0;
+  for (const tenantId of tenantIds) {
     for (const seed of defaultBackgroundJobScheduleSeeds) {
-      await upsertBackgroundJobSchedule.call(input.dataSource, {
-        id: `sched-${tenant.id}-${seed.kind}`,
-        tenantId: tenant.id,
+      const inserted = await insertBackgroundJobScheduleIfMissing.call(input.dataSource, {
+        id: `sched-${tenantId}-${seed.kind}`,
+        tenantId,
         kind: seed.kind,
         scheduleKey: defaultBackgroundJobScheduleKey(seed.kind),
         payload: {},
@@ -59,8 +63,9 @@ export async function ensureDefaultBackgroundJobSchedules(input: {
         enabled: true,
         nextRunAt: now
       });
-      schedules += 1;
+      if (inserted) created += 1;
+      else existing += 1;
     }
   }
-  return { status: "seeded", tenants: tenants.length, schedules };
+  return { status: "seeded", tenants: tenantIds.length, created, existing };
 }

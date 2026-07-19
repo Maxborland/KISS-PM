@@ -5,6 +5,8 @@ import {
 } from "@kiss-pm/domain";
 import { hashPassword, hashResetToken, hashSessionToken } from "@kiss-pm/persistence";
 import { createTenantAdminSeedProfile } from "@kiss-pm/persistence";
+
+import { ensureDefaultBackgroundJobSchedules } from "./backgroundJobs/ensureDefaultBackgroundJobSchedules";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Context } from "hono";
 import { getClientIp } from "./authRateLimit";
@@ -245,6 +247,15 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
 
         return user;
       });
+
+      // Тенант, созданный после старта API, не должен ждать рестарта, чтобы
+      // получить maintenance-расписания (ревью #258): сид точечный и fail-soft —
+      // ошибка не ломает регистрацию, воркер подхватит строки на ближайшем тике.
+      try {
+        await ensureDefaultBackgroundJobSchedules({ dataSource, tenantIds: [tenantId] });
+      } catch (error) {
+        console.warn("background_jobs_seed_on_register_failed", error);
+      }
 
       await deps.authRateLimiter.recordSuccess(rateLimitInput, {
         reserved: reservedAttempt

@@ -9,17 +9,23 @@ import {
   ensureDefaultBackgroundJobSchedules
 } from "./ensureDefaultBackgroundJobSchedules";
 
-function createFakeSeedDataSource(tenantIds: string[]): {
+function createFakeSeedDataSource(tenantIds: string[], options: { existingKeys?: Set<string> } = {}): {
   dataSource: BackgroundJobScheduleSeedDataPort;
   upsertCalls: BackgroundJobScheduleInput[];
 } {
   const upsertCalls: BackgroundJobScheduleInput[] = [];
+  const existingKeys = options.existingKeys ?? new Set<string>();
   const dataSource: BackgroundJobScheduleSeedDataPort = {
     async listTenants() {
       return tenantIds.map((id) => ({ id, name: `Tenant ${id}` }));
     },
-    async upsertBackgroundJobSchedule(input) {
+    // Семантика ON CONFLICT DO NOTHING: существующая строка не трогается,
+    // вызов возвращает undefined.
+    async insertBackgroundJobScheduleIfMissing(input) {
       upsertCalls.push(input);
+      const key = `${input.tenantId}|${input.scheduleKey}`;
+      if (existingKeys.has(key)) return undefined;
+      existingKeys.add(key);
       return toSchedule(input);
     }
   };
@@ -42,7 +48,7 @@ describe("ensureDefaultBackgroundJobSchedules", () => {
 
     const result = await ensureDefaultBackgroundJobSchedules({ dataSource, now });
 
-    expect(result).toEqual({ status: "seeded", tenants: 2, schedules: 6 });
+    expect(result).toEqual({ status: "seeded", tenants: 2, created: 6, existing: 0 });
     expect(upsertCalls).toHaveLength(6);
     expect(upsertCalls.map((call) => [call.tenantId, call.scheduleKey])).toEqual([
       ["tenant-a", "default:storage.asset_cleanup"],
@@ -78,31 +84,42 @@ describe("ensureDefaultBackgroundJobSchedules", () => {
     }
   });
 
-  it("is idempotent: a second run targets the same (tenantId, scheduleKey, id) upsert keys", async () => {
+  it("идемпотентен и сохраняет состояние оператора: повторный запуск не пересоздаёт строки", async () => {
     const { dataSource, upsertCalls } = createFakeSeedDataSource(["tenant-a", "tenant-b"]);
 
-    await ensureDefaultBackgroundJobSchedules({ dataSource });
-    const firstRunKeys = upsertCalls.map((call) =>
-      [call.tenantId, call.scheduleKey, call.id].join("|")
-    );
+    const first = await ensureDefaultBackgroundJobSchedules({ dataSource });
+    expect(first).toEqual({ status: "seeded", tenants: 2, created: 6, existing: 0 });
     upsertCalls.length = 0;
-    await ensureDefaultBackgroundJobSchedules({ dataSource });
-    const secondRunKeys = upsertCalls.map((call) =>
-      [call.tenantId, call.scheduleKey, call.id].join("|")
-    );
 
-    // Конфликтный ключ upsert в persistence — (tenant_id, schedule_key):
-    // одинаковые ключи между запусками означают update, а не дубли строк.
-    expect(secondRunKeys).toEqual(firstRunKeys);
-    expect(new Set(firstRunKeys).size).toBe(firstRunKeys.length);
+    // Второй старт (после рестарта API): все строки уже существуют — DO NOTHING,
+    // enabled/nextRunAt оператора не перезатираются (ревью #258).
+    const second = await ensureDefaultBackgroundJobSchedules({ dataSource });
+    expect(second).toEqual({ status: "seeded", tenants: 2, created: 0, existing: 6 });
+    const keys = upsertCalls.map((call) => [call.tenantId, call.scheduleKey, call.id].join("|"));
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it("fail-soft: warns and performs zero upserts when listTenants is unavailable", async () => {
-    const upsertBackgroundJobSchedule = vi.fn();
+  it("tenantIds: точечный сид нового тенанта без listTenants (регистрация workspace)", async () => {
+    const insertBackgroundJobScheduleIfMissing = vi.fn(async (input: BackgroundJobScheduleInput) => toSchedule(input));
+
+    const result = await ensureDefaultBackgroundJobSchedules({
+      dataSource: { insertBackgroundJobScheduleIfMissing },
+      tenantIds: ["tenant-new"]
+    });
+
+    expect(result).toEqual({ status: "seeded", tenants: 1, created: 3, existing: 0 });
+    expect(insertBackgroundJobScheduleIfMissing).toHaveBeenCalledTimes(3);
+    expect(insertBackgroundJobScheduleIfMissing.mock.calls.map(([input]) => input.tenantId)).toEqual([
+      "tenant-new", "tenant-new", "tenant-new"
+    ]);
+  });
+
+  it("fail-soft: warns and performs zero inserts when listTenants is unavailable", async () => {
+    const insertBackgroundJobScheduleIfMissing = vi.fn();
     const warn = vi.fn();
 
     const result = await ensureDefaultBackgroundJobSchedules({
-      dataSource: { upsertBackgroundJobSchedule },
+      dataSource: { insertBackgroundJobScheduleIfMissing },
       warn
     });
 
@@ -111,10 +128,10 @@ describe("ensureDefaultBackgroundJobSchedules", () => {
       reason: "background_job_seed_data_source_incomplete"
     });
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(upsertBackgroundJobSchedule).not.toHaveBeenCalled();
+    expect(insertBackgroundJobScheduleIfMissing).not.toHaveBeenCalled();
   });
 
-  it("fail-soft: warns when upsertBackgroundJobSchedule is unavailable", async () => {
+  it("fail-soft: warns when insertBackgroundJobScheduleIfMissing is unavailable", async () => {
     const listTenants = vi.fn();
     const warn = vi.fn();
 

@@ -15,7 +15,7 @@ export type AuditDataPort = Pick<ApiTenantDataSource, "appendAuditEvent" | "list
 
 export type BackgroundJobScheduleSeedDataPort = Pick<
   ApiTenantDataSource,
-  "listTenants" | "upsertBackgroundJobSchedule"
+  "listTenants" | "insertBackgroundJobScheduleIfMissing"
 >;
 
 export type EntityLookupDataPort = Pick<

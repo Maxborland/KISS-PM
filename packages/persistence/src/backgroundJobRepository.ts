@@ -81,6 +81,11 @@ export type BackgroundJobRepository = {
     limit: number;
   }): Promise<BackgroundJobEvent[]>;
   upsertBackgroundJobSchedule(input: BackgroundJobScheduleInput): Promise<BackgroundJobSchedule>;
+  /** Сид-вставка: НЕ трогает существующую строку (enabled/nextRunAt оператора
+      сохраняются); undefined = расписание уже существовало. */
+  insertBackgroundJobScheduleIfMissing(
+    input: BackgroundJobScheduleInput
+  ): Promise<BackgroundJobSchedule | undefined>;
   listDueBackgroundJobSchedules(input: {
     now: Date;
     limit: number;
@@ -350,6 +355,28 @@ export function createBackgroundJobRepository(db: KissPmDatabase): BackgroundJob
         .returning();
       if (!row) throw new Error("Background job schedule upsert returned no row");
       return mapBackgroundJobSchedule(row);
+    },
+    async insertBackgroundJobScheduleIfMissing(input) {
+      const now = new Date();
+      const [row] = await db
+        .insert(backgroundJobSchedules)
+        .values({
+          id: input.id,
+          tenantId: input.tenantId,
+          kind: input.kind,
+          scheduleKey: input.scheduleKey,
+          payload: input.payload,
+          intervalSeconds: input.intervalSeconds,
+          enabled: input.enabled,
+          nextRunAt: input.nextRunAt,
+          createdAt: now,
+          updatedAt: now
+        })
+        .onConflictDoNothing({
+          target: [backgroundJobSchedules.tenantId, backgroundJobSchedules.scheduleKey]
+        })
+        .returning();
+      return row ? mapBackgroundJobSchedule(row) : undefined;
     },
     async listDueBackgroundJobSchedules(input) {
       const rows = await db
