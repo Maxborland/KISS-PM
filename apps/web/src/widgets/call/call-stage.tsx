@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CircleDot,
   Mic,
   MicOff,
   PhoneOff,
@@ -45,7 +46,15 @@ export function CallStage({ view, controls, handlers, disabled }: CallStageProps
     <section className="call-stage" aria-label="Звонок команды">
       <header className="call-stage__head">
         <span className="call-stage__title">Звонок команды</span>
-        <span className="call-stage__phase">{PHASE_LABEL[view.phase]}</span>
+        <span className="call-stage__status">
+          {/* Индикация записи видна всем участникам — не только тому, кто ей управляет. */}
+          {controls.recordingOn ? (
+            <span className="call-stage__recording" role="status">
+              <span className="call-stage__recording-dot" aria-hidden /> Идёт запись
+            </span>
+          ) : null}
+          <span className="call-stage__phase">{PHASE_LABEL[view.phase]}</span>
+        </span>
       </header>
 
       <div
@@ -116,6 +125,37 @@ export function CallStage({ view, controls, handlers, disabled }: CallStageProps
           >
             <Sparkles aria-hidden size={18} />
             <span>Фон</span>
+          </button>
+        ) : controls.backgroundUnavailableReason ? (
+          /* Честный гейт (Н9): браузер умеет эффекты, но активы не развёрнуты в сборке —
+             контрол задизейблен с причиной в тултипе вместо молчаливого no-op. */
+          <button
+            type="button"
+            className="call-controls__btn call-controls__btn--off"
+            aria-label="Сменить фон"
+            aria-disabled="true"
+            disabled
+            title={controls.backgroundUnavailableReason}
+          >
+            <Sparkles aria-hidden size={18} />
+            <span>Фон</span>
+          </button>
+        ) : null}
+
+        {controls.recordingAvailable ? (
+          /* Запись (Н11): рендерится только при работающем пути (egress настроен,
+             manage-право, LiveKit-комната) — capability-гейт вместо мёртвой кнопки. */
+          <button
+            type="button"
+            className={cn("call-controls__btn", controls.recordingOn && "call-controls__btn--active")}
+            aria-pressed={controls.recordingOn ?? false}
+            aria-label={controls.recordingOn ? "Остановить запись" : "Начать запись"}
+            disabled={disabled || controls.recordingBusy}
+            title={disabled ? "Демо Storybook: подключение медиа отключено" : undefined}
+            onClick={handlers?.onToggleRecording}
+          >
+            <CircleDot aria-hidden size={18} />
+            <span>Запись</span>
           </button>
         ) : null}
 

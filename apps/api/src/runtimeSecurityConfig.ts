@@ -15,7 +15,12 @@ export function readRuntimeSecurityConfig(
     secureCookies: readSecureCookiePolicy(env)
   };
   const planningEventsRedisUrl = readSecureRedisPolicy({
-      allowInsecure: env.PLANNING_EVENTS_REDIS_ALLOW_INSECURE === "true",
+      // Workspace-шина использует тот же Redis URL: её insecure-override обязан
+      // приниматься и здесь, иначе деплой только с WORKSPACE_EVENTS_BACKEND=redis
+      // + WORKSPACE_EVENTS_REDIS_ALLOW_INSECURE=true падал бы на старте (ревью #261).
+      allowInsecure:
+        env.PLANNING_EVENTS_REDIS_ALLOW_INSECURE === "true" ||
+        env.WORKSPACE_EVENTS_REDIS_ALLOW_INSECURE === "true",
       production,
       url: env.PLANNING_EVENTS_REDIS_URL ?? env.REDIS_URL
   });

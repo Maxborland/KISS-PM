@@ -5,6 +5,12 @@ import { ProjectSchedule } from "./schedule-surface";
 
 let permissions: string[] = [];
 
+// SSE-подписка плана: в юнитах не открываем EventSource (happy-dom полез бы в сеть) — noop-подписка
+vi.mock("@kiss-pm/planning-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  subscribeToPlanEvents: () => ({ unsubscribe() {} })
+}));
+
 vi.mock("@/shell/use-session-user", () => ({
   useSessionUser: () => ({ id: "user", name: "Test User", permissions })
 }));

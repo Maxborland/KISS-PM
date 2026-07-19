@@ -68,6 +68,12 @@ const applyScenario = vi.fn();
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
+// SSE-подписка плана: в юнитах не открываем EventSource (happy-dom полез бы в сеть) — noop-подписка
+vi.mock("@kiss-pm/planning-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  subscribeToPlanEvents: () => ({ unsubscribe() {} })
+}));
+
 vi.mock("@/shell/use-session-user", () => ({
   useSessionUser: () => ({ id: "user", name: "Test User", permissions })
 }));

@@ -9,8 +9,16 @@ import {
 } from "@kiss-pm/domain";
 
 import type { ApiTenantDataSource } from "./apiTypes";
+import { deferUntilTransactionCommit } from "./afterCommitQueue";
+import { emitNotificationCreated } from "./workspaceEventBus";
 
 type NotificationDataPort = Pick<ApiTenantDataSource, "createUserNotification">;
+
+// P8 realtime: паритет с mention-путём collaborationRoutes — каждое персистентное
+// уведомление сопровождается notification.created в user-канал получателя (SSE →
+// бейдж/лента обновляются push'ем). Эмит отложен до коммита внешней транзакции
+// (afterCommitQueue): до-коммитный эмит давал refetch по старому состоянию без
+// повторного события; при откате очередь отбрасывается — фантомных событий нет.
 
 export async function persistPlanningNotifications(input: {
   dataSource: NotificationDataPort;
@@ -33,6 +41,11 @@ export async function persistPlanningNotifications(input: {
       tenantId: input.tenantId,
       ...notification
     });
+    // После коммита обёртки-транзакции (ревью #261): эмит до коммита обгонял
+    // refetch клиента; вне транзакции срабатывает немедленно.
+    deferUntilTransactionCommit(() =>
+      emitNotificationCreated(notification.userId, notification.notificationType)
+    );
   }
 }
 
@@ -58,5 +71,10 @@ export async function persistControlSignalNotifications(input: {
       tenantId: input.tenantId,
       ...notification
     });
+    // После коммита обёртки-транзакции (ревью #261): эмит до коммита обгонял
+    // refetch клиента; вне транзакции срабатывает немедленно.
+    deferUntilTransactionCommit(() =>
+      emitNotificationCreated(notification.userId, notification.notificationType)
+    );
   }
 }

@@ -4,9 +4,12 @@
  *   user:{userId}          — уведомления текущего пользователя (notification.created)
  *   conversation:{convId}  — сообщения беседы (message.created)
  *
- * ponytail: in-memory publisher (один процесс). Для многоинстансного прода —
- * Redis pub/sub по образцу planningRedisEventBus; подключить когда появится >1 реплики.
+ * Бекенды: in-memory publisher (один процесс, дефолт) либо Redis pub/sub
+ * (workspaceRedisEventBus) для >1 реплики — выбирается на буте сервера через
+ * bootstrapWorkspaceEventPublisher (WORKSPACE_EVENTS_BACKEND, по умолчанию
+ * наследует PLANNING_EVENTS_BACKEND).
  */
+import { parseWorkspaceEventsBackend } from "./serverConfig";
 import type { PresenceStatus } from "./presenceStore";
 
 export type WorkspaceRealtimeEvent =
@@ -19,6 +22,7 @@ export type WorkspaceEventListener = (event: WorkspaceRealtimeEvent) => void;
 export interface WorkspaceEventPublisher {
   publish(channel: string, event: WorkspaceRealtimeEvent): void;
   subscribe(channel: string, listener: WorkspaceEventListener): () => void;
+  close?(): Promise<void>;
 }
 
 export class InMemoryWorkspaceEventPublisher implements WorkspaceEventPublisher {
@@ -50,6 +54,30 @@ function getWorkspaceEventPublisher(): WorkspaceEventPublisher {
 
 export function setWorkspaceEventPublisher(next: WorkspaceEventPublisher): void {
   publisher = next;
+}
+
+/**
+ * Async-фабрика для бута сервера (зеркало bootstrapPlanningEventPublisher):
+ * при redis-бекенде и доступном Redis возвращает Redis-publisher, иначе in-memory.
+ * В production недоступный Redis — fail-fast: молчаливый даунгрейд до in-memory
+ * ломал бы чат/бейджи между репликами незаметно.
+ */
+export async function bootstrapWorkspaceEventPublisher(): Promise<WorkspaceEventPublisher> {
+  const backend = parseWorkspaceEventsBackend(
+    process.env.WORKSPACE_EVENTS_BACKEND,
+    process.env.PLANNING_EVENTS_BACKEND
+  );
+  const memory = new InMemoryWorkspaceEventPublisher();
+  if (backend === "redis") {
+    const { createRedisWorkspaceEventPublisher } = await import("./workspaceRedisEventBus.js");
+    const redis = await createRedisWorkspaceEventPublisher(memory);
+    if (redis) return redis;
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("workspace_events_redis_unavailable");
+    }
+    console.warn("[workspace-events] Redis unavailable, falling back to in-memory publisher");
+  }
+  return memory;
 }
 
 export const userChannel = (userId: string): string => `user:${userId}`;

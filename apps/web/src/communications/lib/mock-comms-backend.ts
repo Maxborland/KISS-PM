@@ -1430,7 +1430,7 @@ export function createMockCommsFetch(): typeof fetch {
       return json({ callRoom: serializeCallRoom(created), event }, 201);
     }
 
-    /* 19) GET /call-rooms/:roomId — комната + последние 50 событий + записи. */
+    /* 19) GET /call-rooms/:roomId — комната + последние 50 событий + записи + capabilities. */
     const callRoomGet = method === "GET" ? path.match(/^\/api\/workspace\/call-rooms\/([^/]+)$/) : null;
     if (callRoomGet) {
       const resolved = resolveCallRoom(callRoomGet[1]!);
@@ -1440,7 +1440,14 @@ export function createMockCommsFetch(): typeof fetch {
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
         .slice(0, 50);
       const recordings = db.callRecordings.filter((r) => r.roomId === resolved.room.id);
-      return json({ callRoom: serializeCallRoom(resolved.room), events, recordings });
+      // capabilities зеркалят боевой контракт: провайдер мока = MOCK_VIDEO_PROVIDER,
+      // egress в моке отсутствует, RBAC-стаб отдаёт manage=true.
+      return json({
+        callRoom: serializeCallRoom(resolved.room),
+        events,
+        recordings,
+        capabilities: { videoProviderKind: MOCK_VIDEO_PROVIDER, egressEnabled: false, canManage: true }
+      });
     }
 
     /* 20) POST /call-rooms/:roomId/sessions/start — старт сессии (room→active; 409 already_active). */
@@ -2031,6 +2038,41 @@ export function createMockCommsFetch(): typeof fetch {
        Мок отдаёт единственный демо-проект DEMO_ENTITY, чтобы stories работали как раньше. */
     if (method === "GET" && path === "/api/workspace/projects") {
       return json({ projects: [{ id: DEMO_ENTITY.entityId, title: "Производственный портал" }] });
+    }
+
+    /* 38) GET /sticker-packs — паки со стикерами (боевой контракт communicationUpgradeRoutes:
+       serializeStickerPack + вложенные serializeStickerAsset). Мок оборачивает сид-ассеты
+       в один пак; downloadUrl пуст — бинарного стора у мока нет, UI честно рендерит emoji. */
+    if (method === "GET" && path === "/api/workspace/sticker-packs") {
+      return json({
+        stickerPacks: [
+          {
+            id: "sticker-pack-seed",
+            title: "Базовый набор",
+            description: null,
+            source: "upload",
+            status: "ready",
+            createdByUserId: CURRENT_ACTOR_ID,
+            createdAt: "2026-01-10T00:00:00.000Z",
+            archivedAt: null,
+            stickers: db.stickerAssets.map((sticker) => ({
+              id: sticker.id,
+              packId: "sticker-pack-seed",
+              downloadUrl: "",
+              emoji: sticker.emoji,
+              title: sticker.title,
+              tags: [],
+              mimeType: "image/png",
+              width: 0,
+              height: 0,
+              sizeBytes: 0,
+              status: "ready",
+              createdAt: "2026-01-10T00:00:00.000Z",
+              archivedAt: null
+            }))
+          }
+        ]
+      });
     }
 
     /* Общий 404 fallback (неизвестная ручка). */

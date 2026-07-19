@@ -14,12 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/cn";
 import { CommsFrame } from "@/communications/ui/comms-frame";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
-import { useCommsUsers, useConversation, useDirectMessages, usePresence, type CommsUsersDir } from "@/communications/lib/use-comms";
+import { useCommsUsers, useConversation, useDirectMessages, usePresence, useStickerPacks, type CommsUsersDir, type StickerPacksState } from "@/communications/lib/use-comms";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import { useCommsRuntime } from "@/communications/lib/comms-runtime";
 import { useCommsEntityScope, type CommsScopeState } from "@/communications/lib/entity-scope";
 import { avatarColor, commsErr, initials, PresenceDot, relTime, UnreadDot } from "@/communications/lib/comms-bits";
-import type { Conversation, DirectConversation, EntityType, Message, PresenceStatus, Reaction } from "@/communications/lib/comms-client";
+import type { Conversation, DirectConversation, EntityType, Message, PresenceStatus, Reaction, Sticker } from "@/communications/lib/comms-client";
 
 /* ============================================================
    Поверхность ЧАТ блока «Коммуникации».
@@ -46,15 +46,44 @@ function useSelfUserId(live: boolean): string {
   return id;
 }
 
-// Сид-стикеры (StickerAsset не отдаётся клиентом отдельным методом — берём из сид-набора).
-const STICKERS: { id: string; emoji: string; title: string }[] = [
-  { id: "sticker-thumbsup", emoji: "👍", title: "Палец вверх" },
-  { id: "sticker-party", emoji: "🎉", title: "Праздник" }
-];
-const stickerEmoji = (id: string): string => STICKERS.find((s) => s.id === id)?.emoji ?? "🏷️";
+// Н11: справочник стикеров (id → asset) из реального GET /sticker-packs — для рендера
+// стикеров ленты/pinned-баннера. Пустая Map, пока паки не загрузились/недоступны:
+// неизвестный id честно деградирует до 🏷️.
+const StickerDirContext = createContext<ReadonlyMap<string, Sticker>>(new Map());
+
+// Рендер стикера сообщения: файл пака → <img downloadUrl>, без файла (contract-mock) —
+// emoji-шорткод; неизвестный/архивный id → 🏷️.
+function StickerGlyph({ sticker }: { sticker: Sticker | undefined }) {
+  if (sticker?.downloadUrl) {
+    return <img src={sticker.downloadUrl} alt={sticker.title} title={sticker.title} className="mt-0.5 size-16 max-w-full object-contain" />;
+  }
+  return (
+    <div className="mt-0.5 text-[length:var(--text-28)] leading-none" title={sticker?.title ?? "Стикер"}>
+      {sticker?.emoji ?? "🏷️"}
+    </div>
+  );
+}
 
 // Быстрые реакции для попапа под сообщением.
 const QUICK_EMOJI = ["👍", "🎉", "❤️", "🔥", "👀", "✅"];
+
+// SSE-кадр message.created несёт сериализованное сообщение (wire-формат
+// collaborationRoutes.serializeMessageWithExtras — совпадает с Message клиента).
+// Минимальная проверка формы + дефолты для extras; непригодный кадр → null
+// (вызывающий делает refetch-фолбэк вместо слепого доверия кадру).
+function decodeRealtimeMessage(raw: unknown): Message | null {
+  if (!raw || typeof raw !== "object") return null;
+  const m = raw as Partial<Message>;
+  if (typeof m.id !== "string" || typeof m.conversationId !== "string" || typeof m.authorUserId !== "string" || typeof m.createdAt !== "string") {
+    return null;
+  }
+  return {
+    ...m,
+    body: typeof m.body === "string" ? m.body : "",
+    reactions: Array.isArray(m.reactions) ? m.reactions : [],
+    stickers: Array.isArray(m.stickers) ? m.stickers : []
+  } as Message;
+}
 
 // Scope сущности резолвится из реальных проектов воркспейса (WithCommsEntityScope);
 // явные entityType/entityId пропсы (встраивание, тесты) отключают резолв.
@@ -83,12 +112,20 @@ function ChatSurfaceScoped({ scopeState }: { scopeState: CommsScopeState }) {
   // Текущий пользователь из сессии (live) — для «своих» реакций/авторства.
   const { live } = useCommsRuntime();
   const me = useSelfUserId(live);
+  // Н11: стикер-паки из реального API — пикер композера + рендер стикеров ленты.
+  const stickerPacks = useStickerPacks();
 
   // P4.1/P4.3 realtime: в live-режиме сообщение/присутствие прилетают push'ем (SSE).
-  // onMessage → перечитываем ленту; onPresence → обновляем карту присутствия. В mock — no-op.
+  // onMessage → добавляем кадр в ленту с дедупликацией по id (applyIncomingMessage,
+  // как adoptServerIds агента: echo своего сообщения не дублируется); непригодный
+  // кадр → refetch-фолбэк. onPresence → обновляем карту присутствия. В mock — no-op.
   useWorkspaceRealtime({
     conversationId: data?.selectedConversationId ?? null,
-    onMessage: () => { void conv.reloadMessages(); },
+    onMessage: (event) => {
+      const message = decodeRealtimeMessage(event.message);
+      if (message) conv.applyIncomingMessage(message);
+      else void conv.reloadMessages();
+    },
     onPresence: (event) => presence.apply(event.userId, event.status)
   });
 
@@ -103,6 +140,7 @@ function ChatSurfaceScoped({ scopeState }: { scopeState: CommsScopeState }) {
 
   return (
     <SelfUserContext.Provider value={me}>
+    <StickerDirContext.Provider value={stickerPacks.stickers.byId}>
     <CommsFrame activeTab="Чат" subtitle={`Беседы · ${scope?.title ?? "Личные сообщения"}`} {...(scope?.picker ? { actions: scope.picker } : {})}>
       <div className="flex flex-col gap-3">
         {!live ? <PrototypeBanner /> : null}
@@ -139,7 +177,7 @@ function ChatSurfaceScoped({ scopeState }: { scopeState: CommsScopeState }) {
                 />
               </div>
               {selected ? (
-                <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} users={users} presenceOf={presence.status} />
+                <ChatPane key={selected.id} conv={conv} conversation={selected} messages={data.messages} users={users} presenceOf={presence.status} stickerPacks={stickerPacks} />
               ) : (
                 <div className="grid min-h-[480px] place-items-center rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)]">
                   {scope ? (
@@ -156,6 +194,7 @@ function ChatSurfaceScoped({ scopeState }: { scopeState: CommsScopeState }) {
         </SurfaceState>
       </div>
     </CommsFrame>
+    </StickerDirContext.Provider>
     </SelfUserContext.Provider>
   );
 }
@@ -168,7 +207,7 @@ function PrototypeBanner() {
     <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
       <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
       <span>
-        Реальный контракт: /api/workspace/conversations (беседы сущности + readState), .../messages (отправка, правка, удаление, реакции, закрепление), .../read-state (прочитано). Данные in-memory. Realtime-доставка появится в приложении; здесь лента обновляется по действию.
+        Реальный контракт: /api/workspace/conversations (беседы сущности + readState), .../messages (отправка, правка, удаление, реакции, закрепление), .../read-state (прочитано), /sticker-packs (стикеры). Данные in-memory. В приложении лента живёт на SSE-push (message.created); в этом демо realtime-сервера нет — обновление по действию.
       </span>
     </div>
   );
@@ -372,15 +411,18 @@ function ChatPane({
   conversation,
   messages,
   users,
-  presenceOf
+  presenceOf,
+  stickerPacks
 }: {
   conv: ReturnType<typeof useConversation>;
   conversation: Conversation;
   messages: Message[];
   users: CommsUsersDir;
   presenceOf: (userId: string | null) => PresenceStatus;
+  stickerPacks: StickerPacksState;
 }) {
   const me = useContext(SelfUserContext);
+  const stickerDir = useContext(StickerDirContext);
   const [busy, setBusy] = useState(false);
   const cid = conversation.id;
   const unread = conversation.readState?.unreadCount ?? 0;
@@ -450,7 +492,7 @@ function ChatPane({
             <div key={m.id} className="flex items-center gap-2 text-[length:var(--text-xs)]">
               <Pin className="size-3 shrink-0 text-[var(--accent)]" aria-hidden />
               <span className="font-semibold text-[var(--muted-strong)]">{users.name(m.authorUserId)}:</span>
-              <span className="min-w-0 flex-1 truncate text-[var(--muted)]">{m.body || (m.stickers[0] ? stickerEmoji(m.stickers[0].stickerAssetId) : "—")}</span>
+              <span className="min-w-0 flex-1 truncate text-[var(--muted)]">{m.body || (m.stickers[0] ? stickerDir.get(m.stickers[0].stickerAssetId)?.emoji ?? "🏷️" : "—")}</span>
               {/* COMM-06: снять закрепление */}
               <button type="button" onClick={() => void run(() => conv.unpinMessage(cid, m.id), "Закрепление снято")} className="shrink-0 rounded-[var(--radius-sm)] p-0.5 text-[var(--muted-soft)] hover:bg-[var(--panel-strong)] hover:text-[var(--text-strong)]" title="Снять закрепление" aria-label="Снять закрепление"><X className="size-3" aria-hidden /></button>
             </div>
@@ -485,6 +527,7 @@ function ChatPane({
       {/* Композер */}
       <Composer
         busy={busy}
+        stickerPacks={stickerPacks}
         onSend={(body) => void run(() => conv.postMessage(cid, { body }))}
         onSticker={(stickerAssetId) => void run(() => conv.postMessage(cid, { stickerAssetId }))}
       />
@@ -513,6 +556,7 @@ function MessageBubble({
   onPin: () => void;
 }) {
   const me = useContext(SelfUserContext);
+  const stickerDir = useContext(StickerDirContext);
   const m = message;
   const mine = m.authorUserId === me;
   const archived = Boolean(m.archivedAt);
@@ -582,7 +626,7 @@ function MessageBubble({
           <>
             {m.body ? <p className="mt-0.5 whitespace-pre-wrap text-[length:var(--text-sm)] text-[var(--text)]">{m.body}</p> : null}
             {m.stickers.map((s) => (
-              <div key={s.stickerAssetId} className="mt-0.5 text-[length:var(--text-28)] leading-none" title="Стикер">{stickerEmoji(s.stickerAssetId)}</div>
+              <StickerGlyph key={s.stickerAssetId} sticker={stickerDir.get(s.stickerAssetId)} />
             ))}
           </>
         )}
@@ -675,10 +719,12 @@ function MenuItem({ icon, label, onClick, disabled, danger }: { icon: ReactNode;
 // Композер: textarea + «Отправить» (body) + кнопка-стикер (popover → postMessage stickerAssetId).
 function Composer({
   busy,
+  stickerPacks,
   onSend,
   onSticker
 }: {
   busy: boolean;
+  stickerPacks: StickerPacksState;
   onSend: (body: string) => void;
   onSticker: (stickerAssetId: string) => void;
 }) {
@@ -711,21 +757,36 @@ function Composer({
           <PopoverTrigger asChild>
             <Button variant="secondary" size="sm" disabled={busy} title="Отправить стикер"><Smile className="size-3.5" aria-hidden />Стикер</Button>
           </PopoverTrigger>
-          <PopoverContent align="start" className="w-auto p-1.5">
-            <div className="flex gap-1">
-              {STICKERS.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onSticker(s.id)}
-                  title={s.title}
-                  className="grid size-10 place-items-center rounded-[var(--radius-md)] text-[length:var(--text-h2)] hover:bg-[var(--panel-strong)] disabled:opacity-60"
-                >
-                  {s.emoji}
-                </button>
-              ))}
-            </div>
+          <PopoverContent align="start" className="w-auto max-w-[260px] p-1.5">
+            {/* Н11: стикеры из реального GET /sticker-packs; загрузка/ошибка/пусто — честные состояния. */}
+            {stickerPacks.status === "loading" ? (
+              <p className="px-2 py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Загрузка стикеров…</p>
+            ) : stickerPacks.status !== "ready" ? (
+              <p className="px-2 py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+                Стикеры недоступны: {commsErr(stickerPacks.error ?? undefined)}
+              </p>
+            ) : stickerPacks.stickers.list.length === 0 ? (
+              <p className="px-2 py-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Стикеров пока нет — в рабочей области не загружено ни одного пака.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1">
+                {stickerPacks.stickers.list.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onSticker(s.id)}
+                    title={s.title}
+                    className="grid size-10 place-items-center rounded-[var(--radius-md)] text-[length:var(--text-h2)] hover:bg-[var(--panel-strong)] disabled:opacity-60"
+                  >
+                    {s.downloadUrl ? (
+                      <img src={s.downloadUrl} alt={s.title} className="size-8 max-w-full object-contain" />
+                    ) : (
+                      s.emoji
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </PopoverContent>
         </Popover>
         <span className="text-[length:var(--text-2xs)] text-[var(--muted-soft)]">Тело или стикер обязательны</span>

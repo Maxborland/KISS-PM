@@ -175,6 +175,37 @@ export type MessageMention = {
   createdAt: string;
 };
 
+/* ---- СТИКЕР-ПАКИ (Н11) ---- */
+// Wire-формат communicationUpgradeRoutes: serializeStickerPack / serializeStickerAsset.
+export type StickerPack = {
+  id: string;
+  title: string;
+  description: string | null;
+  source: string;
+  status: string;
+  createdByUserId: string;
+  createdAt: string;
+  archivedAt: string | null;
+};
+
+// Стикер-ассет пака: файл-картинка (downloadUrl) + обязательный emoji-шорткод.
+// В contract-mock бинарного стора нет — downloadUrl пуст, UI рендерит emoji.
+export type Sticker = {
+  id: string;
+  packId: string;
+  downloadUrl: string;
+  emoji: string;
+  title: string;
+  tags: string[];
+  mimeType: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  status: string;
+  createdAt: string;
+  archivedAt: string | null;
+};
+
 /* ---- КАНАЛЫ ---- */
 // Серриализованный канал ОМИТ tenantId и ДОБАВЛЯЕТ canManage (server-computed boolean).
 export type Channel = {
@@ -266,6 +297,17 @@ export type VideoJoinContract = {
   joinUrl: string;
   token: string | null;
   expiresAt: string | null;
+};
+
+/* Способности деплоя/актора для честного гейтинга контролов звонка
+   (GET /call-rooms/:roomId → capabilities). videoProviderKind — настроенный
+   KISS_PM_VIDEO_PROVIDER ("disabled" = видеоподключение невозможно);
+   egressEnabled — серверная запись (LiveKit Egress) доступна;
+   canManage — manage-право актора на сущность комнаты. */
+export type CallRoomCapabilities = {
+  videoProviderKind: CallRoomProvider | "disabled";
+  egressEnabled: boolean;
+  canManage: boolean;
 };
 
 /* ---- МИТИНГИ ---- */
@@ -558,9 +600,14 @@ export function createCommsClient(options: CommsApiClientOptions) {
     createCallRoom(input: CallRoomCreateInput) {
       return requestJson<{ callRoom: CallRoom; event: CallEvent }>("/api/workspace/call-rooms", { method: "POST", body: JSON.stringify(input) });
     },
-    // 19) Комната + последние 50 событий + записи.
+    // 19) Комната + последние 50 событий + записи + capabilities (гейтинг контролов).
     getCallRoom(roomId: string) {
-      return requestJson<{ callRoom: CallRoom; events: CallEvent[]; recordings: CallRecording[] }>(`/api/workspace/call-rooms/${enc(roomId)}`);
+      return requestJson<{
+        callRoom: CallRoom;
+        events: CallEvent[];
+        recordings: CallRecording[];
+        capabilities?: CallRoomCapabilities;
+      }>(`/api/workspace/call-rooms/${enc(roomId)}`);
     },
     // 20) Стартовать сессию (room.status→active). Возвращает комнату + сессию + событие.
     startSession(roomId: string) {
@@ -689,6 +736,13 @@ export function createCommsClient(options: CommsApiClientOptions) {
     // поверхностей (чат/звонки/встречи). В моке отдаётся демо-проект proj-portal.
     listProjects() {
       return requestJson<{ projects: CommsProject[] }>("/api/workspace/projects");
+    },
+
+    /* ===== СТИКЕРЫ (Н11) ===== */
+    // 38) Стикер-паки тенанта со стикерами (communicationUpgradeRoutes:
+    // GET /sticker-packs, read-права коммуникаций; 501 без персистентности).
+    listStickerPacks() {
+      return requestJson<{ stickerPacks: (StickerPack & { stickers: Sticker[] })[] }>("/api/workspace/sticker-packs");
     }
   };
 }

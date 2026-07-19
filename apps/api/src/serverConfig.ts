@@ -5,6 +5,7 @@ const defaultPort = 4000;
 const defaultHostname = "127.0.0.1";
 
 export type PlanningEventsBackend = "memory" | "redis";
+export type WorkspaceEventsBackend = "memory" | "redis";
 
 export type ServerRuntimeConfig = {
   port: number;
@@ -13,6 +14,7 @@ export type ServerRuntimeConfig = {
   enableDevTenantRoutes: boolean;
   planningEventsBackend: PlanningEventsBackend;
   planningEventsRedisUrl: string | undefined;
+  workspaceEventsBackend: WorkspaceEventsBackend;
   backgroundJobsEnabled: boolean;
   backgroundJobsPollMs: number;
   production: boolean;
@@ -33,7 +35,14 @@ export function assertServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env) 
   if (planningEventsBackend === "redis" && !planningEventsRedisUrlFromEnv(env)) {
     throw new Error("planning_events_redis_url_required");
   }
-  if (planningEventsBackend === "redis") {
+  const workspaceEventsBackend = parseWorkspaceEventsBackend(
+    env.WORKSPACE_EVENTS_BACKEND,
+    env.PLANNING_EVENTS_BACKEND
+  );
+  if (workspaceEventsBackend === "redis" && !planningEventsRedisUrlFromEnv(env)) {
+    throw new Error("workspace_events_redis_url_required");
+  }
+  if (planningEventsBackend === "redis" || workspaceEventsBackend === "redis") {
     readRuntimeSecurityConfig(env);
   }
   parseBackgroundJobsPollMs(env.KISS_PM_BACKGROUND_JOBS_POLL_MS);
@@ -68,6 +77,10 @@ export function readServerRuntimeConfig(
     enableDevTenantRoutes: env.KISS_PM_ENABLE_DEV_ROUTES === "true",
     planningEventsBackend: parsePlanningEventsBackend(env.PLANNING_EVENTS_BACKEND),
     planningEventsRedisUrl: planningEventsRedisUrlFromEnv(env),
+    workspaceEventsBackend: parseWorkspaceEventsBackend(
+      env.WORKSPACE_EVENTS_BACKEND,
+      env.PLANNING_EVENTS_BACKEND
+    ),
     backgroundJobsEnabled: env.KISS_PM_BACKGROUND_JOBS_ENABLED === "true",
     backgroundJobsPollMs: parseBackgroundJobsPollMs(env.KISS_PM_BACKGROUND_JOBS_POLL_MS),
     production: env.NODE_ENV === "production",
@@ -106,6 +119,21 @@ export function parsePlanningEventsBackend(value: string | undefined): PlanningE
   if (value === undefined || value === "") return "memory";
   if (value === "memory" || value === "redis") return value;
   throw new Error("invalid_planning_events_backend");
+}
+
+/**
+ * Бекенд workspace-шины (чат/уведомления/presence). Без явного
+ * WORKSPACE_EVENTS_BACKEND наследует PLANNING_EVENTS_BACKEND: деплой, уже
+ * гоняющий planning-события через Redis, автоматически получает и workspace-шину
+ * через Redis (оба нужны при >1 реплики).
+ */
+export function parseWorkspaceEventsBackend(
+  value: string | undefined,
+  planningFallback?: string | undefined
+): WorkspaceEventsBackend {
+  if (value === undefined || value === "") return parsePlanningEventsBackend(planningFallback);
+  if (value === "memory" || value === "redis") return value;
+  throw new Error("invalid_workspace_events_backend");
 }
 
 function planningEventsRedisUrlFromEnv(env: NodeJS.ProcessEnv): string | undefined {

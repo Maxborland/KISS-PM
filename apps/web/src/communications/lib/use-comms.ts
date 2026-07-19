@@ -20,6 +20,7 @@ import {
   type CallParticipantStateValue,
   type CallRecording,
   type CallRoom,
+  type CallRoomCapabilities,
   type CallRoomCreateInput,
   type CallSession,
   type Channel,
@@ -68,6 +69,16 @@ export type CommsMutationResult = MutationResult;
 export type CommsDataResult<T> = MutationDataResult<T>;
 // Общий load-state (data/status/error + 403→forbidden) — ядро apps/web/src/lib/use-resource.ts.
 export type CommsLoadState<T> = ResourceState<T>;
+
+// P8 realtime: вставка входящего message.created в load-state беседы. Кадр чужой
+// беседы → no-op (SSE подписан на канал активной беседы); дубль по id → no-op
+// (echo собственного postMessage приходит и по SSE, и через loadMessages после
+// ответа — второго добавления не происходит). Чистая функция — покрыта юнит-тестом.
+export function appendIncomingMessage(data: ConversationData | null, message: Message): ConversationData | null {
+  if (!data || data.selectedConversationId !== message.conversationId) return data;
+  if (data.messages.some((existing) => existing.id === message.id)) return data;
+  return { ...data, messages: [...data.messages, message] };
+}
 
 export function replaceChannelInList(channels: Channel[], updated: Channel): Channel[] {
   let found = false;
@@ -152,6 +163,12 @@ export function useConversation(entityType: EntityType, entityId: string) {
   const selectConversation = useCallback((conversationId: string) => guard(async () => { await loadMessages(conversationId); }), [guard, loadMessages]);
   const reloadMessages = useCallback(() => guard(async () => { const id = data?.selectedConversationId; if (id) await loadMessages(id); }), [guard, loadMessages, data?.selectedConversationId]);
 
+  // P8 realtime: входящее message.created (SSE) → чистая вставка appendIncomingMessage.
+  const applyIncomingMessage = useCallback(
+    (message: Message) => { setData((d) => appendIncomingMessage(d, message)); },
+    [setData]
+  );
+
   const postMessage = useCallback(
     (conversationId: string, input: PostMessageInput) => guard(async () => { await client.postMessage(conversationId, input); await loadMessages(conversationId); }),
     [client, guard, loadMessages]
@@ -199,7 +216,7 @@ export function useConversation(entityType: EntityType, entityId: string) {
     [client, guard]
   );
 
-  return { client, data, status, error, reload: load, selectConversation, reloadMessages, postMessage, editMessage, deleteMessage, addReaction, removeReaction, pinMessage, unpinMessage, markRead };
+  return { client, data, status, error, reload: load, selectConversation, reloadMessages, applyIncomingMessage, postMessage, editMessage, deleteMessage, addReaction, removeReaction, pinMessage, unpinMessage, markRead };
 }
 
 /* ============================================================
@@ -295,7 +312,13 @@ export function useCallRooms(entityType: EntityType, entityId: string) {
   return { client, data, status, error, reload: load, createRoom };
 }
 
-export type CallRoomDetail = { callRoom: CallRoom; events: CallEvent[]; recordings: CallRecording[] };
+export type CallRoomDetail = {
+  callRoom: CallRoom;
+  events: CallEvent[];
+  recordings: CallRecording[];
+  // null = сервер не сообщил capabilities (старый контракт) — UI не гейтит.
+  capabilities: CallRoomCapabilities | null;
+};
 
 export function useCallRoom(roomId: string) {
   const client = useCommsClient();
@@ -303,7 +326,12 @@ export function useCallRoom(roomId: string) {
 
   const fetcher = useCallback(async (): Promise<CallRoomDetail> => {
     const res = await client.getCallRoom(roomId);
-    return { callRoom: res.callRoom, events: res.events, recordings: res.recordings };
+    return {
+      callRoom: res.callRoom,
+      events: res.events,
+      recordings: res.recordings,
+      capabilities: res.capabilities ?? null
+    };
   }, [client, roomId]);
   const { data, status, error, reload: load } = useResource(fetcher);
 
@@ -497,3 +525,23 @@ export function useCommsProjects(): CommsLoadState<{ projects: CommsProject[] }>
   const client = useCommsClient();
   return useResource(useCallback(() => client.listProjects(), [client]));
 }
+
+/* ============================================================
+   СТИКЕРЫ (Н11): useStickerPacks — паки со стикерами для пикера композера
+   и рендера стикеров в ленте (GET /api/workspace/sticker-packs).
+   list — ready-стикеры неархивных паков; byId — резолв stickerAssetId
+   сообщения. 403/501/сеть → status error, пикер показывает честный
+   empty-state вместо хардкод-набора.
+   ============================================================ */
+export function useStickerPacks() {
+  const client = useCommsClient();
+  const state = useResource(useCallback(() => client.listStickerPacks(), [client]));
+  const stickers = useMemo(() => {
+    const list = (state.data?.stickerPacks ?? [])
+      .filter((pack) => pack.archivedAt === null)
+      .flatMap((pack) => pack.stickers.filter((sticker) => sticker.status === "ready" && sticker.archivedAt === null));
+    return { list, byId: new Map(list.map((sticker) => [sticker.id, sticker])) };
+  }, [state.data]);
+  return { status: state.status, error: state.error, reload: state.reload, stickers };
+}
+export type StickerPacksState = ReturnType<typeof useStickerPacks>;

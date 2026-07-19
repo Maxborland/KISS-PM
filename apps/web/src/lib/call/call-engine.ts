@@ -12,16 +12,26 @@ import {
 } from "livekit-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { toast } from "sonner";
+
 import type { MessageView } from "@/components/domain/message-bubble";
-import { CallBackgroundController, backgroundProcessorsSupported } from "@/lib/call/call-background";
+import { ApiError } from "@/lib/api";
 import {
+  CallBackgroundController,
+  backgroundAssetsAvailable,
+  backgroundProcessorsSupported
+} from "@/lib/call/call-background";
+import {
+  fetchCallRecordingContext,
   fetchCallRoomEntity,
   fetchJoinToken,
   fetchTurnCredentials,
   joinOrStartCallSession,
   persistCallMessage,
   postParticipantState,
-  resolveEntityConversationId
+  resolveEntityConversationId,
+  startCallRecording,
+  stopCallRecording
 } from "@/lib/call/call-client";
 import type {
   BackgroundMode,
@@ -157,7 +167,38 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     backgroundRef.current = new CallBackgroundController();
   }
   const [background, setBackground] = useState<BackgroundMode>("none");
-  const backgroundSupported = useMemo(() => backgroundProcessorsSupported(), []);
+  // Гейт «Фон» двухступенчатый (Н9): поддержка браузера (sync) + наличие
+  // MediaPipe-активов в сборке (async runtime-проба). Пока проба не завершилась —
+  // контрол скрыт; активы отсутствуют — контрол задизейблен с честной причиной.
+  const browserBackgroundSupported = useMemo(() => backgroundProcessorsSupported(), []);
+  const [backgroundAssetsState, setBackgroundAssetsState] = useState<"checking" | "ready" | "missing">(
+    "checking"
+  );
+  useEffect(() => {
+    if (!browserBackgroundSupported) return;
+    let active = true;
+    void backgroundAssetsAvailable().then((available) => {
+      if (active) setBackgroundAssetsState(available ? "ready" : "missing");
+    });
+    return () => {
+      active = false;
+    };
+  }, [browserBackgroundSupported]);
+  const backgroundSupported = browserBackgroundSupported && backgroundAssetsState === "ready";
+  const backgroundUnavailableReason =
+    browserBackgroundSupported && backgroundAssetsState === "missing"
+      ? "Эффекты фона недоступны: MediaPipe-активы не развёрнуты в этой сборке (pnpm livekit:assets + selfie_segmenter.tflite в public/livekit/)."
+      : undefined;
+  // Запись звонка (Н11): capability + активная группа приходят из GET комнаты после
+  // подключения; управление — существующие egress-роуты start/stop.
+  const [recording, setRecording] = useState<{
+    available: boolean;
+    active: boolean;
+    groupId: string | null;
+    busy: boolean;
+  }>({ available: false, active: false, groupId: null, busy: false });
+  const recordingRef = useRef(recording);
+  recordingRef.current = recording;
   const conversationIdRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const joinedSessionIdRef = useRef<string | null>(null);
@@ -324,6 +365,17 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
         // Record presence so the call shows up in occupancy (the recipe is connect → state).
         joinedSessionIdRef.current = session.id;
         void postParticipantState(roomId, session.id, "joined");
+        // Recording capability + already-running recording (badge for late joiners) —
+        // best-effort из того же GET комнаты (Н11).
+        void fetchCallRecordingContext(roomId).then((context) => {
+          if (disposed) return;
+          setRecording({
+            available: context.available,
+            active: context.activeGroupId !== null,
+            groupId: context.activeGroupId,
+            busy: false
+          });
+        });
         // Resolve the durable conversation for the room's parent entity (best-effort).
         const entity = await fetchCallRoomEntity(roomId);
         if (entity && !disposed) {
@@ -364,6 +416,7 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
       sessionIdRef.current = null;
       joinedSessionIdRef.current = null;
       roomRef.current = null;
+      setRecording({ available: false, active: false, groupId: null, busy: false });
     };
   }, [roomId, refresh, options, markParticipantLeft]);
 
@@ -432,10 +485,55 @@ export function useCallEngine(roomId: string, options?: LobbySelection | null): 
     });
   }, [background]);
 
+  // Старт/стоп серверной записи (Н11). Тосты — по месту действия; ошибки показываем
+  // с серверным кодом (например call_recording_no_tracks) — сырой код честнее generic.
+  const onToggleRecording = useCallback(() => {
+    const current = recordingRef.current;
+    if (!current.available || current.busy) return;
+    setRecording({ ...current, busy: true });
+    void (async () => {
+      try {
+        if (current.active && current.groupId) {
+          await stopCallRecording(roomId, current.groupId);
+          toast.success("Запись остановлена");
+          setRecording({ available: current.available, active: false, groupId: null, busy: false });
+        } else {
+          const sessionId = sessionIdRef.current;
+          if (!sessionId) throw new Error("call_session_not_found");
+          const result = await startCallRecording(roomId, sessionId);
+          toast.success("Запись начата");
+          setRecording({
+            available: current.available,
+            active: true,
+            groupId: result.recordingGroupId,
+            busy: false
+          });
+        }
+      } catch (cause) {
+        const code =
+          cause instanceof ApiError && typeof cause.body.error === "string"
+            ? cause.body.error
+            : cause instanceof Error
+              ? cause.message
+              : "recording_failed";
+        toast.error(`Запись: сервер отклонил действие (${code})`);
+        setRecording({ ...current, busy: false });
+      }
+    })();
+  }, [roomId]);
+
   return {
     stage,
-    controls: { ...controls, background, backgroundSupported },
-    handlers: { ...handlers, onCycleBackground },
+    controls: {
+      ...controls,
+      background,
+      backgroundSupported,
+      backgroundUnavailableReason,
+      recordingAvailable: recording.available,
+      recordingOn: recording.active,
+      recordingBusy: recording.busy
+    },
+    handlers: { ...handlers, onCycleBackground, onToggleRecording },
     error,
     externalJoin,
     chat,

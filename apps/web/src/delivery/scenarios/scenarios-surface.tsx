@@ -15,7 +15,9 @@ import { DeliveryFrame, type ProjectMeta } from "@/delivery/ui/delivery-frame";
 import { PROJECT_FALLBACK, deriveProjectMeta, planningErr, useProjectBase } from "@/delivery/lib/project-chrome";
 import { isoToDay, MOCK_PROJECT_ID } from "@/delivery/lib/planning-demo-data";
 import { usePlanning } from "@/delivery/lib/use-planning";
+import { usePlanningRuntime } from "@/delivery/lib/planning-runtime";
 import { useResourceDirectory } from "@/delivery/lib/use-resource-directory";
+import { PlanUpdatedBanner, usePlanVersionWatch } from "@/delivery/schedule/use-plan-version-watch";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 type Profile = "aggressive" | "balanced" | "resilient";
@@ -71,6 +73,15 @@ const riskOf = (score: number) => score >= 67 ? { label: "высокий рис�
 
 export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
   const { readModel, status, error, reload, previewScenarios, applyScenario, rejectScenario, previewBatch } = usePlanning(projectId);
+  const { live } = usePlanningRuntime();
+  // SSE план-событий: чужой коммит делает рассчитанные предложения потенциально устаревшими —
+  // баннер с «Обновить» (сброс proposals → авто-превью пересчитает), автоперезагрузки нет.
+  // Авторитет прежний — серверный 409 plan_version_conflict при apply/preview.
+  const { remotePlanVersion } = usePlanVersionWatch({
+    projectId,
+    enabled: live,
+    clientPlanVersion: readModel?.planVersion ?? null
+  });
   const projectBase = useProjectBase(projectId, PROJECT);
   const resDir = useResourceDirectory();
   const sessionUser = useSessionUser();
@@ -300,6 +311,14 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
           Реальный контракт: previewScenarios(target) → 3 профиля (наборы PlanningCommand с пересчётом метрик) → applyScenario (permission + audit «planning.scenario.applied», bump версии). Агрессивный принимает перегруз — нужна причина риска. Данные in-memory.
         </div>
       )}
+
+      {remotePlanVersion != null ? (
+        <PlanUpdatedBanner
+          version={remotePlanVersion}
+          note="Рассчитанные предложения и предпросмотр могли устареть."
+          onReload={() => { setProposals(null); setCompareId(null); setScenarioErr(null); void reload(); }}
+        />
+      ) : null}
 
       {/* success-квитанция применения: реальный auditEventId + переход к коммиту плана */}
       {lastApplied ? (

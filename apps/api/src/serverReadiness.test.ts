@@ -146,6 +146,8 @@ describe("server readiness checks", () => {
       hostname: "0.0.0.0",
       planningEventsBackend: "redis",
       planningEventsRedisUrl: "redis://127.0.0.1:6379",
+      // Наследует planning-бекенд, пока WORKSPACE_EVENTS_BACKEND не задан явно.
+      workspaceEventsBackend: "redis",
       port: 4100,
       production: false,
       videoProvider: undefined,
@@ -159,6 +161,7 @@ describe("server readiness checks", () => {
       hostname: "127.0.0.1",
       planningEventsBackend: "memory",
       planningEventsRedisUrl: undefined,
+      workspaceEventsBackend: "memory",
       port: 4000,
       production: false,
       videoProvider: undefined,

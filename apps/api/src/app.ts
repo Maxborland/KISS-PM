@@ -14,6 +14,7 @@ import {
   MissingAccessProfileError,
   resolveAppErrorResponse
 } from "./appErrors";
+import { runWithAfterCommitQueue } from "./afterCommitQueue";
 import { registerApiDocsRoutes } from "./apiDocs/apiDocsRoutes";
 import type {
   ApiTenantDataSource,
@@ -190,7 +191,9 @@ export function createApp(options: CreateAppOptions = {}) {
       throw new Error("transaction_not_configured");
     }
 
-    return dataSource.withTransaction(operation);
+    // Отложенные realtime-эмиты выполняются после коммита (ревью #261) —
+    // см. afterCommitQueue.ts; при откате очередь отбрасывается.
+    return runWithAfterCommitQueue(() => dataSource.withTransaction(operation));
   }
 
   async function isWorkspaceUserActive(user: TenantUser) {

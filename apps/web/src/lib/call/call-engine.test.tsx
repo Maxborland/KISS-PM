@@ -11,12 +11,15 @@ import { useCallEngine, type CallEngineState } from "./call-engine";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const callClientMock = vi.hoisted(() => ({
+  fetchCallRecordingContext: vi.fn(),
   fetchCallRoomEntity: vi.fn(),
   fetchJoinToken: vi.fn(),
   fetchTurnCredentials: vi.fn(),
   joinOrStartCallSession: vi.fn(),
   persistCallMessage: vi.fn(),
-  postParticipantState: vi.fn()
+  postParticipantState: vi.fn(),
+  startCallRecording: vi.fn(),
+  stopCallRecording: vi.fn()
 }));
 
 const defaultLobbySelection = { cameraOn: false, micOn: true };
@@ -140,8 +143,10 @@ vi.mock("@/lib/call/call-background", () => ({
     dispose: vi.fn(async () => undefined),
     setMode: vi.fn(async (mode: string) => mode)
   })),
-  backgroundProcessorsSupported: vi.fn(() => false)
+  backgroundProcessorsSupported: vi.fn(() => false),
+  backgroundAssetsAvailable: vi.fn(async () => false)
 }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock("livekit-client", () => livekitMock);
 
 function EngineHarness(props: {
@@ -204,6 +209,7 @@ describe("useCallEngine participant state lifecycle", () => {
     });
     callClientMock.fetchTurnCredentials.mockResolvedValue(null);
     callClientMock.fetchCallRoomEntity.mockResolvedValue(null);
+    callClientMock.fetchCallRecordingContext.mockResolvedValue({ available: false, activeGroupId: null });
     callClientMock.postParticipantState.mockResolvedValue(undefined);
   });
 

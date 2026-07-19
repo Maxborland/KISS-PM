@@ -95,10 +95,12 @@ const startedEvent: CallEvent = {
   createdAt: "2026-07-18T10:05:00.000Z"
 };
 
-/* Мутируемое состояние мока use-comms — меняется между тестами. */
+/* Мутируемое состояние мока use-comms — меняется между тестами.
+   capabilities зеркалит контракт GET /call-rooms/:roomId (Н10). */
 const state = vi.hoisted(() => ({
   room: null as unknown,
-  events: [] as unknown[]
+  events: [] as unknown[],
+  capabilities: null as { videoProviderKind: string; egressEnabled: boolean; canManage: boolean } | null
 }));
 
 vi.mock("@/communications/lib/use-comms", () => ({
@@ -110,7 +112,7 @@ vi.mock("@/communications/lib/use-comms", () => ({
     createRoom: vi.fn()
   }),
   useCallRoom: () => ({
-    data: { callRoom: state.room, events: state.events, recordings: [] },
+    data: { callRoom: state.room, events: state.events, recordings: [], capabilities: state.capabilities },
     status: "ready",
     error: null,
     reload: vi.fn(),
@@ -133,6 +135,7 @@ describe("CallsSurface: путь в живую комнату звонка", () 
     gate.prototypeNotesEnabled = false;
     state.room = roomFixture("active");
     state.events = [startedEvent];
+    state.capabilities = { videoProviderKind: "livekit", egressEnabled: false, canManage: true };
     joinToken.mockClear();
     host = document.createElement("div");
     document.body.appendChild(host);
@@ -205,5 +208,55 @@ describe("CallsSurface: путь в живую комнату звонка", () 
       b.textContent?.includes("Начать сессию")
     );
     expect(startButton).toBeDefined();
+  });
+
+  /* Н10: KISS_PM_VIDEO_PROVIDER=disabled ⇒ вместо кнопок старта/подключения —
+     честная плашка; метаданные (участие/завершение) остаются рабочими. */
+  it("disabled-провайдер, открытая комната: вместо «Начать сессию» — плашка о ненастроенном провайдере", () => {
+    state.room = roomFixture("open");
+    state.events = [];
+    state.capabilities = { videoProviderKind: "disabled", egressEnabled: false, canManage: true };
+    render();
+
+    expect(host.textContent).toContain("Видео-провайдер не настроен (KISS_PM_VIDEO_PROVIDER)");
+    const startButton = Array.from(host.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Начать сессию")
+    );
+    expect(startButton).toBeUndefined();
+  });
+
+  it("disabled-провайдер, активная сессия: без «Открыть комнату», но с плашкой и «Завершить сессию»", () => {
+    state.capabilities = { videoProviderKind: "disabled", egressEnabled: false, canManage: true };
+    render();
+
+    expect(linkByText("Открыть комнату")).toBeNull();
+    expect(host.textContent).toContain("Видео-провайдер не настроен (KISS_PM_VIDEO_PROVIDER)");
+    // Управление метаданными сессии остаётся рабочим — это не мёртвые контролы.
+    const endButton = Array.from(host.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Завершить сессию")
+    );
+    expect(endButton).toBeDefined();
+  });
+
+  it("manual-провайдер остаётся рабочим: кнопки старта/подключения на месте, плашки нет", () => {
+    state.capabilities = { videoProviderKind: "manual", egressEnabled: false, canManage: true };
+    render();
+    expect(linkByText("Открыть комнату")).not.toBeNull();
+    expect(host.textContent).not.toContain("Видео-провайдер не настроен");
+
+    state.room = roomFixture("open");
+    state.events = [];
+    render();
+    const startButton = Array.from(host.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Начать сессию")
+    );
+    expect(startButton).toBeDefined();
+  });
+
+  it("сервер без capabilities (старый контракт): гейт не активируется, кнопки на месте", () => {
+    state.capabilities = null;
+    render();
+    expect(linkByText("Открыть комнату")).not.toBeNull();
+    expect(host.textContent).not.toContain("Видео-провайдер не настроен");
   });
 });

@@ -27,6 +27,46 @@ export function backgroundProcessorsSupported(): boolean {
   }
 }
 
+/* Минимальный набор self-hosted активов, без которых BackgroundProcessor гарантированно
+   не работает: entry-point WASM-рантайма tasks-vision + модель сегментации.
+   (`pnpm --filter @kiss-pm/web livekit:assets` + selfie_segmenter.tflite — см. README.) */
+export const BACKGROUND_ASSET_PROBE_PATHS: readonly string[] = [
+  `${ASSET_PATHS.tasksVisionFileSet}/vision_wasm_internal.js`,
+  `${ASSET_PATHS.tasksVisionFileSet}/vision_wasm_internal.wasm`,
+  ASSET_PATHS.modelAssetPath
+];
+
+let assetsProbe: Promise<boolean> | null = null;
+
+async function assetPresent(path: string): Promise<boolean> {
+  try {
+    const response = await fetch(path, { method: "HEAD" });
+    if (!response.ok) return false;
+    // SPA-fallback честность: 200 с HTML вместо бинарного актива = актива нет.
+    const contentType = response.headers.get("content-type") ?? "";
+    return !contentType.toLowerCase().startsWith("text/html");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Runtime-проверка, что MediaPipe-активы реально развёрнуты в этой сборке (Н9).
+ * Без неё контрол «Фон» выглядел бы рабочим, а эффект молча не применялся бы.
+ * Результат кэшируется на время жизни страницы (активы не появляются на лету).
+ */
+export function backgroundAssetsAvailable(): Promise<boolean> {
+  assetsProbe ??= Promise.all(BACKGROUND_ASSET_PROBE_PATHS.map(assetPresent)).then((results) =>
+    results.every(Boolean)
+  );
+  return assetsProbe;
+}
+
+/** Сброс кэша пробы — только для тестов. */
+export function resetBackgroundAssetsProbeForTests(): void {
+  assetsProbe = null;
+}
+
 function optionsFor(mode: BackgroundMode): SwitchBackgroundProcessorOptions {
   if (mode === "blur") return { mode: "background-blur", blurRadius: BLUR_RADIUS };
   if (mode === "image") return { mode: "virtual-background", imagePath: DEFAULT_BACKGROUND_IMAGE };
