@@ -10,6 +10,9 @@ export type ReadinessChecks = Partial<Record<ReadinessCheckName, ReadinessCheck>
 type HealthRouteDeps = {
   readinessChecks?: ReadinessChecks | undefined;
   storageProvider: StorageProvider;
+  // Honest-индикация для деплой-проверок: true только когда server.ts реально
+  // запускает воркер фоновых джоб (runtimeConfig.backgroundJobsEnabled).
+  backgroundJobsEnabled?: boolean | undefined;
 };
 
 type ReadinessCheckResponse =
@@ -26,7 +29,11 @@ type ReadinessCheckResponse =
 
 export function registerHealthRoutes(app: ApiApp, deps: HealthRouteDeps) {
   app.get("/health", (context) => {
-    return context.json({ status: "ok", product: "KISS PM" });
+    return context.json({
+      status: "ok",
+      product: "KISS PM",
+      backgroundJobs: { enabled: deps.backgroundJobsEnabled === true }
+    });
   });
 
   app.get("/health/live", (context) => {

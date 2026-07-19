@@ -1,11 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil, Plus, UserCheck, UserMinus } from "lucide-react";
+import { Copy, KeyRound, Pencil, Plus, UserCheck, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { FormDialog } from "@/components/domain/form-dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -24,7 +33,7 @@ const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium t
 export function AdminUsersSurface() {
   const { live } = useAdminRuntime();
   const admin = useAdmin("users");
-  const { data, status, error, reload, createUser, updateUser, deactivateUser } = admin;
+  const { data, status, error, reload, createUser, updateUser, deactivateUser, issueUserResetToken } = admin;
   const [busy, setBusy] = useState(false);
   const sessionUser = useSessionUser();
 
@@ -70,7 +79,7 @@ export function AdminUsersSurface() {
       {!live ? (
         <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-          <span>Реальный контракт админки: GET/POST/PATCH /api/workspace/users (createAdminClient + in-memory mock, swap = apiOrigin). Деактивация = PATCH status:&quot;inactive&quot;. Самого себя (текущий — Администратор) деактивировать или сменить себе роль нельзя (self_access_change_forbidden). Политики безопасности (2FA/SSO/whitelist) — во вкладке «Безопасность».</span>
+          <span>Реальный контракт админки: GET/POST/PATCH /api/workspace/users (createAdminClient + in-memory mock, swap = apiOrigin). Деактивация = PATCH status:&quot;inactive&quot;. Выдача токена сброса пароля = POST /api/workspace/users/:userId/password-reset-token (токен показывается один раз). Самого себя (текущий — Администратор) деактивировать или сменить себе роль нельзя (self_access_change_forbidden). Политики безопасности (2FA/SSO/whitelist) — во вкладке «Безопасность».</span>
         </div>
       ) : null}
 
@@ -100,6 +109,7 @@ export function AdminUsersSurface() {
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1">
                         <EditUserDialog user={u} roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} update={updateUser} {...(actionPolicy.editDisabledReason ? { disabledReason: actionPolicy.editDisabledReason } : {})} />
+                        <IssueResetTokenAction user={u} busy={busy} setBusy={setBusy} issue={issueUserResetToken} {...(actionPolicy.resetTokenDisabledReason ? { disabledReason: actionPolicy.resetTokenDisabledReason } : {})} />
                         {u.status === "active" ? (
                           <ConfirmDialog
                             title={`Деактивировать «${u.name}»?`}
@@ -123,6 +133,70 @@ export function AdminUsersSurface() {
         ) : null}
       </SurfaceState>
     </AdminFrame>
+  );
+}
+
+// Выдача токена сброса пароля (delivery:none): подтверждение → POST
+// /api/workspace/users/:userId/password-reset-token → диалог с токеном.
+// ЧЕСТНОСТЬ: токен приходит в ответе ровно один раз — сервер хранит только хэш,
+// повторно показать его нельзя (в журнале аудита остаётся только факт выдачи).
+export function IssueResetTokenAction({ user, busy, setBusy, issue, disabledReason }: {
+  user: WorkspaceUser;
+  busy: boolean; setBusy: (v: boolean) => void;
+  issue: ReturnType<typeof useAdmin>["issueUserResetToken"];
+  disabledReason?: string | undefined;
+}) {
+  const [issued, setIssued] = useState<{ resetToken: string; expiresAt: string } | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    const res = await issue(user.id);
+    setBusy(false);
+    if (res.ok) setIssued(res.data);
+    else toast.error(`Отклонено: ${adminErr(res.code, res.message)}`);
+  };
+
+  const copy = async () => {
+    if (!issued) return;
+    try {
+      await navigator.clipboard.writeText(issued.resetToken);
+      toast.success("Токен скопирован в буфер обмена");
+    } catch {
+      toast.error("Не удалось скопировать — выделите токен и скопируйте вручную");
+    }
+  };
+
+  return (
+    <>
+      <ConfirmDialog
+        title={`Выдать токен сброса пароля для «${user.name}»?`}
+        description="Токен действует 60 минут и показывается только один раз. Передайте его пользователю по безопасному каналу — ввод на странице /password-reset/confirm."
+        confirmLabel="Выдать токен"
+        destructive={false}
+        onConfirm={run}
+      >
+        <Button variant="ghost" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Выдать токен сброса пароля"}><KeyRound className="size-3.5" aria-hidden /></Button>
+      </ConfirmDialog>
+      <Dialog open={issued !== null} onOpenChange={(open) => { if (!open) setIssued(null); }}>
+        <DialogContent className="max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Токен сброса пароля — {user.name}</DialogTitle>
+            <DialogDescription>
+              Токен показывается один раз: после закрытия окна получить его снова нельзя (в журнале аудита остаётся только факт выдачи).
+              Передайте его пользователю по безопасному каналу — ввод на странице /password-reset/confirm.
+              {issued ? ` Действует до ${new Date(issued.expiresAt).toLocaleString("ru-RU")}.` : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div data-testid="reset-token-value" className="v4-mono break-all rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--text-strong)]">
+            {issued?.resetToken}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => void copy()}><Copy className="size-3.5" aria-hidden />Скопировать</Button>
+            <DialogClose asChild><Button variant="default">Готово</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

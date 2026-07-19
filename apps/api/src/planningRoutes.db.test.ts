@@ -14,10 +14,14 @@ import { createHash } from "node:crypto";
 
 import { createApp } from "./app";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error("planningRoutes.db.test requires an explicit disposable DATABASE_URL");
-}
+// Конвенция всего db-сьюта (см. остальные *.db.test.ts): при отсутствии явного
+// DATABASE_URL работаем на локальной dev-БД, которую beforeEach трункейтит
+// (после прогона dev-БД пересеивается db:migrate + db:seed:dev). Жёсткий guard
+// «только явная disposable-БД» (коммит 51c7562c, гигиена одного воркера) ронял
+// файл на этапе коллекции и делал общий `pnpm test:db` детерминированно красным.
+const databaseUrl =
+  process.env.DATABASE_URL ??
+  "postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm";
 
 const dataset: SeedTenantDataset = {
   tenants: [{ id: "tenant-alpha", name: "Альфа Проект" }],

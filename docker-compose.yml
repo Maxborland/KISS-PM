@@ -97,6 +97,20 @@ services:
       KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY: ${KISS_PM_STORAGE_S3_SECRET_ACCESS_KEY:-}
       KISS_PM_STORAGE_S3_TIMEOUT_MS: ${KISS_PM_STORAGE_S3_TIMEOUT_MS:-}
       KISS_PM_STORAGE_S3_ALLOW_INSECURE_HTTP: ${KISS_PM_STORAGE_S3_ALLOW_INSECURE_HTTP:-false}
+      # Почтовый канал (password reset). Без KISS_PM_EMAIL_PROVIDER=smtp инсталляция
+      # честно отвечает delivery:none — письма не уходят; переменные ниже дают
+      # включить SMTP из .env без правки compose.
+      KISS_PM_EMAIL_PROVIDER: ${KISS_PM_EMAIL_PROVIDER:-}
+      KISS_PM_SMTP_HOST: ${KISS_PM_SMTP_HOST:-}
+      KISS_PM_SMTP_PORT: ${KISS_PM_SMTP_PORT:-}
+      KISS_PM_SMTP_FROM: ${KISS_PM_SMTP_FROM:-}
+      KISS_PM_SMTP_USERNAME: ${KISS_PM_SMTP_USERNAME:-}
+      KISS_PM_SMTP_PASSWORD: ${KISS_PM_SMTP_PASSWORD:-}
+      KISS_PM_SMTP_SECURE: ${KISS_PM_SMTP_SECURE:-false}
+      KISS_PM_SMTP_REQUIRE_TLS: ${KISS_PM_SMTP_REQUIRE_TLS:-true}
+      # Фоновые джобы (cleanup вложений, janitor записей, purge planning-runs):
+      # включены по умолчанию — иначе maintenance не выполняется никогда.
+      KISS_PM_BACKGROUND_JOBS_ENABLED: ${KISS_PM_BACKGROUND_JOBS_ENABLED:-true}
     ports:
       - "${KISS_PM_API_PORT:-4000}:4000"
     depends_on:

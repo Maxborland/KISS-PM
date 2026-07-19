@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { DomainApiError, guardMutation, type MutationResult } from "../../lib/domain-client";
+import { DomainApiError, guardData, guardMutation, type MutationDataResult, type MutationResult } from "../../lib/domain-client";
 import { useDomainClient } from "../../lib/use-domain-client";
 import { useResource, type LoadStatus } from "../../lib/use-resource";
 import {
@@ -117,6 +117,12 @@ export function useAdmin(scope: AdminLoadScope = "all") {
   const updateUser = useCallback((userId: string, input: UserUpdateInput) => guard(async () => { const r = await client.updateUser(userId, input); patchUser(r.user); }), [client, guard]);
   // Деактивация = PATCH status:"inactive"; затронутый пользователь обновляется в кэше.
   const deactivateUser = useCallback((userId: string) => guard(async () => { const r = await client.deactivateUser(userId); patchUser(r.user); }), [client, guard]);
+  // Выдача токена сброса пароля: данные ответа (raw-токен + срок) нужны UI один раз — guardData.
+  const issueUserResetToken = useCallback(
+    (userId: string): Promise<MutationDataResult<{ resetToken: string; expiresAt: string }>> =>
+      guardData(() => client.issueUserPasswordResetToken(userId)),
+    [client]
+  );
 
-  return { client, data, status, error, reload: load, createRole, updateRole, deleteRole, createUser, updateUser, deactivateUser };
+  return { client, data, status, error, reload: load, createRole, updateRole, deleteRole, createUser, updateUser, deactivateUser, issueUserResetToken };
 }

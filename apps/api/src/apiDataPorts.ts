@@ -13,6 +13,11 @@ export type TenantIdentityDataPort = Pick<
 
 export type AuditDataPort = Pick<ApiTenantDataSource, "appendAuditEvent" | "listAuditEventsByTenantId">;
 
+export type BackgroundJobScheduleSeedDataPort = Pick<
+  ApiTenantDataSource,
+  "listTenants" | "insertBackgroundJobScheduleIfMissing"
+>;
+
 export type EntityLookupDataPort = Pick<
   ApiTenantDataSource,
   | "findClientById"

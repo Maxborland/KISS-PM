@@ -79,6 +79,9 @@ export type UserCreateInput = {
   email: string; name: string; accessProfileId: string; password: string;
   id?: string; positionId?: string | null; phone?: string | null; telegram?: string | null; status?: UserStatus;
 };
+// Ответ POST /api/workspace/users/:userId/password-reset-token: raw-токен приходит
+// РОВНО ОДИН РАЗ (сервер хранит только хэш), expiresAt — ISO-срок действия (60 минут).
+export type UserResetTokenResponse = { resetToken: string; expiresAt: string };
 // Тело PATCH /api/workspace/users/:userId — частичное (parseWorkspaceUserPatchBody мёржит с текущим).
 export type UserUpdateInput = Partial<{
   email: string; name: string; accessProfileId: string;
@@ -103,6 +106,9 @@ export function createAdminClient(options: AdminApiClientOptions) {
     updateUser(userId: string, input: UserUpdateInput) { return requestJson<{ user: WorkspaceUser }>(`/api/workspace/users/${enc(userId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     // Деактивация = PATCH status:"inactive" (отдельной ручки нет; self_access_change_forbidden 400 для себя).
     deactivateUser(userId: string) { return requestJson<{ user: WorkspaceUser }>(`/api/workspace/users/${enc(userId)}`, { method: "PATCH", body: JSON.stringify({ status: "inactive" }) }); },
+    // Выдача токена сброса пароля (POST …/password-reset-token). ЧЕСТНОСТЬ: токен из ответа
+    // показывается один раз — сервер хранит только хэш и повторно его не отдаёт.
+    issueUserPasswordResetToken(userId: string) { return requestJson<UserResetTokenResponse>(`/api/workspace/users/${enc(userId)}/password-reset-token`, { method: "POST" }); },
 
     // позиции (должности) — справочник для назначения пользователю
     listPositions() { return requestJson<{ positions: Position[] }>("/api/workspace/positions"); },

@@ -319,6 +319,15 @@ export function createMockAdminFetch(): typeof fetch {
       db.users.push(u);
       return json({ user: u }, 201);
     }
+    // Выдача токена сброса пароля (зеркало POST /api/workspace/users/:userId/password-reset-token):
+    // raw hex(64) отдаётся РОВНО ОДИН РАЗ, TTL 60 минут; сервер хранит только хэш (в моке — ничего).
+    const userResetToken = method === "POST" ? path.match(/^\/api\/workspace\/users\/([^/]+)\/password-reset-token$/) : null;
+    if (userResetToken) {
+      const userId = decodeURIComponent(userResetToken[1]!);
+      if (!ROUTE_ID_RE.test(userId)) return err("invalid_user_id", 400); // параметр маршрута до резолва
+      if (!db.users.some((u) => u.id === userId)) return err("user_not_found", 404);
+      return json({ resetToken: randomHex64(), expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() }, 201);
+    }
     const userPatch = method === "PATCH" ? path.match(/^\/api\/workspace\/users\/([^/]+)$/) : null;
     if (userPatch) {
       const userId = decodeURIComponent(userPatch[1]!);
@@ -374,6 +383,18 @@ export function createMockAdminFetch(): typeof fetch {
     return err("not_found", 404);
   };
   return mockFetch;
+}
+
+// hex(64) для reset-токена мока — та же форма, что боевой randomBytes(32).toString("hex").
+function randomHex64(): string {
+  const c: Crypto | undefined = typeof globalThis.crypto !== "undefined" ? globalThis.crypto : undefined;
+  if (c && typeof c.getRandomValues === "function") {
+    const bytes = c.getRandomValues(new Uint8Array(32));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  let out = "";
+  while (out.length < 64) out += Math.floor(Math.random() * 16).toString(16);
+  return out;
 }
 
 // Псевдо-uuid для авто-id пользователя (мок; боевой — crypto.randomUUID()). Без управляющих байтов.

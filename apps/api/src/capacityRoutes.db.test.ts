@@ -369,11 +369,17 @@ describe("capacity API routes", () => {
       title: "Активный проект",
       status: "active"
     });
+    // Planning apply-command по draft-проектам намеренно отдаёт 404 project_not_found
+    // (lifecycle-ужесточение из коммита 51c7562cc: дефолт getPlanSnapshot — status=active).
+    // Capacity-агрегация при этом по контракту учитывает нагрузку draft/paused-контейнеров
+    // (capacityService.isCapacityCommittedProject + явный statuses в getPlanSnapshot) —
+    // например, нагрузку, созданную до перевода проекта в draft. Поэтому фикстура: создаём
+    // нагрузку в active-статусе через штатный API, затем возвращаем проект в draft в БД.
     await createProject({
       projectId: "project-draft",
       opportunityId: "opportunity-draft",
       title: "Черновой проект",
-      status: "draft"
+      status: "active"
     });
     await createProject({
       projectId: "project-draft-empty",
@@ -395,6 +401,39 @@ describe("capacity API routes", () => {
       title: "Черновая работа",
       workMinutes: 240
     });
+    await client`UPDATE projects SET status = 'draft' WHERE id = 'project-draft'`;
+
+    // Намеренный контракт lifecycle-гарда: apply-command по draft-проекту — 404
+    // (не раскрываем существование проекта вне планируемого lifecycle).
+    const draftApply = await app.request(
+      "/api/workspace/projects/project-draft-empty/planning/apply-command",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-kiss-pm-action": "same-origin",
+          cookie: adminCookie
+        },
+        body: JSON.stringify({
+          clientPlanVersion: 1,
+          command: {
+            type: "task.create",
+            payload: {
+              id: "task-draft-denied",
+              projectId: "project-draft-empty",
+              title: "Задача в черновике",
+              statusId: "task-status-new",
+              plannedStart: "2026-06-02",
+              plannedFinish: "2026-06-02",
+              workMinutes: 60,
+              assignments: []
+            }
+          }
+        })
+      }
+    );
+    expect(draftApply.status).toBe(404);
+    expect(await draftApply.json()).toEqual({ error: "project_not_found" });
     const occupancy = await app.request(
       "/api/workspace/resources/user-alpha-resource-reader/personal-calendar/events",
       {

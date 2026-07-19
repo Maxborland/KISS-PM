@@ -259,6 +259,16 @@ export const coreSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  WorkspaceUserResetTokenResponse: {
+    type: "object",
+    required: ["resetToken", "expiresAt"],
+    properties: {
+      // Raw reset token (hex, 32 bytes). Returned exactly once; only the hash is stored.
+      resetToken: { type: "string", minLength: 64, maxLength: 64, pattern: "^[0-9a-f]{64}$" },
+      expiresAt: { type: "string", format: "date-time" }
+    },
+    additionalProperties: false
+  },
   WorkspaceUserCreateRequest: {
     type: "object",
     required: ["email", "name", "accessProfileId", "password"],

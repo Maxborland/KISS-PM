@@ -6,6 +6,8 @@ import {
 } from "@kiss-pm/access-control";
 import type { TenantId, TenantUser, UserId } from "@kiss-pm/domain";
 import { hashPassword } from "@kiss-pm/persistence";
+import { getClientIp } from "./authRateLimit";
+import { issuePasswordResetToken } from "./authRegistrationRoutes";
 import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRoutes";
 import { readLimitedJsonBody } from "./jsonBody";
 import { authorizeRoute } from "./routeAuth";
@@ -342,6 +344,93 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ user });
+  });
+
+  // POST /api/workspace/users/:userId/password-reset-token — админская выдача
+  // токена сброса пароля (для инсталляций с delivery:none, где письмо не придёт).
+  // Токен генерируется ТЕМ ЖЕ механизмом, что и публичный password-reset/request
+  // (issuePasswordResetToken: hashResetToken + passwordResetTtlMs); rawToken
+  // возвращается РОВНО ОДИН РАЗ в ответе и нигде больше не существует в открытом
+  // виде — в аудит пишется только факт выдачи (tokenId + срок), без rawToken.
+  app.post("/api/workspace/users/:userId/password-reset-token", async (context) => {
+    const parsedUserId = parseUserIdParam(context.req.param("userId"));
+    if (!parsedUserId.ok) return context.json({ error: parsedUserId.error }, 400);
+    const userId = parsedUserId.value;
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageTenantUsers,
+      capabilities: [
+        "createPasswordResetToken",
+        "listWorkspaceUsers",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceUserDeniedAudit(deps, actor, {
+          actionType: "workspace.user.password_reset_token_denied",
+          entityId: userId,
+          commandInput: { userId },
+          decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
+
+    // Только пользователь СВОЕГО тенанта: чужой/несуществующий id → 404.
+    const targetUser =
+      (await dataSource.listWorkspaceUsers(actor.tenantId)).find(
+        (user) => user.id === userId
+      ) ?? null;
+    if (!targetUser) return context.json({ error: "user_not_found" }, 404);
+
+    const issued = await runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createPasswordResetToken) {
+        throw new Error("transactional_password_reset_token_not_configured");
+      }
+
+      const token = await issuePasswordResetToken(
+        transactionDataSource.createPasswordResetToken,
+        {
+          tenantId: actor.tenantId,
+          userId: targetUser.id,
+          requestedIp: getClientIp(context.req.raw.headers, {
+            trustForwardedHeaders: deps.trustForwardedAuthHeaders
+          })
+        }
+      );
+
+      await appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "workspace.user.password_reset_token_issued",
+          sourceWorkflow: "single_workspace_users",
+          sourceEntity: {
+            type: "TenantUser",
+            id: targetUser.id
+          },
+          // Честность аудита: фиксируем факт выдачи (tokenId + срок), rawToken
+          // в audit-payload отсутствует принципиально.
+          commandInput: { userId: targetUser.id },
+          beforeState: null,
+          afterState: {
+            tokenId: token.tokenId,
+            expiresAt: token.expiresAt.toISOString()
+          },
+          permissionResult: decision
+        },
+        transactionDataSource
+      );
+
+      return token;
+    });
+
+    return context.json(
+      {
+        resetToken: issued.rawToken,
+        expiresAt: issued.expiresAt.toISOString()
+      },
+      201
+    );
   });
 
   app.delete("/api/workspace/users/:userId", async (context) => {

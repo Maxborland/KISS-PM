@@ -198,12 +198,16 @@ describe("attachment and unified search API", () => {
       headers: { cookie }
     });
     expect(search.status).toBe(200);
+    // Фактический контракт search-роутинга (searchRouting.ts, коммит 6bc96cc1): у CRM-клиентов
+    // нет entity-карточки (в apps/web/src/app/crm только deals имеет [id]), поэтому client/
+    // external_reference ведут на живой список /crm/clients. Deep-link на карточку клиента —
+    // отложенный gap, см. docs/plans/2026-07-19-gap-research-blocks-8-12.md (Р12).
     await expect(search.json()).resolves.toMatchObject({
       results: [
         expect.objectContaining({
           type: "external_reference",
           title: "Архитектурный бриф",
-          route: "/clients/client-alpha"
+          route: "/crm/clients"
         })
       ]
     });
@@ -501,11 +505,13 @@ describe("attachment and unified search API", () => {
       { headers: { cookie: readerCookie } }
     );
     expect(search.status).toBe(200);
+    // См. комментарий выше: /crm/clients — честный контракт (карточки клиента нет),
+    // deep-link — отложенный gap (Р12, docs/plans/2026-07-19-gap-research-blocks-8-12.md).
     await expect(search.json()).resolves.toMatchObject({
       results: [
         expect.objectContaining({
           title: "Общий ресурсный бриф",
-          route: "/clients/client-alpha"
+          route: "/crm/clients"
         })
       ]
     });

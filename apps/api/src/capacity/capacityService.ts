@@ -109,8 +109,11 @@ export function monthRangeIso(monthIso: string): { fromDate: string; toDate: str
   return { fromDate, toDate };
 }
 
+/** Статусы проектов, чья нагрузка учитывается в capacity (в отличие от планирования, где только active). */
+const capacityCommittedStatuses = ["draft", "active", "paused"] as const;
+
 export function isCapacityCommittedProject(project: ProjectRecord): boolean {
-  return project.status === "draft" || project.status === "active" || project.status === "paused";
+  return (capacityCommittedStatuses as readonly string[]).includes(project.status);
 }
 
 function hasCommittedLoad(bucket: ResourceLoadBucket): boolean {
@@ -166,10 +169,15 @@ export async function buildWorkspaceCapacityAggregation(
   // ponytail: потолок — кэш read-model per-project по planVersion либо вынос CPM в worker; апгрейд, когда CPU станет узким.
   // Зовём как метод (dataSource.getPlanSnapshot!), а не через извлечённую ссылку — иначе теряется
   // this-биндинг репозитория (реальный DB-datasource использует this → 500).
+  // Явно расширяем статусы снапшота: дефолт getPlanSnapshot — active-only (lifecycle-гард
+  // планирования), а capacity обязан видеть нагрузку draft/paused-контейнеров (см. фильтр
+  // isCapacityCommittedProject выше и обработку пустых draft ниже).
   const snapshots = await Promise.all(
     projects.map(async (project) => ({
       project,
-      snapshot: await dataSource.getPlanSnapshot!(input.tenantId, project.id)
+      snapshot: await dataSource.getPlanSnapshot!(input.tenantId, project.id, {
+        statuses: capacityCommittedStatuses
+      })
     }))
   );
 

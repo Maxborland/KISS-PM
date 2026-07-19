@@ -20,7 +20,24 @@ describe("KISS PM API Phase 1 shell", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store, private");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-    await expect(response.json()).resolves.toEqual({ status: "ok", product: "KISS PM" });
+    await expect(response.json()).resolves.toEqual({
+      status: "ok",
+      product: "KISS PM",
+      backgroundJobs: { enabled: false }
+    });
+  });
+
+  it("reports background jobs worker as enabled on /health when the runtime flag is set", async () => {
+    const app = createApp({ backgroundJobsEnabled: true });
+
+    const response = await app.request("/health");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      status: "ok",
+      product: "KISS PM",
+      backgroundJobs: { enabled: true }
+    });
   });
 
   it("returns liveness status on public and API health routes", async () => {
