@@ -167,6 +167,7 @@ export type PostgresTenantDataSource = CrmRepository &
   listDevUsers(): Promise<TenantUser[]>;
   findUserById(userId: UserId): Promise<TenantUser | undefined>;
   findTenantById(tenantId: TenantId): Promise<Tenant | undefined>;
+  listTenants(): Promise<Tenant[]>;
   findAccessProfileById(
     tenantId: TenantId,
     accessProfileId: string
@@ -338,6 +339,13 @@ export function createPostgresTenantDataSource(
             name: row.name
           }
         : undefined;
+    },
+    async listTenants() {
+      const rows = await db.select().from(tenants).orderBy(tenants.id);
+      return rows.map((row) => ({
+        id: row.id,
+        name: row.name
+      }));
     },
     async findAccessProfileById(tenantId, accessProfileId) {
       const [row] = await db

@@ -7,6 +7,7 @@ import {
 
 import { createApp, type CreateAppOptions } from "./app";
 import { createAuthRateLimiterFromEnv } from "./authRateLimit";
+import { ensureDefaultBackgroundJobSchedules } from "./backgroundJobs/ensureDefaultBackgroundJobSchedules";
 import { createDefaultBackgroundJobRegistry } from "./backgroundJobs/jobHandlers";
 import { createSerializedBackgroundJobPoller } from "./backgroundJobs/backgroundJobWorker";
 import { createLiveKitEgressProviderFromEnv } from "./communications/recording/livekitEgressProvider";
@@ -47,6 +48,7 @@ setPlanningEventPublisher(publisher);
 
 const appOptions: CreateAppOptions = {
   authRateLimiter,
+  backgroundJobsEnabled: runtimeConfig.backgroundJobsEnabled,
   enableDevTenantRoutes,
   emailProvider,
   readinessChecks,
@@ -73,6 +75,19 @@ if (postgresClient) {
 
 let backgroundJobsTimer: NodeJS.Timeout | undefined;
 if (dataSource && runtimeConfig.backgroundJobsEnabled) {
+  // Сид дефолтных maintenance-расписаний ДО первого poll: без него у
+  // background_job_schedules нет ни одного продюсера и воркер вечно idle.
+  // Fail-soft: ошибка сида логируется, но не валит сервер и не блокирует воркер.
+  try {
+    const seeded = await ensureDefaultBackgroundJobSchedules({ dataSource });
+    if (seeded.status === "seeded") {
+      console.log(
+        `KISS PM background job schedules seeded: ${seeded.schedules} schedules across ${seeded.tenants} tenants`
+      );
+    }
+  } catch (error) {
+    console.error("background_jobs_seed_failed", error);
+  }
   const registry = createDefaultBackgroundJobRegistry();
   const workerId = `api-worker-${process.pid}`;
   const runBackgroundJobsPoll = createSerializedBackgroundJobPoller({

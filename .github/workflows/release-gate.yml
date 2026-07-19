@@ -48,20 +48,36 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: kiss_pm
+          # Имя с суффиксом _test — обязательное: guard db-тестов (planningRepository
+          # и др.) отказывается работать с БД без него; CI-база одноразовая.
+          POSTGRES_DB: kiss_pm_test
           POSTGRES_USER: kiss_pm
           POSTGRES_PASSWORD: kiss_pm_dev_password
         ports:
           - 55432:5432
         options: >-
-          --health-cmd "pg_isready -U kiss_pm -d kiss_pm"
+          --health-cmd "pg_isready -U kiss_pm -d kiss_pm_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      redis:
+        # Redis-вариант planning event bus иначе не тестируется никогда
+        # (smoke-тест skipIf без REDIS_URL).
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12
 
     env:
       CI: "true"
-      DATABASE_URL: postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm
+      DATABASE_URL: postgres://kiss_pm:kiss_pm_dev_password@127.0.0.1:55432/kiss_pm_test
+      REDIS_URL: redis://127.0.0.1:6379
+      # CI-база одноразовая: write-спеки full-eval перестают молча скипаться.
+      KISS_PM_E2E_DISPOSABLE_DATABASE: "1"
       E2E_API_PORT: "4100"
       E2E_WEB_PORT: "3100"
       STORYBOOK_PORT: "6006"

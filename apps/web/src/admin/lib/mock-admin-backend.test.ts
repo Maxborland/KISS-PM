@@ -207,6 +207,27 @@ describe("contract-mock admin backend", () => {
     await expect(c.updateUser("user-ghost", { name: "Призрак" })).rejects.toMatchObject({ status: 404, code: "user_not_found" });
   });
 
+  /* ---- выдача токена сброса пароля ---- */
+  it("issues a one-time password reset token (hex64 + expiresAt), fresh per call", async () => {
+    const c = client();
+    const first = await c.issueUserPasswordResetToken("user-ivan");
+    expect(first.resetToken).toMatch(/^[0-9a-f]{64}$/);
+    expect(Date.parse(first.expiresAt)).toBeGreaterThan(Date.now());
+    // Повторная выдача — новый токен: прежний нигде не хранится и не переотдаётся.
+    const second = await c.issueUserPasswordResetToken("user-ivan");
+    expect(second.resetToken).not.toBe(first.resetToken);
+  });
+
+  it("returns 404 user_not_found when issuing a reset token for an unknown user", async () => {
+    const c = client();
+    await expect(c.issueUserPasswordResetToken("user-ghost")).rejects.toMatchObject({ status: 404, code: "user_not_found" });
+  });
+
+  it("rejects malformed route ids on reset token issuance (400 invalid_user_id)", async () => {
+    const c = client();
+    await expect(c.issueUserPasswordResetToken("Bad..Id")).rejects.toMatchObject({ status: 400, code: "invalid_user_id" });
+  });
+
   it("rejects malformed route ids before resolution (400 invalid_user_id)", async () => {
     const c = client();
     await expect(c.updateUser("Bad..Id", { name: "X" })).rejects.toMatchObject({ status: 400, code: "invalid_user_id" });

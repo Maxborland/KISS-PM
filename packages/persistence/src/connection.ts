@@ -8,7 +8,10 @@ export type PostgresClient = ReturnType<typeof postgres>;
 export function createPostgresClient(databaseUrl: string): PostgresClient {
   return postgres(databaseUrl, {
     max: 5,
-    prepare: false
+    prepare: false,
+    // NOTICE-класс (truncate cascade и т.п.) заваливал логи db-тестов мегабайтами
+    // шума, за которым не видно падений; на боевых коннектах он тоже не нужен.
+    connection: { client_min_messages: "warning" }
   });
 }
 

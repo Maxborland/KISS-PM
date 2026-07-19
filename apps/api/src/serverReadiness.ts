@@ -6,7 +6,11 @@ import { getPlanningRealtimeStatus } from "./planningRealtimeHealth";
 import type { PlanningEventsBackend } from "./serverConfig";
 import type { StorageProvider } from "./storageProvider";
 
-export const expectedDatabaseMigrationTag = "0043_phase_g4_recording_size_bigint.sql";
+// ВНИМАНИЕ: тег обязан совпадать с ПОСЛЕДНИМ файлом в packages/persistence/migrations —
+// иначе /health/ready отдаёт READY на базе без свежих миграций. Синхронность
+// закреплена guard-тестом serverReadiness.migrationTag.test.ts (класс ошибки уже
+// повторялся: тег застревал на 0043 при миграциях до 0055).
+export const expectedDatabaseMigrationTag = "0055_planning_run_reject.sql";
 
 type ReadinessPostgresClient = (
   strings: TemplateStringsArray,

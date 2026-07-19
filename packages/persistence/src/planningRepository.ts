@@ -54,6 +54,7 @@ import {
   expandAbsenceToCalendarExceptions
 } from "./resourceAbsencesRepository";
 import { createOccupancyRepository } from "./occupancyRepository";
+import type { ProjectStatus } from "./projectIntakeRepository";
 import { TENANT_DEFAULT_CALENDAR_ID } from "./tenantProductionCalendarConstants";
 
 export type PlanningDependencyInput = {
@@ -79,7 +80,17 @@ export type PlanningAssignmentInput = {
 };
 
 export type PlanningRepository = {
-  getPlanSnapshot(tenantId: string, projectId: string): Promise<PlanSnapshot | undefined>;
+  /**
+   * Снапшот плана проекта. По умолчанию — только `status = "active"`: это lifecycle-гард
+   * планирования (apply/preview/read-model не работают с draft/paused/closed, отдают 404;
+   * см. schedule-closeout, коммит 51c7562cc). Потребители, которым нагрузка нужна и вне
+   * active (capacity учитывает draft/paused-контейнеры), явно расширяют список статусов.
+   */
+  getPlanSnapshot(
+    tenantId: string,
+    projectId: string,
+    options?: { statuses?: readonly ProjectStatus[] }
+  ): Promise<PlanSnapshot | undefined>;
   listProjectTaskAssignments(tenantId: string, projectId: string): Promise<PlanAssignment[]>;
   ensurePlanVersion(tenantId: string, projectId: string): Promise<number>;
   incrementPlanVersion(tenantId: string, projectId: string): Promise<number>;
@@ -219,7 +230,8 @@ type WbsTaskRow = Pick<typeof tasks.$inferSelect, "id" | "parentTaskId" | "wbsCo
 
 export function createPlanningRepository(db: KissPmDatabase): PlanningRepository {
   return {
-    async getPlanSnapshot(tenantId, projectId) {
+    async getPlanSnapshot(tenantId, projectId, options) {
+      const statuses = options?.statuses ?? ["active"];
       const [project] = await db
         .select()
         .from(projects)
@@ -227,7 +239,7 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
           and(
             eq(projects.tenantId, tenantId),
             eq(projects.id, projectId),
-            eq(projects.status, "active")
+            inArray(projects.status, [...statuses])
           )
         )
         .limit(1);

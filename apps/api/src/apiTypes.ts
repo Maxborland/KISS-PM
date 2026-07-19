@@ -338,6 +338,9 @@ export type CreateAppOptions = {
   videoProvider?: VideoProvider;
   egressProvider?: LiveKitEgressProvider | null;
   authRateLimiter?: AuthRateLimiter;
+  // Honest-флаг для /health: server.ts передаёт runtimeConfig.backgroundJobsEnabled;
+  // без опции (unit-тесты, dev-fallback) воркер не запущен — false.
+  backgroundJobsEnabled?: boolean;
   emailProvider?: EmailProvider;
   readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;

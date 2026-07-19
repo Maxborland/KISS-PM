@@ -10,11 +10,39 @@ import type { Context } from "hono";
 import { getClientIp } from "./authRateLimit";
 import { buildSessionCookieHeader, sessionTtlMs } from "./authSession";
 import { readLimitedJsonBody } from "./jsonBody";
+import type { PasswordResetTokenRecord } from "./apiTypes";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
-import type { TenantUser } from "@kiss-pm/domain";
+import type { TenantId, TenantUser, UserId } from "@kiss-pm/domain";
 
 // Срок жизни токена сброса пароля: 60 минут от момента запроса.
-const passwordResetTtlMs = 60 * 60 * 1000;
+export const passwordResetTtlMs = 60 * 60 * 1000;
+
+// ЕДИНСТВЕННЫЙ механизм генерации reset-токена: raw = 32 случайных байта hex,
+// персистится только hashResetToken(raw), TTL = passwordResetTtlMs. Его
+// переиспользуют и публичный /api/auth/password-reset/request (email-доставка),
+// и админская выдача токена (workspaceUserRoutes) — криптография и формат
+// записи не дублируются. rawToken существует в открытом виде только в
+// возвращаемом значении вызывающей стороны.
+export async function issuePasswordResetToken(
+  createPasswordResetToken: (input: PasswordResetTokenRecord) => Promise<void>,
+  input: { tenantId: TenantId; userId: UserId; requestedIp: string | null }
+): Promise<{ tokenId: string; rawToken: string; expiresAt: Date }> {
+  const now = new Date();
+  const rawToken = randomBytes(32).toString("hex");
+  const tokenId = `password-reset-${randomUUID()}`;
+  const expiresAt = new Date(now.getTime() + passwordResetTtlMs);
+  await createPasswordResetToken({
+    id: tokenId,
+    tenantId: input.tenantId,
+    userId: input.userId,
+    tokenHash: hashResetToken(rawToken),
+    expiresAt,
+    consumedAt: null,
+    requestedIp: input.requestedIp,
+    createdAt: now
+  });
+  return { tokenId, rawToken, expiresAt };
+}
 
 // Гонка регистрации одного email (TOCTOU): pre-check прошёл, но глобальный uniqueIndex
 // user_credentials_email_uidx отверг параллельную вставку. Распознаём нарушение уникальности
@@ -286,18 +314,14 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
       // Токен создаём и письмо шлём только если email существует. Ответ всегда 202 —
       // не раскрываем наличие/отсутствие аккаунта (anti-enumeration).
       if (credential) {
-        const now = new Date();
-        const rawToken = randomBytes(32).toString("hex");
-        await dataSource.createPasswordResetToken({
-          id: `password-reset-${randomUUID()}`,
-          tenantId: credential.tenantId,
-          userId: credential.userId,
-          tokenHash: hashResetToken(rawToken),
-          expiresAt: new Date(now.getTime() + passwordResetTtlMs),
-          consumedAt: null,
-          requestedIp: rateLimitInput.ip ?? null,
-          createdAt: now
-        });
+        const { rawToken } = await issuePasswordResetToken(
+          dataSource.createPasswordResetToken,
+          {
+            tenantId: credential.tenantId,
+            userId: credential.userId,
+            requestedIp: rateLimitInput.ip ?? null
+          }
+        );
         await emailProvider.sendPasswordReset({
           email,
           rawToken,

@@ -256,6 +256,7 @@ export function createApp(options: CreateAppOptions = {}) {
   };
 
   registerHealthRoutes(app, {
+    backgroundJobsEnabled: options.backgroundJobsEnabled,
     readinessChecks: options.readinessChecks,
     storageProvider
   });
