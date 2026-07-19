@@ -2,13 +2,17 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# ЕДИНСТВЕННОЕ место overrides: pnpm игнорирует этот блок, если в корневом
+# package.json есть pnpm.overrides (он удалён ревью #260 — из-за него строки
+# hono/vitest/vite/yaml здесь были мёртвым конфигом и не попадали в lock).
 overrides:
   esbuild: ^0.25.12
   uuid: ^11.1.1
   postcss: ^8.5.14
   hono: ^4.12.27
-  vitest: ^3.2.6
-  vite: 6.4.3
+  # security-аудит: транзитивный yaml (<2.8.1) уязвим к stack overflow —
+  # прижимаем к патченной линии для всего дерева (yaml-language-server пинит 2.7.1).
+  yaml: ^2.9.0
 
 onlyBuiltDependencies:
   - better-sqlite3
