@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BookOpen, CheckSquare, FilePlus2, GitBranch, Plus, Scale } from "lucide-react";
 import { toast } from "sonner";
 
@@ -138,15 +139,21 @@ export function ProjectKnowledge({
 
   // Deep-link из глобального поиска: /projects/:id/knowledge?document=|decision=|actionItem=<id>.
   // Открываем нужную секцию (и выделяем документ) — иначе клик по knowledge-результату
-  // вёл бы на несуществующий под-путь /knowledge/documents/:id (Next 404). Применяем
-  // ровно один раз, чтобы не перебивать ручную навигацию пользователя.
-  const deepLinkAppliedRef = useRef(false);
+  // вёл бы на несуществующий под-путь /knowledge/documents/:id (Next 404). Реагируем на
+  // смену searchParams и guard'им по ЗНАЧЕНИЮ (ref), а не по жизни компонента — чтобы
+  // повторный клик по другому knowledge-результату при уже открытой странице срабатывал
+  // (образец — commits-surface). В Storybook хук отдаёт null → fallback на location.search.
+  const searchParams = useSearchParams();
+  const resolvedDeepLinkRef = useRef<string | null>(null);
   useEffect(() => {
-    if (deepLinkAppliedRef.current || typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
+    const search = searchParams ? searchParams.toString() : (typeof window === "undefined" ? "" : window.location.search);
+    const params = new URLSearchParams(search);
     const doc = params.get("document");
     const decision = params.get("decision");
     const actionItem = params.get("actionItem");
+    const key = doc ? `document:${doc}` : decision ? `decision:${decision}` : actionItem ? `actionItem:${actionItem}` : "";
+    if (resolvedDeepLinkRef.current === key) return;
+    resolvedDeepLinkRef.current = key;
     if (doc) {
       setSection("documents");
       setSelectedDocumentId(doc);
@@ -154,11 +161,8 @@ export function ProjectKnowledge({
       setSection("decisions");
     } else if (actionItem) {
       setSection("actions");
-    } else {
-      return;
     }
-    deepLinkAppliedRef.current = true;
-  }, []);
+  }, [searchParams]);
 
   const documents = useMemo(
     () => [...(knowledge.data?.documents ?? [])].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
