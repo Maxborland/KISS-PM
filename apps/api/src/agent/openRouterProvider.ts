@@ -66,8 +66,20 @@ export function fromOpenAiResponse(data: unknown): LlmResponse {
   return usage ? { ...base, usage: { inputTokens: usage.prompt_tokens ?? 0, outputTokens: usage.completion_tokens ?? 0 } } : base;
 }
 
-export function createOpenRouterLlmProvider(opts: { apiKey: string; model: string; maxTokens?: number; fetchImpl?: typeof fetch }): LlmProvider {
+export function createOpenRouterLlmProvider(opts: { apiKey: string; model: string; maxTokens?: number; reasoningEffort?: string; fetchImpl?: typeof fetch }): LlmProvider {
   const fetchImpl = opts.fetchImpl ?? fetch;
+  // Reasoning-effort (low|medium|high) для reasoning-моделей передаём как top-level
+  // `reasoning.effort` — OpenRouter нормализует его под конкретный провайдер. Пусто —
+  // не отправляем ключ, модель берёт свой дефолт.
+  const reasoning = opts.reasoningEffort ? { reasoning: { effort: opts.reasoningEffort } } : {};
+  // При включённом reasoning на Anthropic-пути OpenRouter выводит reasoning-budget с
+  // минимумом 1024 токена и требует max_tokens СТРОГО больше бюджета. Дефолтный
+  // max_tokens=1024 сломал бы каждый живой запрос. Поднимаем пол до 8192 (бюджет +
+  // запас на вывод), сохраняя явный KISS_PM_AGENT_MAX_TOKENS, если он больше.
+  const REASONING_MAX_TOKENS_FLOOR = 8192;
+  const maxTokens = opts.reasoningEffort
+    ? Math.max(opts.maxTokens ?? 0, REASONING_MAX_TOKENS_FLOOR)
+    : opts.maxTokens ?? 1024;
   return {
     model: opts.model,
     async createMessage(input) {
@@ -82,10 +94,11 @@ export function createOpenRouterLlmProvider(opts: { apiKey: string; model: strin
         },
         body: JSON.stringify({
           model: opts.model,
-          max_tokens: opts.maxTokens ?? 1024,
+          max_tokens: maxTokens,
           messages: toOpenAiMessages(input.system, input.messages),
           tools: toOpenAiTools(input.tools),
-          tool_choice: "auto"
+          tool_choice: "auto",
+          ...reasoning
         })
       });
       if (!response.ok) {

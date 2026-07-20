@@ -266,9 +266,11 @@ export function createAgentLlmProviderFromEnv(): LlmProvider {
   const maxTokensRaw = Number.parseInt(process.env.KISS_PM_AGENT_MAX_TOKENS ?? "", 10);
   const maxTokens = Number.isFinite(maxTokensRaw) && maxTokensRaw > 0 ? maxTokensRaw : undefined;
   const maxTokensOpt = maxTokens ? { maxTokens } : {};
+  const reasoningEffort = (process.env.KISS_PM_AGENT_REASONING_EFFORT ?? "").trim();
+  const reasoningOpt = reasoningEffort ? { reasoningEffort } : {};
 
   if (openRouterKey && openRouterKey.length > 0 && (explicit === "openrouter" || explicit === "")) {
-    return createOpenRouterLlmProvider({ apiKey: openRouterKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_OPENROUTER_MODEL, ...maxTokensOpt });
+    return createOpenRouterLlmProvider({ apiKey: openRouterKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_OPENROUTER_MODEL, ...maxTokensOpt, ...reasoningOpt });
   }
   if (anthropicKey && (explicit === "anthropic" || explicit === "")) {
     return createAnthropicLlmProvider({ apiKey: anthropicKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_MODEL, ...maxTokensOpt });
