@@ -281,6 +281,9 @@ export const coreSchemas = openApiSchemaFragment({
       // "email" — письмо ушло каналом инсталляции; "none" — канал не настроен,
       // и тогда сырой токен возвращается ровно один раз (иначе живёт лишь как хэш).
       delivery: { type: "string", enum: ["email", "none"] },
+      // true, когда канал был настроен, но отправка письма упала после коммита
+      // транзакции — токен тогда всё равно возвращается для ручной передачи.
+      deliveryFailed: { type: "boolean" },
       invitationToken: { type: "string", minLength: 64, maxLength: 64, pattern: "^[0-9a-f]{64}$" },
       expiresAt: { type: "string", format: "date-time" }
     },

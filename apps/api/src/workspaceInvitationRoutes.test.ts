@@ -238,6 +238,36 @@ describe("POST /api/workspace/invitations", () => {
     expect(sent.rawToken).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("деградирует до delivery:none и возвращает токен, если SMTP падает после коммита", async () => {
+    const sendInvitation = vi.fn(async (_input: InvitationEmailInput) => {
+      throw new Error("smtp_unreachable");
+    });
+    const emailProvider: SmtpEmailProvider = {
+      provider: "smtp",
+      sendPasswordReset: async () => undefined,
+      sendNotificationDigest: async () => undefined,
+      sendInvitation
+    };
+    const { app, state } = createFixture({ emailProvider });
+
+    const response = await invite(app, invitee);
+    // Транзакция уже закоммичена — падение письма НЕ должно давать 500 и оставлять
+    // сотрудника в лимбе; отдаём токен админу для ручной передачи.
+    expect(response.status).toBe(201);
+    const payload = await response.json();
+    expect(payload.delivery).toBe("none");
+    expect(payload.deliveryFailed).toBe(true);
+    expect(payload.invitationToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(sendInvitation).toHaveBeenCalledTimes(1);
+    // Пользователь и токен всё равно созданы — повтор инвайта упёрся бы в 409.
+    expect([...state.users.values()].some((user) => user.email === "new@kiss-pm.local")).toBe(true);
+    expect(
+      [...state.resetTokens.values()].some(
+        (token) => token.tokenHash === hashResetToken(payload.invitationToken)
+      )
+    ).toBe(true);
+  });
+
   it("отдаёт invitation в in-memory provider (для демо/ручной передачи)", async () => {
     const emailProvider = createInMemoryEmailProvider();
     const { app } = createFixture({ emailProvider });

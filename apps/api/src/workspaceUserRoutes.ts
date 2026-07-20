@@ -327,22 +327,39 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
     }
 
     // delivery — свойство ИНСТАЛЛЯЦИИ (настроен ли канал почты), не аккаунта.
-    const delivery =
+    let delivery: "email" | "none" =
       "provider" in emailProvider && emailProvider.provider === "smtp" ? "email" : "none";
+    // Транзакция уже закоммичена (inactive-юзер + токен), поэтому падение отправки
+    // НЕ должно отдавать 500 и оставлять сотрудника в лимбе (повтор инвайта упрётся
+    // в user_email_taken, а сырой токен админ так и не получит). Деградируем честно:
+    // при delivery:"email" помечаем delivery:"none" + deliveryFailed и возвращаем
+    // токен админу. In-memory-провайдер (delivery:"none") всё равно вызываем — он
+    // фиксирует lastInvitation для демо/ручной передачи, а токен возвращается ниже.
+    let deliveryFailed = false;
     const workspace = await dataSource.findTenantById?.(actor.tenantId);
-    await emailProvider.sendInvitation({
-      email: outcome.user.email,
-      rawToken: outcome.rawToken,
-      acceptUrl: buildInvitationAcceptUrl(context, outcome.rawToken),
-      ...(workspace?.name ? { workspaceName: workspace.name } : {}),
-      ...(actor.name ? { invitedByName: actor.name } : {})
-    });
+    try {
+      await emailProvider.sendInvitation({
+        email: outcome.user.email,
+        rawToken: outcome.rawToken,
+        acceptUrl: buildInvitationAcceptUrl(context, outcome.rawToken),
+        ...(workspace?.name ? { workspaceName: workspace.name } : {}),
+        ...(actor.name ? { invitedByName: actor.name } : {})
+      });
+    } catch {
+      if (delivery === "email") {
+        delivery = "none";
+        deliveryFailed = true;
+      }
+    }
 
     invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json(
       {
         user: outcome.user,
         delivery,
+        // deliveryFailed отличает «канал не настроен» от «письмо не ушло» —
+        // в обоих случаях токен ниже возвращается, но UI покажет разный текст.
+        ...(deliveryFailed ? { deliveryFailed: true } : {}),
         // Токен возвращаем в открытом виде ТОЛЬКО когда письмо не уйдёт
         // (delivery:"none") — иначе он существует лишь как хэш в БД.
         ...(delivery === "none"

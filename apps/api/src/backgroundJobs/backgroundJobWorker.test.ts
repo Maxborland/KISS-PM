@@ -173,6 +173,32 @@ describe("background job worker", () => {
     expect(scheduleReads).toBe(1);
   });
 
+  it("forwards emailProvider from the poller into the worker tick context", async () => {
+    const job = backgroundJob("notification.dispatch");
+    let seenEmailProvider: unknown = "unset";
+    const dataSource = ensureCompleteDataSource({
+      ...createIdleSchedulerDataSource(),
+      claimNextBackgroundJob: async () => job,
+      completeBackgroundJob: async () => ({ ...job, status: "succeeded" }),
+      failBackgroundJob: async () => ({ ...job, status: "queued" })
+    }) as unknown as ApiTenantDataSource;
+
+    const emailProvider = { provider: "smtp" } as never;
+    const poller = createSerializedBackgroundJobPoller({
+      dataSource,
+      // Хэндлер-шпион: фиксирует, был ли emailProvider проброшен в контекст тика.
+      registry: { "notification.dispatch": async (_job, context) => {
+        seenEmailProvider = context.emailProvider;
+      } },
+      emailProvider,
+      workerId: "worker-test"
+    });
+
+    await expect(poller()).resolves.toBe("ran");
+    // Регрессия ревью #266 P1: без проброса notification.dispatch fail-close'ился бы.
+    expect(seenEmailProvider).toBe(emailProvider);
+  });
+
   it("enqueues due schedules with idempotency tied to schedule key and due instant", async () => {
     const enqueued: string[] = [];
     const dataSource = ensureCompleteDataSource({

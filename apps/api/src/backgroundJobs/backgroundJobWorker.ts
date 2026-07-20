@@ -135,6 +135,7 @@ export function createSerializedBackgroundJobPoller(input: {
         registry: input.registry,
         ...(input.storageProvider ? { storageProvider: input.storageProvider } : {}),
         ...(input.egressProvider ? { egressProvider: input.egressProvider } : {}),
+        ...(input.emailProvider ? { emailProvider: input.emailProvider } : {}),
         workerId: input.workerId
       });
       return "ran";
