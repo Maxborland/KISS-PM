@@ -67,7 +67,11 @@ import {
   setApiSecurityHeaders,
   trustedMutationOriginsFromEnv
 } from "./requestSecurity";
-import { requestObservabilityMiddleware } from "./requestObservability";
+import {
+  requestIdFromContext,
+  requestObservabilityMiddleware,
+  type RequestLogger
+} from "./requestObservability";
 import { parseUserIdParam } from "./routeParamParsers";
 import type { ApiRouteDeps } from "./routeTypes";
 import { tenantAdminProfile } from "./tenantAdminProfile";
@@ -90,8 +94,24 @@ export function createApp(options: CreateAppOptions = {}) {
   const trustForwardedAuthHeaders =
     options.trustForwardedAuthHeaders ?? shouldTrustForwardedAuthHeaders();
   const enableDevTenantRoutes = options.enableDevTenantRoutes ?? false;
+  const errorLogger: RequestLogger = options.errorLogger ?? console;
 
   app.onError((error, context) => {
+    const normalizedError =
+      error instanceof Error ? error : new Error(String(error));
+
+    // Структурный лог необработанной ошибки через существующий logger (RequestLogger,
+    // как в requestObservability) — message + stack + requestId для корреляции; не
+    // console.log. Ответ клиенту не меняется: контракт/статус берём из resolveAppErrorResponse.
+    errorLogger.error(
+      JSON.stringify({
+        level: "error",
+        message: normalizedError.message,
+        requestId: requestIdFromContext(context),
+        stack: normalizedError.stack
+      })
+    );
+
     const response = resolveAppErrorResponse(error);
     return context.json(response.body, response.status);
   });

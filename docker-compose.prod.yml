@@ -1,0 +1,175 @@
+# Production stack for a single-host KISS PM deployment.
+#
+#   1. cp .env.prod.example .env  &&  fill in real secrets
+#   2. docker compose -f docker-compose.prod.yml build
+#   3. docker compose -f docker-compose.prod.yml up -d
+#
+# Everything is served through Caddy (TLS on 80/443). Only Caddy publishes host
+# ports; postgres/redis/api/web stay on the internal compose network.
+# See docs/runbooks/self-hosted-deployment.md for the full runbook.
+
+# Shared build + env for the api image (reused by the one-shot migrate job so the
+# image is built once and the DB migration runner is guaranteed to match the API).
+x-api-build: &api-build
+  context: .
+  dockerfile: apps/api/Dockerfile
+
+x-api-env: &api-env
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  PORT: "4000"
+  # DATABASE_URL is derived from the postgres vars so there is a single source of
+  # truth for credentials (postgres service + api + migrate all agree).
+  DATABASE_URL: postgres://${KISS_PM_POSTGRES_USER:-kiss_pm}:${KISS_PM_POSTGRES_PASSWORD:?KISS_PM_POSTGRES_PASSWORD is required}@postgres:5432/${KISS_PM_POSTGRES_DB:-kiss_pm}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${KISS_PM_POSTGRES_DB:-kiss_pm}
+      POSTGRES_USER: ${KISS_PM_POSTGRES_USER:-kiss_pm}
+      # No default: startup fails loudly if the operator forgot to set a password.
+      POSTGRES_PASSWORD: ${KISS_PM_POSTGRES_PASSWORD:?KISS_PM_POSTGRES_PASSWORD is required}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${KISS_PM_POSTGRES_USER:-kiss_pm} -d ${KISS_PM_POSTGRES_DB:-kiss_pm}"
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    volumes:
+      - kiss_pm_prod_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Internal only — never published to the host.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  # One-shot: applies pending SQL migrations, then exits. api waits for it to
+  # complete successfully before starting (see api.depends_on).
+  migrate:
+    build: *api-build
+    image: kiss-pm/api:latest
+    command: ["node", "apps/api/dist/migrate.js"]
+    environment:
+      # NODE_ENV=production activates migrate.js's fail-closed guard: it refuses the
+      # built-in dev DB default and requires an explicit DATABASE_URL (set below).
+      NODE_ENV: production
+      DATABASE_URL: postgres://${KISS_PM_POSTGRES_USER:-kiss_pm}:${KISS_PM_POSTGRES_PASSWORD:?KISS_PM_POSTGRES_PASSWORD is required}@postgres:5432/${KISS_PM_POSTGRES_DB:-kiss_pm}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: *api-build
+    image: kiss-pm/api:latest
+    # Operator secrets (SMTP, OPENROUTER_API_KEY, agent model, …) flow in from .env;
+    # the deploy invariants below always override whatever .env might contain.
+    env_file:
+      - .env
+    environment:
+      <<: *api-env
+      # Realtime fan-out over the internal redis (required for >1 replica; harmless
+      # for one). ALLOW_INSECURE is safe here because redis is not reachable off the
+      # compose network — TLS would be terminated at the same trust boundary anyway.
+      REDIS_URL: redis://redis:6379
+      PLANNING_EVENTS_BACKEND: redis
+      WORKSPACE_EVENTS_BACKEND: redis
+      PLANNING_EVENTS_REDIS_ALLOW_INSECURE: "true"
+      # Background maintenance jobs (attachment cleanup, planning-run purge, …).
+      KISS_PM_BACKGROUND_JOBS_ENABLED: "true"
+      # Local-root object storage on a named volume (no S3 configured by default).
+      KISS_PM_STORAGE_PROVIDER: ${KISS_PM_STORAGE_PROVIDER:-local}
+      KISS_PM_STORAGE_LOCAL_ROOT: /var/lib/kiss-pm/storage
+      # Browser mutations arrive with the public https Origin, which differs from the
+      # internal request host — it must be trusted explicitly or every POST/PATCH 403s.
+      KISS_PM_TRUSTED_MUTATION_ORIGINS: ${KISS_PM_PUBLIC_ORIGIN:?KISS_PM_PUBLIC_ORIGIN is required}
+      # Secure cookies are forced on in production by runtimeSecurityConfig; Caddy
+      # terminates TLS so the browser always sees https. Dev routes stay OFF.
+    volumes:
+      - kiss_pm_prod_storage:/var/lib/kiss-pm/storage
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: kiss-pm/web:latest
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Server-side rewrites / health proxy reach the API over the compose network.
+      KISS_PM_API_ORIGIN: http://api:4000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      # Consumed by Caddyfile: the public domain and the ACME contact email.
+      KISS_PM_DOMAIN: ${KISS_PM_DOMAIN:?KISS_PM_DOMAIN is required}
+      KISS_PM_ACME_EMAIL: ${KISS_PM_ACME_EMAIL:?KISS_PM_ACME_EMAIL is required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - kiss_pm_prod_caddy_data:/data
+      - kiss_pm_prod_caddy_config:/config
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  kiss_pm_prod_postgres_data:
+  kiss_pm_prod_storage:
+  kiss_pm_prod_caddy_data:
+  kiss_pm_prod_caddy_config:

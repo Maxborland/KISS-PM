@@ -1,9 +1,22 @@
 import { randomUUID } from "node:crypto";
 import type { Context, Next } from "hono";
 
-type RequestLogger = Pick<Console, "info" | "error">;
+export type RequestLogger = Pick<Console, "info" | "error">;
 
 const requestIdPattern = /^[A-Za-z0-9._:-]{1,128}$/;
+
+// Достаёт requestId, назначенный requestObservabilityMiddleware: он кладёт его в
+// response-заголовок x-request-id ещё до next(), поэтому в onError (когда цепочка
+// уже бросила) канонический id читается из ответа, а не генерируется заново.
+export function requestIdFromContext(context: Context): string {
+  const fromResponse = context.res.headers.get("x-request-id");
+  if (fromResponse && requestIdPattern.test(fromResponse)) return fromResponse;
+
+  const fromRequest = context.req.header("x-request-id")?.trim();
+  if (fromRequest && requestIdPattern.test(fromRequest)) return fromRequest;
+
+  return "unknown";
+}
 
 export function requestObservabilityMiddleware(input: {
   enabled?: boolean;

@@ -1,0 +1,33 @@
+# Reverse proxy + automatic TLS for a single-domain KISS PM deployment.
+# Mounted read-only into the caddy service by docker-compose.prod.yml.
+# KISS_PM_DOMAIN / KISS_PM_ACME_EMAIL are injected from .env via compose.
+
+{
+	# ACME contact for Let's Encrypt certificate issuance/renewal.
+	email {$KISS_PM_ACME_EMAIL}
+}
+
+{$KISS_PM_DOMAIN} {
+	encode zstd gzip
+
+	# API surface and public health probes are served by the backend directly.
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+	handle /health* {
+		reverse_proxy api:4000
+	}
+
+	# Everything else is the Next.js standalone web app.
+	handle {
+		reverse_proxy web:3000
+	}
+
+	# Caddy adds X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host and
+	# preserves the original Host header, so the API sees the public origin.
+
+	header {
+		# Belt-and-suspenders HSTS at the edge (Next also sets it per-response).
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	}
+}

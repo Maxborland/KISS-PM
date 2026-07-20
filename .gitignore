@@ -12,6 +12,7 @@ test-results/
 .env
 .env.*
 !.env.example
+!.env.prod.example
 *.tsbuildinfo
 tmp-*.log
 .DS_Store

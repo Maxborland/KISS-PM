@@ -18,6 +18,11 @@ COPY apps/api apps/api
 COPY packages packages
 
 RUN pnpm --filter @kiss-pm/api exec esbuild src/server.ts --bundle --platform=node --format=esm --target=node22 --external:redis --outfile=dist/server.js
+# Standalone migration runner so the production image can apply DB migrations
+# without the pnpm workspace (docker-compose.prod.yml runs this as a one-shot).
+# The bundled file lives at apps/api/dist/migrate.js; its `../migrations` lookup
+# resolves to apps/api/migrations, which the runtime stage populates below.
+RUN pnpm --filter @kiss-pm/api exec esbuild ../../packages/persistence/scripts/migrate.mjs --bundle --platform=node --format=esm --target=node22 --outfile=dist/migrate.js
 RUN CI=true pnpm prune --prod
 RUN pnpm --filter @kiss-pm/api install --prod --frozen-lockfile --offline
 
@@ -32,6 +37,8 @@ COPY --from=builder /workspace/apps/api/package.json apps/api/package.json
 COPY --from=builder /workspace/node_modules node_modules
 COPY --from=builder /workspace/apps/api/node_modules apps/api/node_modules
 COPY --from=builder /workspace/apps/api/dist apps/api/dist
+# Migration SQL for the bundled dist/migrate.js runner (see docker-compose.prod.yml).
+COPY --from=builder /workspace/packages/persistence/migrations apps/api/migrations
 
 EXPOSE 4000
 

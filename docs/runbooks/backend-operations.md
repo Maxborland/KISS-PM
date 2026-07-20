@@ -101,7 +101,37 @@ Required backups:
 - Local storage root snapshot or S3 bucket backup/versioning policy.
 - Env/config snapshot without exposing secret values in tickets or audit.
 
-Restore procedure:
+### Scripts
+
+Ручной путь для дампа/восстановления БД:
+
+- [`scripts/backup.sh`](../../scripts/backup.sh) — `pg_dump` из `DATABASE_URL` в
+  gzip-файл `kiss-pm-<UTC-timestamp>.sql.gz` в каталоге `BACKUP_DIR`
+  (по умолчанию `./backups`). Печатает абсолютный путь дампа в stdout, падает при
+  отсутствии `DATABASE_URL`.
+- [`scripts/restore.sh`](../../scripts/restore.sh) — восстановление из указанного
+  `.sql.gz` в `DATABASE_URL`. Деструктивно: требует интерактивного `yes` или флага
+  `--force` (для автоматизации/CI).
+
+Оба скрипта — POSIX `sh`, требуют установленного `postgresql-client`
+(`pg_dump`/`psql`). Пример регулярного бэкапа через cron (ежедневно 03:15 UTC):
+
+```cron
+15 3 * * * DATABASE_URL='postgres://...' BACKUP_DIR='/var/backups/kiss-pm' \
+  /opt/kiss-pm/scripts/backup.sh >> /var/log/kiss-pm-backup.log 2>&1
+```
+
+`restore.sh` в cron не ставится — восстановление запускается только осознанно
+оператором.
+
+Пример ручного вызова:
+
+```bash
+DATABASE_URL='postgres://...' ./scripts/backup.sh
+DATABASE_URL='postgres://...' ./scripts/restore.sh ./backups/kiss-pm-20260720T031500Z.sql.gz
+```
+
+### Restore procedure
 
 1. Stop API traffic.
 2. Restore PostgreSQL backup.
@@ -111,6 +141,31 @@ Restore procedure:
 6. Run smoke checks for auth, project/task/planning, attachments/search and audit.
 
 Database and storage backups must be point-in-time compatible. Restoring only one side can leave dangling file assets or missing objects.
+
+### Restore drill
+
+Регулярно проверяйте, что дамп реально восстановим (backup без проверенного
+restore — это не бэкап):
+
+1. Поднимите пустую одноразовую БД (отдельный контейнер/схема), НЕ production.
+2. Экспортируйте `DATABASE_URL` этой пустой БД.
+3. Прогоните restore из свежего дампа:
+
+   ```bash
+   DATABASE_URL='postgres://kiss_pm:...@127.0.0.1:5432/kiss_pm_drill' \
+     ./scripts/restore.sh --force ./backups/kiss-pm-<timestamp>.sql.gz
+   ```
+
+4. Проверьте целостность: количество строк в ключевых таблицах (`kiss_pm_migrations`,
+   пользователи/проекты/задачи) сходится с ожидаемым, `SELECT` по нескольким
+   сущностям возвращает данные.
+5. Запустите API против восстановленной БД и проверьте `/health/ready`.
+6. Уроните drill-БД после проверки.
+
+Куда класть evidence: результаты drill (дата, имя дампа, размер, вывод restore,
+проверенные счётчики строк, статус `/health/ready`) фиксируйте в
+`.superloopy/evidence/` под каталогом соответствующей волны эксплуатации; secret
+values и connection string с паролем в evidence не попадают.
 
 ## Storage cleanup policy
 

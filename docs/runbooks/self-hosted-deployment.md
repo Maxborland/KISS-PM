@@ -27,6 +27,77 @@
 - `/health/live` only proves process liveness.
 - `/health/ready` is the traffic gate and must include configured DB, storage and Redis realtime dependencies.
 
+## Executable quickstart (single-host Docker)
+
+End-to-end bring-up on one server using `docker-compose.prod.yml` + `Caddyfile`. All host traffic goes through Caddy (TLS on 80/443); postgres, redis, api and web stay on the internal compose network.
+
+### 0. Prerequisites
+
+- A Linux host with Docker Engine + the Docker Compose plugin (`docker compose version`).
+- A domain (e.g. `pm.example.com`) with a DNS **A/AAAA record pointing at the host's public IP**. Let's Encrypt validates over ports 80/443, so both must be reachable from the internet.
+- Outbound SMTP reachable (password-reset email fails closed in production).
+
+### 1. Configure environment
+
+```bash
+git clone <repo> kiss-pm && cd kiss-pm
+cp .env.prod.example .env
+$EDITOR .env   # set KISS_PM_DOMAIN, KISS_PM_ACME_EMAIL, KISS_PM_PUBLIC_ORIGIN,
+               # KISS_PM_POSTGRES_PASSWORD, SMTP_*, OPENROUTER_API_KEY, agent model
+```
+
+`KISS_PM_PUBLIC_ORIGIN` must equal `https://<KISS_PM_DOMAIN>` — it is the trusted browser mutation origin; a mismatch makes every POST/PATCH return 403.
+
+### 2. Build images
+
+```bash
+docker compose -f docker-compose.prod.yml build
+```
+
+Builds `kiss-pm/api:latest` (multi-stage bundle: `dist/server.js` + `dist/migrate.js` + `apps/api/migrations`) and `kiss-pm/web:latest` (Next.js standalone).
+
+### 3. Apply migrations
+
+Migrations run automatically as the one-shot `migrate` service on every `up` (the `api` service waits for it to complete successfully). To run them explicitly first:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm migrate
+```
+
+This executes `node apps/api/dist/migrate.js`, which is idempotent: it creates `kiss_pm_migrations` if absent and applies only pending `*.sql` files in order.
+
+### 4. Start the stack
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Boot order is enforced by healthchecks: postgres/redis healthy → migrate completes → api healthy (`/health/ready`) → web → caddy. Watch progress with `docker compose -f docker-compose.prod.yml ps` and `... logs -f caddy` (certificate issuance).
+
+### 5. Verify over TLS
+
+```bash
+curl -fsS https://<KISS_PM_DOMAIN>/health/ready | jq .
+# => {"status":"ready","product":"KISS PM","checks":{"database":{"status":"ok"}, "storage":{"status":"ok","provider":"local"}, "realtime":{"status":"ok"}}}
+```
+
+A `200` with `status: ready` means DB, local storage and the redis realtime bus are all live. `503`/`not_ready` names the failing dependency (no secrets are exposed).
+
+### 6. First owner sign-in
+
+Open `https://<KISS_PM_DOMAIN>/register` and create the first workspace owner account, then sign in. Dev routes and seed data are intentionally absent in production — the first registration bootstraps the tenant.
+
+### Operations cheat-sheet
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f api        # tail API logs
+docker compose -f docker-compose.prod.yml pull && \
+  docker compose -f docker-compose.prod.yml up -d             # not used (images are local builds)
+docker compose -f docker-compose.prod.yml build && \
+  docker compose -f docker-compose.prod.yml up -d             # deploy a new version (migrate re-runs)
+docker compose -f docker-compose.prod.yml down                # stop (named volumes persist)
+```
+
 ## Backup contract
 
 Backups must be coordinated:

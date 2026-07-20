@@ -105,6 +105,7 @@ import type {
   TaskStatusRecord
 } from "@kiss-pm/persistence";
 import type { AuthRateLimiter } from "./authRateLimit";
+import type { RequestLogger } from "./requestObservability";
 import type { EmailProvider } from "./emailProvider";
 import type { LiveKitEgressProvider } from "./communications/recording/livekitEgressProvider";
 import type { ReadinessChecks } from "./healthRoutes";
@@ -342,6 +343,9 @@ export type CreateAppOptions = {
   // без опции (unit-тесты, dev-fallback) воркер не запущен — false.
   backgroundJobsEnabled?: boolean;
   emailProvider?: EmailProvider;
+  // Инъекция logger для onError (unit-моки). Без опции — console (как в
+  // requestObservability). Пишем только .error, структурным JSON.
+  errorLogger?: RequestLogger;
   readinessChecks?: ReadinessChecks;
   secureCookies?: boolean;
   trustedMutationOrigins?: string[];
