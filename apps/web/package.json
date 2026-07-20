@@ -7,7 +7,7 @@
     "dev": "next dev -H 127.0.0.1 -p 3000",
     "dev:docker": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
-    "start": "next start -H 127.0.0.1 -p 3000",
+    "start": "HOSTNAME=0.0.0.0 PORT=${PORT:-3000} node .next/standalone/apps/web/server.js",
     "typecheck": "next typegen && tsc -p tsconfig.json --pretty false",
     "lint": "next lint",
     "test": "vitest run",

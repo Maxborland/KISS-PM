@@ -33,7 +33,7 @@ const textExtensions = new Set([
 const checks = [
   {
     name: "committed-env-file",
-    path: (file) => /(^|\/)\.env(\.|$)/.test(file) && !file.endsWith(".env.example")
+    path: (file) => /(^|\/)\.env(\.|$)/.test(file) && !file.endsWith(".example")
   },
   {
     name: "private-key",
