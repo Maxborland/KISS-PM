@@ -24,14 +24,18 @@ const EDITABLE_FIELD: Record<string, string> = { comment_task: "body", create_ta
 
 function actionToChange(action: ProposedAction, index: number): AgentChange {
   const allowed = action.capability.allowed;
+  // Честный diff обязателен до подтверждения: mutation с пустым «после» (сервер не смог
+  // сериализовать изменения) НЕ преселектится — иначе пользователь подтвердил бы вслепую.
+  // Карточка остаётся видимой (заголовок + before), но требует ручного выбора.
+  const hasHonestDiff = action.preview.after.trim().length > 0;
   return {
     id: `chg-${index}`,
     number: index + 1,
     title: action.title,
     before: action.preview.before,
     after: action.preview.after,
-    status: allowed ? "выбрано" : "требует прав",
-    selected: allowed,
+    status: allowed ? (hasHonestDiff ? "выбрано" : "отклонено") : "требует прав",
+    selected: allowed && hasHonestDiff,
     editable: Boolean(EDITABLE_FIELD[action.tool])
   };
 }

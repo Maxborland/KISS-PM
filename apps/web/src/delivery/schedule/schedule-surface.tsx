@@ -2217,15 +2217,17 @@ export function ProjectSchedule({ projectId = MOCK_PROJECT_ID }: { projectId?: s
 
       {canManagePlan && taskModal ? <TaskModal open mode={taskModal.mode} initial={taskModal.initial} {...resourceOverrideProps} canAssign={canManageResources} workingMinutesPerDay={projectWorkingTime.workingMinutesPerDay} onOpenChange={(o) => { if (!o) setTaskModal(null); }} onSubmit={submitTaskModal} /> : null}
 
-      {/* Подтверждение необратимого удаления (G3-06): вызов из ПКМ-меню, поэтому контролируемый диалог, а не asChild-триггер */}
+      {/* Подтверждение удаления (G3-06): вызов из ПКМ-меню, поэтому контролируемый диалог, а не asChild-триггер.
+          Удаление обратимо в текущей сессии — компенсирующий коммит по кнопке «Откат» (Блок 9). */}
       {canManagePlan && confirmDelete ? (
         <Dialog open onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}>
           <DialogContent className="max-w-[440px]">
             <DialogHeader>
               <DialogTitle>{`Удалить задачу «${confirmDelete.name}»?`}</DialogTitle>
               <DialogDescription>
-                Задача будет безвозвратно удалена из плана.
-                {confirmDelete.kind === "summary" ? " Вместе с суммарной задачей будут также удалены все её подзадачи." : ""}
+                Задача будет удалена из плана.
+                {confirmDelete.kind === "summary" ? " Вместе с суммарной задачей будут удалены все её подзадачи." : ""}
+                {" Сразу после удаления его можно отменить кнопкой «Откат»."}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

@@ -126,6 +126,15 @@ export type PlanningRepository = {
     proposalId: string;
     appliedAt: Date;
   }): Promise<void>;
+  /** Явное отклонение run авто-солвера (reject-flow, симметрично scenario reject):
+      план не мутирует, run становится неприменимым (apply → 409). */
+  markPlanningSolverRunRejected(input: {
+    tenantId: string;
+    projectId: string;
+    runId: string;
+    rejectedAt: Date;
+    rejectedReason: string | null;
+  }): Promise<void>;
   /** Purge неприменённых истёкших runs (TTL): applied-runs не трогаем — они историческая
       ссылка квитанций. Возвращает счётчики удалённого по обеим таблицам. */
   purgeExpiredPlanningRuns(input: {
@@ -711,6 +720,19 @@ export function createPlanningRepository(db: KissPmDatabase): PlanningRepository
       await db
         .update(planningSolverRuns)
         .set({ appliedProposalId: input.proposalId, appliedAt: input.appliedAt })
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, input.tenantId),
+            eq(planningSolverRuns.projectId, input.projectId),
+            eq(planningSolverRuns.id, input.runId)
+          )
+        );
+    },
+
+    async markPlanningSolverRunRejected(input) {
+      await db
+        .update(planningSolverRuns)
+        .set({ rejectedAt: input.rejectedAt, rejectedReason: input.rejectedReason })
         .where(
           and(
             eq(planningSolverRuns.tenantId, input.tenantId),

@@ -165,6 +165,7 @@ export function ProjectClosureSection({
   const [lessonBusy, setLessonBusy] = useState(false);
 
   const [insights, setInsights] = useState<{ status: "loading" | "ready" | "error"; data: TemplateInsights | null }>({ status: "loading", data: null });
+  const [applyActionId, setApplyActionId] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
   // StrictMode-safe: dev-режим React монтирует эффекты дважды (mount → cleanup →
@@ -294,6 +295,34 @@ export function ProjectClosureSection({
     }
   }
 
+  async function applyImprovement(actionId: string) {
+    if (!canManageLessons || applyActionId) return;
+    setApplyActionId(actionId);
+    try {
+      const result = await closureClient.applyTemplateImprovement(projectId, actionId);
+      if (!mountedRef.current) return;
+      setState((prev) => prev
+        ? {
+            ...prev,
+            templateImprovementActions: prev.templateImprovementActions.map((action) =>
+              action.id === result.action.id ? result.action : action
+            )
+          }
+        : prev);
+      // Обновляем read-only выводы шаблона (счётчик применённых улучшений).
+      if (closedTemplateId) {
+        void closureClient.getTemplateInsights(closedTemplateId)
+          .then((data) => { if (mountedRef.current) setInsights({ status: "ready", data }); })
+          .catch(() => { if (mountedRef.current) setInsights((prev) => prev); });
+      }
+      toast.success("Улучшение шаблона применено");
+    } catch (error) {
+      toast.error(closureErrorText(error, "Не удалось применить улучшение шаблона"));
+    } finally {
+      if (mountedRef.current) setApplyActionId(null);
+    }
+  }
+
   // ── Закрытый проект: статус + дата вместо кнопки, итоги, уроки, выводы ──
   if (snapshot) {
     return (
@@ -365,6 +394,41 @@ export function ProjectClosureSection({
             <p className="mt-1.5 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Только чтение: добавлять уроки могут пользователи с правом управления ретроспективами.</p>
           ) : null}
         </div>
+
+        {state.templateImprovementActions.length > 0 ? (
+          <div data-testid="closure-template-improvements" className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-3">
+            <p className="mb-2 text-[length:var(--text-xs)] font-medium uppercase tracking-[0.04em] text-[var(--muted-soft)]">Предложенные улучшения шаблона</p>
+            <ul className="space-y-2">
+              {state.templateImprovementActions.map((action) => (
+                <li key={action.id} data-testid={`template-improvement-${action.id}`} className="flex flex-wrap items-start justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">{action.title}</span>
+                      <Chip variant={action.status === "applied" ? "success" : action.status === "rejected" ? "danger" : "info"}>
+                        {action.status === "applied" ? "Применено" : action.status === "rejected" ? "Отклонено" : "Предложено"}
+                      </Chip>
+                    </div>
+                    {action.description ? <p className="mt-0.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">{action.description}</p> : null}
+                  </div>
+                  {action.status === "proposed" && canManageLessons ? (
+                    <Button
+                      data-testid={`template-improvement-apply-${action.id}`}
+                      variant="secondary"
+                      size="sm"
+                      disabled={applyActionId !== null}
+                      onClick={() => void applyImprovement(action.id)}
+                    >
+                      {applyActionId === action.id ? "Применяем…" : "Применить"}
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {!canManageLessons ? (
+              <p className="mt-1.5 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Применять улучшения шаблона могут пользователи с правом управления ретроспективами.</p>
+            ) : null}
+          </div>
+        ) : null}
 
         {closedTemplateId ? (
           <div data-testid="closure-insights" className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] p-3">

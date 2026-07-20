@@ -58,6 +58,7 @@ const SOLVER_RESOURCES_PERMISSION = "tenant.project_resources.manage";
 // сбрасываем карточку, пользователь пересчитывает заново (RU-тексты в PLANNING_ERROR_MESSAGES)
 const STALE_SOLVER_CODES = new Set([
   "planning_solver_run_already_applied",
+  "planning_solver_run_already_rejected",
   "planning_solver_run_expired",
   "planning_solver_payload_hash_mismatch",
   "planning_solver_run_not_found",
@@ -91,7 +92,7 @@ const ddmm = (iso: string | null) => { if (!iso) return "—"; const d = new Dat
 const riskOf = (score: number) => score >= 67 ? { label: "высокий риск", cls: "bg-[var(--danger-soft)] text-[var(--danger-text)]" } : score >= 34 ? { label: "средний риск", cls: "bg-[var(--warning-soft)] text-[var(--warning-text)]" } : { label: "низкий риск", cls: "bg-[var(--success-soft)] text-[var(--success-text)]" };
 
 export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: string }) {
-  const { readModel, status, error, reload, previewScenarios, applyScenario, rejectScenario, previewBatch, runAutoSolver, applySolverProposal } = usePlanning(projectId);
+  const { readModel, status, error, reload, previewScenarios, applyScenario, rejectScenario, previewBatch, runAutoSolver, applySolverProposal, rejectSolverRun } = usePlanning(projectId);
   const { live } = usePlanningRuntime();
   // SSE план-событий: чужой коммит делает рассчитанные предложения потенциально устаревшими —
   // баннер с «Обновить» (сброс proposals → авто-превью пересчитает), автоперезагрузки нет.
@@ -136,6 +137,7 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
   const [solverRun, setSolverRun] = useState<{ runId: string; proposals: AutoSolverWireProposal[]; expiresAt: string } | null>(null);
   const [solverBusy, setSolverBusy] = useState(false);
   const [solverApplyBusy, setSolverApplyBusy] = useState(false);
+  const [solverRejectBusy, setSolverRejectBusy] = useState(false);
   const [solverErr, setSolverErr] = useState<string | null>(null);
   const [solverExpired, setSolverExpired] = useState(false);
   const [solverRiskReason, setSolverRiskReason] = useState("");
@@ -377,6 +379,25 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
     }
   };
 
+  // Явное отклонение всего run авто-солвера: план не мутирует, run становится неприменимым.
+  // После успеха сбрасываем карточку — «Рассчитать заново» создаст новый run.
+  const onRejectSolver = async () => {
+    if (!canUseSolver || !solverRun) return;
+    setSolverRejectBusy(true); setSolverErr(null); setSolverReasonError(null);
+    const res = await rejectSolverRun(solverRun.runId);
+    setSolverRejectBusy(false);
+    if (res.ok) {
+      toast.success("Расчёт авто-солвера отклонён");
+      setSolverRiskReason(""); setSolverRun(null);
+    } else if (res.code && STALE_SOLVER_CODES.has(res.code)) {
+      // run уже неприменим (истёк/применён/отклонён другой сессией) — честно сбрасываем карточку
+      setSolverErr(res.message);
+      setSolverRun(null);
+    } else {
+      toast.error(`Не удалось отклонить: ${res.message}`);
+    }
+  };
+
   const FinishChip = ({ d }: { d: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", d > 0 ? "bg-[var(--warning-soft)] text-[var(--warning-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{d > 0 ? `+${d} дн` : "+0 дн"}</span>;
   const OverChip = ({ m }: { m: number }) => <span className={cn("rounded-full px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold", m < 0 ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--panel-strong)] text-[var(--muted-soft)]")}>{m < 0 ? `−${h(-m)} ч` : "0 ч"}</span>;
 
@@ -605,8 +626,13 @@ export function ProjectScenarios({ projectId = MOCK_PROJECT_ID }: { projectId?: 
                   ? <span data-testid="solver-ttl-expired" className="inline-flex items-center rounded-full bg-[var(--warning-soft)] px-2 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--warning-text)]">Расчёт истёк — рассчитайте заново</span>
                   : <span data-testid="solver-ttl" className="inline-flex items-center rounded-full bg-[var(--panel-strong)] px-2 py-0.5 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Расчёт действует до {hhmmLocal(solverRun.expiresAt)}</span>
               ) : null}
+              {canUseSolver && solverRun ? (
+                <Button data-testid="solver-reject" variant="ghost" size="sm" disabled={solverRejectBusy || solverBusy || solverApplyBusy} onClick={() => void onRejectSolver()} title="Отклонить расчёт — предложения больше нельзя будет применить">
+                  <X className={cn("size-3.5", solverRejectBusy && "animate-pulse")} aria-hidden />Отклонить
+                </Button>
+              ) : null}
               {canUseSolver ? (
-                <Button data-testid="solver-run" variant="secondary" size="sm" disabled={solverBusy} onClick={() => void onRunSolver()}>
+                <Button data-testid="solver-run" variant="secondary" size="sm" disabled={solverBusy || solverRejectBusy} onClick={() => void onRunSolver()}>
                   <Wand2 className={cn("size-3.5", solverBusy && "animate-spin")} aria-hidden />{solverRun ? "Рассчитать заново" : "Рассчитать"}
                 </Button>
               ) : null}

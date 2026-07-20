@@ -191,6 +191,25 @@ export function createPlanningProposalRunStore(db: KissPmDatabase) {
             eq(planningSolverRuns.id, input.solverRunId)
           )
         );
+    },
+
+    async markPlanningSolverRunRejected(input: {
+      tenantId: string;
+      projectId: string;
+      runId: string;
+      rejectedAt: Date;
+      rejectedReason: string | null;
+    }): Promise<void> {
+      await db
+        .update(planningSolverRuns)
+        .set({ rejectedAt: input.rejectedAt, rejectedReason: input.rejectedReason })
+        .where(
+          and(
+            eq(planningSolverRuns.tenantId, input.tenantId),
+            eq(planningSolverRuns.projectId, input.projectId),
+            eq(planningSolverRuns.id, input.runId)
+          )
+        );
     }
   };
 }

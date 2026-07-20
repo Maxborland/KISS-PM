@@ -1599,7 +1599,7 @@ describe("planning API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: limitedManagerCookie
         },
-        body: JSON.stringify({ mode: "repair", clientPlanVersion: 1 })
+        body: JSON.stringify({ mode: "schedule", clientPlanVersion: 1 })
       }
     );
     expect(deniedCreate.status).toBe(403);
@@ -1614,7 +1614,7 @@ describe("planning API routes", () => {
           "x-kiss-pm-action": "same-origin",
           cookie: adminCookie
         },
-        body: JSON.stringify({ mode: "repair", clientPlanVersion: 1 })
+        body: JSON.stringify({ mode: "schedule", clientPlanVersion: 1 })
       }
     );
     expect(created.status).toBe(200);

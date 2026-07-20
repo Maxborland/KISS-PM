@@ -1,6 +1,6 @@
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { TenantUser } from "@kiss-pm/domain";
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 
 import type {
   ApiTenantDataSource,
@@ -18,6 +18,16 @@ import { parseProjectIdParam, parseTaskIdParam } from "./routeParamParsers";
 import { createTaskCommandWorkspace } from "./project-work/taskCommandWorkspace";
 import { createTaskReadWorkspace } from "./project-work/taskReadWorkspace";
 import { registerTaskStatusRoutes } from "./project-work/taskStatusRoutes";
+import {
+  createManualProject,
+  transitionProjectStatus,
+  updateProjectSettings,
+  type ProjectStatusAction
+} from "./project-work/projectLifecycle";
+import {
+  parseCreateProjectBody,
+  parseUpdateProjectBody
+} from "./project-work/projectLifecycleParsers";
 
 export type ProjectWorkRouteDeps = {
   dataSource: ApiTenantDataSource;
@@ -41,6 +51,71 @@ export function registerProjectWorkRoutes(app: Hono, deps: ProjectWorkRouteDeps)
   const taskReadWorkspace = createTaskReadWorkspace(deps);
 
   registerTaskStatusRoutes(app, deps);
+
+  // Блок 5 — ручное создание внутреннего проекта (без сделки CRM).
+  app.post("/api/workspace/projects", async (context) => {
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseCreateProjectBody(body.value, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const result = await createManualProject(deps, { actor, fields: parsed.value });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+
+    invalidateCapacityCacheForTenant(actor.tenantId);
+    return context.json({ project: result.project }, result.status);
+  });
+
+  // Блок 5 — редактирование параметров проекта (название/тип/шаблон/календарь).
+  app.patch("/api/workspace/projects/:projectId", async (context) => {
+    const projectId = parseProjectIdParam(context.req.param("projectId"));
+    if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+
+    const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseUpdateProjectBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const result = await updateProjectSettings(deps, {
+      actor,
+      projectId: projectId.value,
+      fields: parsed.value
+    });
+    if (!result.ok) return context.json({ error: result.error }, result.status);
+
+    invalidateCapacityCacheForTenant(actor.tenantId);
+    return context.json({ project: result.project }, result.status);
+  });
+
+  // Блок 5 — статусные переходы жизненного цикла (переоткрытие/пауза/возобновление).
+  // Явные литералы путей (а не цикл) — чтобы они попадали и в inventory-парити OpenAPI.
+  const statusTransitionHandler =
+    (action: ProjectStatusAction) => async (context: Context) => {
+      const projectId = parseProjectIdParam(context.req.param("projectId"));
+      if (!projectId.ok) return context.json({ error: projectId.error }, 400);
+
+      const actor = await getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+      if (!actor) return context.json({ error: "session_required" }, 401);
+
+      const result = await transitionProjectStatus(deps, {
+        actor,
+        projectId: projectId.value,
+        action
+      });
+      if (!result.ok) return context.json({ error: result.error }, result.status);
+
+      invalidateCapacityCacheForTenant(actor.tenantId);
+      return context.json({ project: result.project }, result.status);
+    };
+  app.post("/api/workspace/projects/:projectId/reopen", statusTransitionHandler("reopen"));
+  app.post("/api/workspace/projects/:projectId/pause", statusTransitionHandler("pause"));
+  app.post("/api/workspace/projects/:projectId/resume", statusTransitionHandler("resume"));
 
   app.get("/api/workspace/projects/:projectId", async (context) => {
     const projectId = parseProjectIdParam(context.req.param("projectId"));

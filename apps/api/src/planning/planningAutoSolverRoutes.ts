@@ -14,7 +14,7 @@ import { readLimitedJsonBody } from "../jsonBody";
 import { persistPlanningNotifications } from "../collaborationNotificationService";
 import { invalidateCapacityCacheForTenant } from "../capacity/registerCapacityRoutes";
 import { notifyPlanVersionChanged } from "../planningEventBus";
-import { parsePlanningCommand, parseScenarioApplyEnvelope } from "../planningParsers";
+import { parsePlanningCommand, parseScenarioApplyEnvelope, parseScenarioRejectEnvelope } from "../planningParsers";
 import { previewPlanningCommands } from "./planningCommandCore";
 import { PLANNING_ENGINE_VERSION } from "./planningConstants";
 import { createPlanningReadModel } from "./planningReadModel";
@@ -341,6 +341,25 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
           }, transactionDataSource);
           return { ok: false as const, status: 409, error: "planning_solver_run_already_applied" };
         }
+        if (run.rejectedAt) {
+          await appendPlanningAuditIfConfigured(deps, {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.apply_already_rejected",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId, proposalId },
+            beforeState: {
+              planVersion: snapshot.planVersion,
+              rejectedAt: run.rejectedAt.toISOString(),
+              rejectedReason: run.rejectedReason
+            },
+            afterState: null,
+            permissionResult: readDecision,
+            executionResult: { status: "rejected", reason: "planning_solver_run_already_rejected" }
+          }, transactionDataSource);
+          return { ok: false as const, status: 409, error: "planning_solver_run_already_rejected" };
+        }
         if (run.expiresAt.getTime() <= Date.now()) {
           await appendPlanningAuditIfConfigured(deps, {
             tenantId: actor.tenantId,
@@ -565,6 +584,135 @@ export function registerPlanningAutoSolverRoutes(app: Hono, deps: PlanningRouteD
       return context.json(result.body);
     }
   );
+
+  // Явное отклонение run авто-солвера (reject-flow, симметрично scenario reject).
+  // План не мутирует, версия не растёт; run становится неприменимым (apply → 409
+  // planning_solver_run_already_rejected). RBAC как у create: чтение план-модели +
+  // управление планом и ресурсами (тот же круг, что запускает и применяет солвер).
+  app.post(
+    "/api/workspace/projects/:projectId/planning/auto-solver-runs/:runId/reject",
+    async (context) => {
+      const parsedProjectId = parseProjectRouteParam(context);
+      if (!parsedProjectId.ok) return context.json({ error: parsedProjectId.error }, 400);
+      const parsedRunId = parseSolverRunRouteParam(context);
+      if (!parsedRunId.ok) return context.json({ error: parsedRunId.error }, 400);
+
+      const actor = await deps.getSessionActorFromHeaders(context.req.header("cookie") ?? null);
+      if (!actor) return context.json({ error: "session_required" }, 401);
+      if (!deps.dataSource.appendAuditEvent) {
+        return context.json({ error: "persistence_not_configured" }, 501);
+      }
+
+      const profile = await deps.getActorProfile(actor);
+      const projectId = parsedProjectId.value;
+      const runId = parsedRunId.value;
+
+      const readDecision = canReadPlanningReadModel({ actor, profile });
+      if (!readDecision.allowed) {
+        await appendAutoSolverDeniedAuditIfConfigured(deps, {
+          actor,
+          projectId,
+          runId,
+          operation: "reject",
+          permissionResult: readDecision
+        });
+        return context.json({ error: readDecision.reason }, 403);
+      }
+      const manageDecision = canManageProjectPlan({ actor, profile, targetTenantId: actor.tenantId });
+      if (!manageDecision.allowed) {
+        await appendAutoSolverDeniedAuditIfConfigured(deps, {
+          actor,
+          projectId,
+          runId,
+          operation: "reject",
+          permissionResult: manageDecision
+        });
+        return context.json({ error: manageDecision.reason }, 403);
+      }
+      const resourceManageDecision = canManageProjectResources({
+        actor,
+        profile,
+        targetTenantId: actor.tenantId
+      });
+      if (!resourceManageDecision.allowed) {
+        await appendAutoSolverDeniedAuditIfConfigured(deps, {
+          actor,
+          projectId,
+          runId,
+          operation: "reject",
+          permissionResult: resourceManageDecision
+        });
+        return context.json({ error: resourceManageDecision.reason }, 403);
+      }
+
+      // Тело парсим ПОСЛЕ RBAC (как scenario reject): неавторизованный вызов получает
+      // аудируемый 403, а не различимый 400-пробник формы тела. reason опционален.
+      const body = await readLimitedJsonBody(context);
+      if (!body.ok) return context.json({ error: body.error }, body.status);
+      const parsed = parseScenarioRejectEnvelope(body.value ?? {});
+      if (!parsed.ok) return context.json({ error: "planning_solver_invalid" }, 400);
+
+      const result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+        if (
+          !transactionDataSource.findPlanningSolverRun ||
+          !transactionDataSource.markPlanningSolverRunRejected ||
+          !transactionDataSource.appendAuditEvent ||
+          !transactionDataSource.lockTenantResourcePlanning
+        ) {
+          return { ok: false as const, status: 501, error: "persistence_not_configured" };
+        }
+        // Тот же tenant-lock, что у apply: сериализует гонку apply↔reject одного run.
+        await transactionDataSource.lockTenantResourcePlanning(actor.tenantId);
+        const run = await transactionDataSource.findPlanningSolverRun(actor.tenantId, projectId, runId);
+        if (!run) return { ok: false as const, status: 404, error: "planning_solver_run_not_found" };
+        if (run.appliedAt) {
+          return { ok: false as const, status: 409, error: "planning_solver_run_already_applied" };
+        }
+        if (run.rejectedAt) {
+          return { ok: false as const, status: 409, error: "planning_solver_run_already_rejected" };
+        }
+
+        const rejectedAt = new Date();
+        await transactionDataSource.markPlanningSolverRunRejected({
+          tenantId: actor.tenantId,
+          projectId,
+          runId: run.id,
+          rejectedAt,
+          rejectedReason: parsed.value.reason
+        });
+        await appendPlanningAuditIfConfigured(
+          deps,
+          {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "planning.auto_solver.run_rejected",
+            sourceWorkflow: "planning",
+            sourceEntity: { type: "Project", id: projectId },
+            commandInput: { runId: run.id, reason: parsed.value.reason },
+            beforeState: { planVersion: run.clientPlanVersion },
+            afterState: {
+              rejectedAt: rejectedAt.toISOString(),
+              rejectedReason: parsed.value.reason
+            },
+            permissionResult: manageDecision,
+            executionResult: { status: "succeeded" }
+          },
+          transactionDataSource
+        );
+        return {
+          ok: true as const,
+          body: { runId: run.id, rejectedAt: rejectedAt.toISOString() }
+        };
+      });
+
+      if (!result.ok) {
+        if (result.status === 501) return context.json({ error: result.error }, 501);
+        if (result.status === 404) return context.json({ error: result.error }, 404);
+        return context.json({ error: result.error }, 409);
+      }
+      return context.json(result.body);
+    }
+  );
 }
 
 function parseAutoSolverRunEnvelope(input: unknown):
@@ -575,7 +723,10 @@ function parseAutoSolverRunEnvelope(input: unknown):
   const clientPlanVersion = input.clientPlanVersion;
   const targetDeadline = input.targetDeadline;
   if (
-    (mode !== "schedule" && mode !== "repair") ||
+    // Контракт солвера обещает только реально реализованную ветку «schedule».
+    // Режим «repair» в autoSolver фантомный (не ветвит расчёт), поэтому не принимаем его
+    // на границе API, чтобы клиент не выбирал несуществующее поведение (Блок 9, честность).
+    mode !== "schedule" ||
     typeof clientPlanVersion !== "number" ||
     !Number.isInteger(clientPlanVersion) ||
     clientPlanVersion < 1 ||
@@ -617,7 +768,7 @@ async function appendAutoSolverDeniedAuditIfConfigured(
     projectId: string;
     runId?: string;
     proposalId?: string;
-    operation: "create" | "read" | "apply";
+    operation: "create" | "read" | "apply" | "reject";
     permissionResult: Record<string, unknown>;
   }
 ): Promise<void> {

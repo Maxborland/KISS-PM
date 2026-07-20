@@ -274,10 +274,23 @@ export function registerProjectIntakeRoutes(
     if (!auth.ok) return auth.response;
     const { actor, dataSource } = auth.value;
 
-    return context.json({
-      projects: (await dataSource.listProjects(actor.tenantId)).filter(
-        (project) => project.status === "active"
-      )
-    });
+    // Блок 5: фильтр статуса. Значения — active (по умолчанию) | closed | paused | all.
+    // Неизвестное/отсутствующее значение → active (обратная совместимость: раньше
+    // ручка отдавала только активные проекты).
+    const statusFilter = parseProjectStatusFilter(context.req.query("status"));
+    const all = await dataSource.listProjects(actor.tenantId);
+    const projects =
+      statusFilter === "all"
+        ? all
+        : all.filter((project) => project.status === statusFilter);
+
+    return context.json({ projects });
   });
+}
+
+type ProjectStatusFilter = "active" | "closed" | "paused" | "all";
+
+function parseProjectStatusFilter(value: string | undefined): ProjectStatusFilter {
+  if (value === "closed" || value === "paused" || value === "all") return value;
+  return "active";
 }

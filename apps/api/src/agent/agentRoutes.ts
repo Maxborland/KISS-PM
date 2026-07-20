@@ -53,7 +53,7 @@ const AGENT_SYSTEM_PROMPT = [
 // analyze-инструменты, подключённые к данным/контракту. preview_resource_resolution
 // исполняется вживую через governed-эндпоинт scenarios/preview (он стейджит сценарные run'ы,
 // плана не меняет) — агент получает их id, чтобы предложить применение.
-const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads", "preview_resource_resolution"]);
+const WIRED_ANALYZE = new Set(["list_my_tasks", "read_project_plan", "detect_resource_overloads", "preview_resource_resolution", "list_task_statuses"]);
 // Mutation-инструменты с ручным /execute. OFFERABLE_MUTATIONS — более узкий набор: только
 // действия, для которых review-карточка уже показывает полный честный before/after.
 const EXECUTABLE_MUTATIONS = new Set(["change_task_status", "comment_task", "create_task", "apply_resource_resolution", "apply_plan_commands"]);
@@ -637,13 +637,53 @@ export async function buildActionPreview(
       after: changes.length > 0 ? changes.map((change) => change.after).join("; ") : "Поля не указаны"
     };
   }
+  // Честный «после» для доменных mutation без выделенной ветки: раскрываем вложенный
+  // input.fields (тело governed-роута) в пары «ключ: значение». Прежний фильтр брал
+  // только string/number верхнего уровня — вложенный fields выпадал, карточка была
+  // пустой, и пользователь подтверждал изменение вслепую.
+  const fields = input.fields && typeof input.fields === "object" && !Array.isArray(input.fields)
+    ? (input.fields as Record<string, unknown>)
+    : null;
+  const fieldPairs = fields ? serializePreviewPairs(fields, 1) : [];
+  const scalarPairs = Object.entries(input)
+    .filter(([key, value]) => key !== "fields" && (typeof value === "string" || typeof value === "number"))
+    .map(([key, value]) => `${key}: ${String(value)}`);
+  const after = [...fieldPairs, ...scalarPairs].join(" · ");
   return {
     before: "Текущее значение определяется целевым маршрутом",
-    after: Object.entries(input)
-      .filter(([, value]) => typeof value === "string" || typeof value === "number")
-      .map(([key, value]) => `${key}: ${String(value)}`)
-      .join(" · ")
+    after: after.length > 0 ? after : "Поля не указаны"
   };
+}
+
+// Рекурсивная человекочитаемая сериализация значения для diff-карточки: вложенные
+// объекты/массивы раскрываются в текст (с ограничением глубины и длины), чтобы «после»
+// доменной mutation честно показывал реальные изменения, а не терял вложенный payload.
+const PREVIEW_MAX_DEPTH = 3;
+const PREVIEW_MAX_STR = 200;
+
+function serializePreviewValue(value: unknown, depth: number): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value.length > PREVIEW_MAX_STR ? `${value.slice(0, PREVIEW_MAX_STR)}…` : value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    if (depth >= PREVIEW_MAX_DEPTH) return `[${value.length}]`;
+    return `[${value.map((item) => serializePreviewValue(item, depth + 1)).join(", ")}]`;
+  }
+  if (typeof value === "object") {
+    if (depth >= PREVIEW_MAX_DEPTH) return "{…}";
+    const pairs = serializePreviewPairs(value as Record<string, unknown>, depth + 1);
+    return pairs.length > 0 ? `{ ${pairs.join("; ")} }` : "{}";
+  }
+  return String(value);
+}
+
+function serializePreviewPairs(record: Record<string, unknown>, depth: number): string[] {
+  // hasOwnProperty-гард: ключ вроде "toString"/"__proto__" не должен затянуть член
+  // прототипа в карточку (fail-safe, симметрично гарду update_task).
+  return Object.entries(record)
+    .filter(([key, value]) => Object.prototype.hasOwnProperty.call(record, key) && value !== undefined)
+    .map(([key, value]) => `${key}: ${serializePreviewValue(value, depth)}`);
 }
 
 // Имя файла из content-disposition. filename*=UTF-8''… percent-декодируем (безопасно, с
@@ -832,6 +872,19 @@ export function buildAnalyzeExecutor(deps: ApiRouteDeps, app: ApiApp, cookie: st
       const tasks = await deps.dataSource.listMyWorkTasks(actorTenantId, actorUserId);
       return {
         tasks: tasks.map((task) => ({ id: task.id, title: task.title, statusId: task.statusId, projectId: task.projectId, priority: task.priority }))
+      };
+    }
+
+    if (tool.name === "list_task_statuses") {
+      // Справочник статусов задач тенанта: LLM берёт валидный statusId для
+      // change_task_status, а не галлюцинирует. Только активные статусы —
+      // перевод в архивный execute всё равно отвергнет.
+      if (!deps.dataSource.listTaskStatuses) return { statuses: [], note: "persistence_not_configured" };
+      const statuses = await deps.dataSource.listTaskStatuses(actorTenantId);
+      return {
+        statuses: statuses
+          .filter((status) => status.status === "active")
+          .map((status) => ({ id: status.id, name: status.name, category: status.category }))
       };
     }
 
@@ -1106,6 +1159,11 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       });
       const persisted = await persistProposeTurns(parsed.value, { kind: "success", result, traceSteps });
       return context.json({ ...result, ...(persisted ?? {}) });
+    } catch (error) {
+      // Сбой LLM/аплинка (сеть, таймаут, 5xx апстрима) — честный 502 Bad Gateway с
+      // кодом, а не generic 500: клиент отличает «апстрим агента упал» от внутренней
+      // ошибки. SSE-вариант эмитит такой же error-эвент — симметрия контракта.
+      return context.json({ error: error instanceof Error ? error.message : "agent_failed" }, 502);
     } finally {
       slot.release();
     }

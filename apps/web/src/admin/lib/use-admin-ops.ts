@@ -12,6 +12,7 @@ import {
   type BackgroundJobRun,
   type BackgroundJobStatus,
   type ProductionCalendar,
+  type ProductionCalendarBaseModeInput,
   type ProductionCalendarBulkItem,
   type ResourceAbsence,
   type WorkspaceUser
@@ -97,7 +98,27 @@ export function useProductionCalendar(year: number) {
     [client, reload]
   );
 
-  return { calendar, status, error, reload, upsertExceptions };
+  // Правка базового режима недели (PATCH): ёмкость/CPM считаются от него.
+  const updateBaseMode = useCallback(
+    (input: ProductionCalendarBaseModeInput): Promise<MutationResult> =>
+      guardMutation(async () => {
+        await client.updateProductionCalendarBaseMode(input);
+        await reload();
+      }),
+    [client, reload]
+  );
+
+  // Удаление исключения (DELETE) — ошибочный праздник/сокращённый день.
+  const deleteException = useCallback(
+    (exceptionId: string): Promise<MutationResult> =>
+      guardMutation(async () => {
+        await client.deleteProductionCalendarException(exceptionId);
+        await reload();
+      }),
+    [client, reload]
+  );
+
+  return { calendar, status, error, reload, upsertExceptions, updateBaseMode, deleteException };
 }
 
 /**

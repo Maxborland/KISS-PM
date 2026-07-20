@@ -204,6 +204,111 @@ export function buildCompensatingCommands(
         }
       ];
     }
+    case "task.delete_or_archive": {
+      // Обратимость удаления ветки WBS (Блок 9): по снапшоту «до» пересоздаём задачу
+      // (task.create) и восстанавливаем поля, которые create не переносит (прогресс,
+      // рабочая модель, кастом-поля), её назначения с распределением и связи. Так ошибочное
+      // удаление откатывается кнопкой «Откат» тем же путём apply, что и остальные команды.
+      const taskId = command.payload.taskId;
+      const source = before.authored.tasks.find((task) => String(task.id) === taskId);
+      if (!source) return [];
+      const assignments = before.authored.assignments.filter(
+        (assignment) => String(assignment.taskId) === taskId
+      );
+      const commands: PlanningCommand[] = [
+        {
+          type: "task.create",
+          payload: {
+            id: taskId,
+            projectId: String(before.project.id),
+            parentTaskId: source.parentTaskId ?? null,
+            title: source.title,
+            statusId: source.statusId,
+            plannedStart: source.plannedStart ?? null,
+            plannedFinish: source.plannedFinish ?? null,
+            durationMinutes: source.durationMinutes ?? null,
+            workMinutes: source.workMinutes,
+            assignments: assignments.map((assignment) => ({
+              id: assignment.id,
+              resourceId: assignment.resourceId,
+              role: assignment.role,
+              unitsPermille: assignment.unitsPermille,
+              workMinutes: assignment.workMinutes
+            }))
+          }
+        },
+        // create добавляет задачу В КОНЕЦ ветки — возвращаем её на исходную позицию среди
+        // сиблингов (ревью #265). Последний сегмент wbsCode «1.2» = 1-based позиция (2),
+        // sortOrder move_wbs — 0-based индекс вставки, поэтому позиция минус 1.
+        {
+          type: "task.move_wbs" as const,
+          payload: {
+            taskId,
+            parentTaskId: source.parentTaskId ?? null,
+            sortOrder: Math.max(0, (Number.parseInt(String(source.wbsCode).split(".").at(-1) ?? "1", 10) || 1) - 1)
+          }
+        },
+        // create фиксирует taskType=fixed_units/effortDriven=false и progress=0 — возвращаем прежние
+        {
+          type: "task.update_work_model",
+          payload: {
+            taskId,
+            taskType: source.taskType,
+            effortDriven: source.effortDriven,
+            durationMinutes: source.durationMinutes ?? null,
+            workMinutes: source.workMinutes
+          }
+        }
+      ];
+      if (source.percentComplete > 0) {
+        commands.push({
+          type: "task.update_progress",
+          payload: { taskId, percentComplete: source.percentComplete }
+        });
+      }
+      for (const [fieldKey, value] of Object.entries(source.customFields ?? {})) {
+        commands.push({ type: "task.update_custom_field", payload: { taskId, fieldKey, value } });
+      }
+      // распределение труда назначений (assignmentAllocations create не переносит)
+      for (const assignment of assignments) {
+        const allocations = before.authored.assignmentAllocations
+          .filter((allocation) => String(allocation.assignmentId) === String(assignment.id))
+          .map(({ date, workMinutes }) => ({ date, workMinutes }));
+        if (allocations.length > 0) {
+          commands.push({
+            type: "assignment.allocations.replace",
+            payload: { assignmentId: assignment.id, allocations }
+          });
+        }
+      }
+      // связи, которых касалась удалённая задача (summary-задачи связей не имеют по правилам домена)
+      for (const dep of before.authored.dependencies) {
+        if (String(dep.predecessorTaskId) === taskId || String(dep.successorTaskId) === taskId) {
+          commands.push({
+            type: "dependency.upsert",
+            payload: {
+              id: String(dep.id),
+              predecessorTaskId: String(dep.predecessorTaskId),
+              successorTaskId: String(dep.successorTaskId),
+              dependencyType: dep.type,
+              lagMinutes: Number(dep.lagMinutes ?? 0)
+            }
+          });
+        }
+      }
+      if (source.constraint) {
+        commands.push({
+          type: "constraint.update",
+          payload: {
+            taskId,
+            constraintId: String(source.constraint.id),
+            type: source.constraint.type,
+            date: source.constraint.date ?? null
+          }
+        });
+      }
+      return commands;
+    }
     default:
       return [];
   }
@@ -215,5 +320,15 @@ export function buildCompensatingCommandBatch(
 ): PlanningCommand[] {
   const groups = commands.map((command) => buildCompensatingCommands(command, before));
   if (groups.some((group) => group.length === 0)) return [];
-  return groups.reverse().flat();
+  const flat = groups.reverse().flat();
+  // Пересоздание (task.create) должно предшествовать всему, что ссылается на задачи
+  // (dependency.upsert между сёстрами, assignment/constraint) — иначе в откате удалённого
+  // поддерева связь сослалась бы на ещё не созданную задачу и валидация отклонила бы пакет.
+  // Стабильная секционировка: сначала все creates (в их порядке — родитель раньше ребёнка,
+  // т.к. удаление шло листья→корень и уже перевёрнуто), затем остальное. Для команд без
+  // task.create (все прочие откаты) порядок не меняется.
+  if (!flat.some((command) => command.type === "task.create")) return flat;
+  const creates = flat.filter((command) => command.type === "task.create");
+  const rest = flat.filter((command) => command.type !== "task.create");
+  return [...creates, ...rest];
 }

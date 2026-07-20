@@ -140,6 +140,9 @@ export function createCrmClient(options: CrmApiClientOptions) {
     updateProduct(productId: string, input: Record<string, unknown>) { return requestJson<{ product: Product }>(`/api/workspace/products/${enc(productId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     listDealStages() { return requestJson<{ dealStages: DealStage[] }>("/api/workspace/deal-stages"); },
     listProjectTypes() { return requestJson<{ projectTypes: ProjectType[] }>("/api/workspace/project-types"); },
+    // Типы проектов (конструктор CRM): создание/полное обновление. PATCH — full-replace (боевой parseProjectTypeBody).
+    createProjectType(input: { name: string; description?: string | null; status?: CrmStatus }) { return requestJson<{ projectType: ProjectType }>("/api/workspace/project-types", { method: "POST", body: JSON.stringify(input) }); },
+    updateProjectType(projectTypeId: string, input: { name: string; description?: string | null; status?: CrmStatus }) { return requestJson<{ projectType: ProjectType }>(`/api/workspace/project-types/${enc(projectTypeId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     // Справочник пользователей — резолв владельца/автора/исполнителя сделки (отображение аватара/имени).
     listUsers() { return requestJson<{ users: CrmUser[] }>("/api/workspace/users"); },
 
@@ -155,6 +158,8 @@ export function createCrmClient(options: CrmApiClientOptions) {
     createPipeline(input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) { return requestJson<{ pipeline: Pipeline }>("/api/workspace/pipelines", { method: "POST", body: JSON.stringify(input) }); },
     // Стадия сделки (POST /deal-stages): нужна бутстрапу первой воронки — воронка без стадий неюзабельна.
     createDealStage(input: { name: string; sortOrder: number; pipelineId?: string | null; status?: CrmStatus }) { return requestJson<{ dealStage: DealStage }>("/api/workspace/deal-stages", { method: "POST", body: JSON.stringify(input) }); },
+    // Стадия (PATCH /deal-stages/:id): full-replace name/sortOrder/status — воронка сохраняется сервером (боевой parseDealStageBody + before-state). Нужна конструктору для переименования/переупорядочивания/архивации стадий.
+    updateDealStage(stageId: string, input: { name: string; sortOrder: number; status?: CrmStatus }) { return requestJson<{ dealStage: DealStage }>(`/api/workspace/deal-stages/${enc(stageId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     updatePipeline(pipelineId: string, input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) { return requestJson<{ pipeline: Pipeline }>(`/api/workspace/pipelines/${enc(pipelineId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     listStageTransitions(pipelineId: string) { return requestJson<{ stageTransitions: StageTransition[] }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`); },
     createStageTransition(pipelineId: string, input: { fromStageId: string; toStageId: string; requireFeasibilityOk?: boolean; minProbability?: number | null; guardNote?: string | null }) { return requestJson<{ stageTransition: StageTransition }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`, { method: "POST", body: JSON.stringify(input) }); },

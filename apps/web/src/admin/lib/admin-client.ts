@@ -106,6 +106,10 @@ export type ProductionCalendar = {
 export type ProductionCalendarBulkItem = {
   id?: string; date: string; workingMinutes: number; reason?: string | null; resourceId?: string | null;
 };
+// Тело PATCH базового режима недели: рабочие дни ISO 1..7 (уникальные, 1..7 шт.), длительность дня 1..1440.
+export type ProductionCalendarBaseModeInput = {
+  workingWeekdays: number[]; workingMinutesPerDay: number;
+};
 
 // Прогон фоновой задачи (боевой serializeJobRun из backgroundJobRoutes: даты — ISO-строки).
 export type BackgroundJobStatus = "queued" | "running" | "succeeded" | "dead" | "cancelled";
@@ -189,11 +193,17 @@ export function createAdminClient(options: AdminApiClientOptions) {
     createAbsence(input: AbsenceCreateInput) { return requestJson<{ absence: ResourceAbsence }>("/api/tenant/current/absences", { method: "POST", body: JSON.stringify(input) }); },
     deleteAbsence(absenceId: string) { return requestJson<{ ok: true }>(`/api/tenant/current/absences/${enc(absenceId)}`, { method: "DELETE" }); },
 
-    // производственный календарь (год 2000..2100; ответ без обёртки). Удаления исключения
-    // в боевом API нет — только bulk-upsert (честно отражено в UI).
+    // производственный календарь (год 2000..2100; ответ без обёртки). PATCH правит базовый
+    // режим недели, DELETE удаляет исключение по id — оба под tenant.workspace_config.manage.
     getProductionCalendar(year?: number) { return requestJson<ProductionCalendar>(`/api/tenant/current/production-calendar${year ? `?year=${year}` : ""}`); },
+    updateProductionCalendarBaseMode(input: ProductionCalendarBaseModeInput) {
+      return requestJson<ProductionCalendar>("/api/tenant/current/production-calendar", { method: "PATCH", body: JSON.stringify(input) });
+    },
     bulkUpsertProductionCalendarExceptions(exceptions: ProductionCalendarBulkItem[]) {
       return requestJson<ProductionCalendar>("/api/tenant/current/production-calendar/bulk", { method: "POST", body: JSON.stringify({ exceptions }) });
+    },
+    deleteProductionCalendarException(exceptionId: string) {
+      return requestJson<{ ok: true }>(`/api/tenant/current/production-calendar/exceptions/${enc(exceptionId)}`, { method: "DELETE" });
     },
 
     // фоновые задачи (read-only обзор: список прогонов + события прогона)

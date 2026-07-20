@@ -769,6 +769,33 @@ export const crmProjectSchemas = openApiSchemaFragment({
     properties: { project: schemaRef("Project") },
     additionalProperties: false
   },
+  ProjectCreateRequest: {
+    type: "object",
+    required: ["title", "plannedStart", "plannedFinish"],
+    properties: {
+      id: stringIdSchema,
+      title: { type: "string", minLength: 1, maxLength: 160 },
+      clientName: { type: "string", maxLength: 120 },
+      projectTypeId: nullableStringSchema,
+      templateId: nullableStringSchema,
+      calendarId: nullableStringSchema,
+      plannedStart: dateSchema,
+      plannedFinish: dateSchema,
+      contractValue: { type: "integer", minimum: 0 },
+      plannedHours: { type: "integer", minimum: 0 }
+    },
+    additionalProperties: false
+  },
+  ProjectUpdateRequest: {
+    type: "object",
+    properties: {
+      title: { type: "string", minLength: 1, maxLength: 160 },
+      projectTypeId: nullableStringSchema,
+      templateId: nullableStringSchema,
+      calendarId: nullableStringSchema
+    },
+    additionalProperties: false
+  },
   Project: {
     type: "object",
     required: [

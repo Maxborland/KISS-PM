@@ -139,13 +139,62 @@ export type ProjectRecord = {
   demand: PositionDemand[];
 };
 
+// Фильтр статуса списка проектов и статусные действия жизненного цикла (Блок 5).
+export type ProjectStatusFilter = "active" | "closed" | "paused" | "all";
+export type ProjectStatusAction = "reopen" | "pause" | "resume";
+
+// Тело ручного создания проекта. Даты — ISO YYYY-MM-DD (как боевой parseCreateProjectBody).
+export type CreateProjectInput = {
+  title: string;
+  clientName?: string;
+  projectTypeId?: string | null;
+  templateId?: string | null;
+  calendarId?: string | null;
+  plannedStart: string;
+  plannedFinish: string;
+  contractValue?: number;
+  plannedHours?: number;
+};
+
+// Частичное редактирование параметров проекта.
+export type UpdateProjectInput = {
+  title?: string;
+  projectTypeId?: string | null;
+  templateId?: string | null;
+  calendarId?: string | null;
+};
+
 export function createWorkspaceClient(options: WorkspaceApiClientOptions) {
   const requestJson = createRequestJson(options);
 
   const enc = encodeURIComponent;
   return {
-    // Активные проекты рабочей области (GET /api/workspace/projects → только status==="active").
-    listProjects() { return requestJson<{ projects: ProjectRecord[] }>("/api/workspace/projects"); },
+    // Проекты рабочей области (GET /api/workspace/projects). Фильтр статуса:
+    // active (по умолчанию) | closed | paused | all — см. projectIntakeRoutes.
+    listProjects(status?: ProjectStatusFilter) {
+      const query = status && status !== "active" ? `?status=${status}` : "";
+      return requestJson<{ projects: ProjectRecord[] }>(`/api/workspace/projects${query}`);
+    },
+    // Ручное создание внутреннего проекта без сделки (POST /api/workspace/projects → {project}).
+    createProject(input: CreateProjectInput) {
+      return requestJson<{ project: ProjectRecord }>("/api/workspace/projects", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    },
+    // Редактирование параметров проекта (PATCH /api/workspace/projects/:projectId → {project}).
+    updateProject(projectId: string, input: UpdateProjectInput) {
+      return requestJson<{ project: ProjectRecord }>(`/api/workspace/projects/${enc(projectId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(input)
+      });
+    },
+    // Статусные переходы жизненного цикла (POST …/reopen|pause|resume → {project}).
+    setProjectStatus(projectId: string, action: ProjectStatusAction) {
+      return requestJson<{ project: ProjectRecord }>(`/api/workspace/projects/${enc(projectId)}/${action}`, {
+        method: "POST"
+      });
+    },
     // Карточка проекта + его задачи (GET /api/workspace/projects/:projectId). 404 на чужой/неактивный.
     getProjectDetail(projectId: string) { return requestJson<{ project: ProjectRecord; tasks: TaskRecord[] }>(`/api/workspace/projects/${enc(projectId)}`); },
     // Задачи текущего пользователя по всем проектам (GET /api/workspace/my-work).

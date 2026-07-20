@@ -80,9 +80,16 @@ export type AutoSolverRunDetailResponse = AutoSolverRunResponse & {
 };
 
 export type AutoSolverRunRequest = {
-  mode: AutoPlanningSolverMode;
+  // Контракт принимает только реализованную ветку «schedule»: режим «repair» в autoSolver
+  // фантомный (не ветвит расчёт) и API его отклоняет — не предлагаем его и в типе клиента.
+  mode: "schedule";
   clientPlanVersion: number;
   targetDeadline?: string | null;
+};
+
+export type AutoSolverRunRejectResponse = {
+  runId: string;
+  rejectedAt: string;
 };
 
 export type PlanningApplyResponse = {

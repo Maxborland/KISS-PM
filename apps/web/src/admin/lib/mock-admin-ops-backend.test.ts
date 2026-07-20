@@ -114,6 +114,52 @@ describe("contract-mock admin ops backend: production calendar", () => {
       { date: `${year}-05-01`, workingMinutes: 2000 }
     ])).rejects.toMatchObject({ status: 400, code: "production_calendar_invalid" });
   });
+
+  it("bulk response reflects the edited items' year, not the current one", async () => {
+    const c = client();
+    const otherYear = year + 1;
+    const view = await c.bulkUpsertProductionCalendarExceptions([
+      { id: "pc-next-year", date: `${otherYear}-07-01`, workingMinutes: 0, reason: "Проверка года" }
+    ]);
+    expect(view.year).toBe(otherYear);
+    expect(view.exceptions.some((e) => e.id === "pc-next-year")).toBe(true);
+  });
+
+  it("PATCH updates the base weekly mode (6-day / 12h) and it drives the calendar view", async () => {
+    const c = client();
+    const updated = await c.updateProductionCalendarBaseMode({
+      workingWeekdays: [1, 2, 3, 4, 5, 6], workingMinutesPerDay: 720
+    });
+    expect(updated.workingWeekdays).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(updated.workingMinutesPerDay).toBe(720);
+    const calendar = await c.getProductionCalendar(year);
+    expect(calendar.workingWeekdays).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(calendar.workingMinutesPerDay).toBe(720);
+  });
+
+  it("rejects invalid base mode (empty weekdays / bad minutes) with production_calendar_invalid", async () => {
+    const c = client();
+    await expect(c.updateProductionCalendarBaseMode({ workingWeekdays: [], workingMinutesPerDay: 480 }))
+      .rejects.toMatchObject({ status: 400, code: "production_calendar_invalid" });
+    await expect(c.updateProductionCalendarBaseMode({ workingWeekdays: [1, 8], workingMinutesPerDay: 480 }))
+      .rejects.toMatchObject({ status: 400, code: "production_calendar_invalid" });
+    await expect(c.updateProductionCalendarBaseMode({ workingWeekdays: [1, 2], workingMinutesPerDay: 0 }))
+      .rejects.toMatchObject({ status: 400, code: "production_calendar_invalid" });
+  });
+
+  it("deletes an exception; invalid id → 400, missing → 404", async () => {
+    const c = client();
+    await c.bulkUpsertProductionCalendarExceptions([
+      { id: "pc-to-delete", date: `${year}-08-15`, workingMinutes: 0, reason: "Ошибочный праздник" }
+    ]);
+    await expect(c.deleteProductionCalendarException("!!"))
+      .rejects.toMatchObject({ status: 400, code: "production_calendar_invalid" });
+    await expect(c.deleteProductionCalendarException("pc-absent-exception"))
+      .rejects.toMatchObject({ status: 404, code: "production_calendar_exception_not_found" });
+    await expect(c.deleteProductionCalendarException("pc-to-delete")).resolves.toEqual({ ok: true });
+    const calendar = await c.getProductionCalendar(year);
+    expect(calendar.exceptions.some((e) => e.id === "pc-to-delete")).toBe(false);
+  });
 });
 
 describe("contract-mock admin ops backend: background jobs (read-only)", () => {

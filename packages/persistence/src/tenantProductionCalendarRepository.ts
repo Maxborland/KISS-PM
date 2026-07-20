@@ -29,6 +29,17 @@ export type TenantProductionCalendarBulkItem = {
   resourceId?: string | null;
 };
 
+export type TenantProductionCalendarBaseMode = {
+  calendarId: string;
+  workingWeekdays: number[];
+  workingMinutesPerDay: number;
+};
+
+export type TenantProductionCalendarBaseModeInput = {
+  workingWeekdays: number[];
+  workingMinutesPerDay: number;
+};
+
 export type TenantProductionCalendarRepository = {
   getProductionCalendar(
     tenantId: TenantId,
@@ -40,10 +51,19 @@ export type TenantProductionCalendarRepository = {
     workingMinutesPerDay: number;
     exceptions: TenantProductionCalendarExceptionRecord[];
   }>;
+  getBaseMode(tenantId: TenantId): Promise<TenantProductionCalendarBaseMode>;
+  updateBaseMode(
+    tenantId: TenantId,
+    input: TenantProductionCalendarBaseModeInput
+  ): Promise<TenantProductionCalendarBaseMode>;
   bulkUpsertExceptions(
     tenantId: TenantId,
     items: TenantProductionCalendarBulkItem[]
   ): Promise<void>;
+  deleteException(
+    tenantId: TenantId,
+    exceptionId: string
+  ): Promise<TenantProductionCalendarExceptionRecord | null>;
   listExceptionsForYear(
     tenantId: TenantId,
     year: number
@@ -72,6 +92,67 @@ export function createTenantProductionCalendarRepository(
         workingMinutesPerDay:
           calendar?.workingMinutesPerDay ?? DEFAULT_WORKING_MINUTES_PER_DAY,
         exceptions
+      };
+    },
+
+    async getBaseMode(tenantId) {
+      const [calendar] = await db
+        .select()
+        .from(tenantProductionCalendars)
+        .where(eq(tenantProductionCalendars.tenantId, tenantId))
+        .limit(1);
+      return {
+        calendarId: calendar?.calendarId ?? TENANT_DEFAULT_CALENDAR_ID,
+        workingWeekdays: calendar?.workingWeekdays ?? [...DEFAULT_WORKING_WEEKDAYS],
+        workingMinutesPerDay:
+          calendar?.workingMinutesPerDay ?? DEFAULT_WORKING_MINUTES_PER_DAY
+      };
+    },
+
+    async updateBaseMode(tenantId, input) {
+      const now = new Date();
+      const workingWeekdays = [...input.workingWeekdays];
+      await db
+        .insert(tenantProductionCalendars)
+        .values({
+          tenantId,
+          calendarId: TENANT_DEFAULT_CALENDAR_ID,
+          workingWeekdays,
+          workingMinutesPerDay: input.workingMinutesPerDay,
+          updatedAt: now
+        })
+        .onConflictDoUpdate({
+          target: tenantProductionCalendars.tenantId,
+          set: {
+            workingWeekdays,
+            workingMinutesPerDay: input.workingMinutesPerDay,
+            updatedAt: now
+          }
+        });
+      return {
+        calendarId: TENANT_DEFAULT_CALENDAR_ID,
+        workingWeekdays,
+        workingMinutesPerDay: input.workingMinutesPerDay
+      };
+    },
+
+    async deleteException(tenantId, exceptionId) {
+      const [row] = await db
+        .delete(tenantProductionCalendarExceptions)
+        .where(
+          and(
+            eq(tenantProductionCalendarExceptions.tenantId, tenantId),
+            eq(tenantProductionCalendarExceptions.id, exceptionId)
+          )
+        )
+        .returning();
+      if (!row) return null;
+      return {
+        id: row.id,
+        date: row.date,
+        workingMinutes: row.workingMinutes,
+        reason: row.reason,
+        resourceId: row.resourceId
       };
     },
 

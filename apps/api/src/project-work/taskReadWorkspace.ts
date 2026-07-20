@@ -82,7 +82,7 @@ async function getProjectDetail(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  const project = await findActiveProject(
+  const project = await findReadableProject(
     deps.dataSource,
     input.actor.tenantId,
     input.projectId
@@ -111,7 +111,7 @@ async function listProjectTasks(
   });
   if (!decision.allowed) return { ok: false, status: 403, error: decision.reason };
 
-  const project = await findActiveProject(
+  const project = await findReadableProject(
     deps.dataSource,
     input.actor.tenantId,
     input.projectId
@@ -228,4 +228,20 @@ async function findActiveProject(
 ): Promise<ProjectRecord | undefined> {
   const projects = await dataSource.listProjects?.(tenantId);
   return projects?.find((project) => project.id === projectId && project.status === "active");
+}
+
+// Для ЧТЕНИЯ (детали/задачи) проект любого статуса, включая closed/paused — иначе
+// строки из списка со статус-фильтром вели бы в 404 (ревью #265). Мутации задач
+// остаются на findActiveProject (не-active проекты не редактируются).
+async function findReadableProject(
+  dataSource: ApiTenantDataSource,
+  tenantId: string,
+  projectId: string
+): Promise<ProjectRecord | undefined> {
+  if (dataSource.findProjectById) {
+    const project = await dataSource.findProjectById(tenantId, projectId);
+    if (project) return project;
+  }
+  const projects = await dataSource.listProjects?.(tenantId);
+  return projects?.find((project) => project.id === projectId);
 }

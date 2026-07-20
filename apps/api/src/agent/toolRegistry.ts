@@ -47,6 +47,14 @@ const HANDWIRED_TOOLS: AgentTool[] = [
     capability: tenantCapability(canReadProjectPlan)
   },
   {
+    name: "list_task_statuses",
+    title: "Статусы задач",
+    description: "Вернуть справочник статусов задач тенанта (id, название, категория). Используй, чтобы взять корректный statusId для смены статуса задачи, а не угадывать его. Только чтение.",
+    kind: "analyze",
+    inputSchema: { type: "object", properties: {} },
+    capability: tenantCapability(canReadProjects)
+  },
+  {
     name: "detect_resource_overloads",
     title: "Найти перегрузки ресурсов",
     description: "Найти перегруженные ресурсы по тенанту/проекту (capacity summary + read-model overloads): кто перегружен, на сколько минут, какие задачи. Только чтение.",
