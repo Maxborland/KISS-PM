@@ -27,7 +27,13 @@ export function ChatThread({
   auditLinkEnabled?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const lastMessageId = messages[messages.length - 1]?.id;
+  // Инвариант рендера: каждый turn.id — ровно одна строка. Пути добавления
+  // (optimistic, adoptServerIds, realtime, гидрация) дедупятся по id, но живой
+  // SSE-стрим может транзиентно дать два сообщения с одним id (напр. двойная
+  // подписка realtime под dev-StrictMode) — это ронял React-варнингом о дубль-ключе
+  // и мог дублировать/ронять строку. Схлопываем по id, сохраняя первое вхождение.
+  const renderMessages = dedupeMessagesById(messages);
+  const lastMessageId = renderMessages[renderMessages.length - 1]?.id;
   // Чат открывается на ПОСЛЕДНЕМ сообщении (гидрация вставляет историю сверху) и
   // докручивается при новых ходах; префикс «Показать раньше» last id не меняет —
   // позиция чтения при подгрузке старого не прыгает.
@@ -42,8 +48,8 @@ export function ChatThread({
       aria-label="Диалог с агентом"
       className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 md:px-6"
     >
-      {messages.length === 0 && !thinking && !historyLoading ? <ChatEmpty /> : null}
-      {messages.map((message) =>
+      {renderMessages.length === 0 && !thinking && !historyLoading ? <ChatEmpty /> : null}
+      {renderMessages.map((message) =>
         message.role === "trace" ? (
           // aria-live=off: шаги уже были озвучены при стриме — повторная вставка
           // завершённого трейса не должна объявляться второй раз.
@@ -57,6 +63,19 @@ export function ChatThread({
       {thinking ? <TraceSteps steps={liveSteps} done={false} /> : null}
     </div>
   );
+}
+
+// Схлопывает сообщения по id, сохраняя первое вхождение и исходный порядок.
+// Гарантирует уникальность React-ключей треда независимо от гонок стрима.
+export function dedupeMessagesById(messages: AgentMessage[]): AgentMessage[] {
+  const seen = new Set<string>();
+  const result: AgentMessage[] = [];
+  for (const message of messages) {
+    if (seen.has(message.id)) continue;
+    seen.add(message.id);
+    result.push(message);
+  }
+  return result;
 }
 
 function ChatEmpty() {
