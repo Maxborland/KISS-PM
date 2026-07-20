@@ -97,6 +97,22 @@ export type UserNotificationInput = Omit<
   UserNotification,
   "createdAt" | "readAt" | "archivedAt"
 >;
+// Проекция уведомления для offline-доставки: только поля, нужные письму-дайджесту
+// и проверке прав. Отдельный тип, чтобы маркер delivered_at не протекал в
+// доменный UserNotification (in-app контракт остаётся неизменным).
+export type PendingNotificationDelivery = {
+  id: string;
+  tenantId: TenantId;
+  userId: UserId;
+  notificationType: NotificationType;
+  sourceEntityType: string;
+  sourceEntityId: string;
+  title: string;
+  body: string;
+  route: string;
+  createdAt: Date;
+};
+
 export type MeetingInput = Omit<Meeting, "createdAt" | "archivedAt">;
 export type MeetingExternalLinkInput = Omit<
   MeetingExternalLink,
@@ -262,6 +278,35 @@ export type CollaborationRepository = {
   listNotificationPreferences(
     tenantId: TenantId,
     userId: UserId
+  ): Promise<NotificationPreference[]>;
+  // Очередь offline-доставки: ОДИН запрос на тенант вместо перебора
+  // пользователей. Отдаёт непрочитанные, неархивные и ещё не размеченные
+  // маркером delivered_at уведомления в порядке создания (старые первыми).
+  listPendingNotificationDeliveries(input: {
+    tenantId: TenantId;
+    limit: number;
+  }): Promise<PendingNotificationDelivery[]>;
+  // Проставляет маркер вручения пачкой. Возвращает число реально размеченных
+  // строк (повторный вызов по тем же id вернёт 0 — маркер уже стоит).
+  markUserNotificationsDelivered(input: {
+    tenantId: TenantId;
+    notificationIds: readonly string[];
+    deliveredAt: Date;
+  }): Promise<number>;
+  // Учёт ТРАНЗИЕНТНОГО отказа доставки: +1 к счётчику попыток, а на попытке
+  // maxAttempts — dead-letter (ставится маркер, письма по строке больше не
+  // будет). Без этого «мёртвый» ящик одного пользователя навсегда занимает
+  // голову очереди тенанта: выборка идёт по created_at ASC с лимитом.
+  recordFailedNotificationDeliveries(input: {
+    tenantId: TenantId;
+    notificationIds: readonly string[];
+    maxAttempts: number;
+    deadLetteredAt: Date;
+  }): Promise<{ retried: number; deadLettered: number }>;
+  // Настройки уведомлений сразу по набору пользователей (один inArray-запрос).
+  listNotificationPreferencesForUsers(
+    tenantId: TenantId,
+    userIds: readonly UserId[]
   ): Promise<NotificationPreference[]>;
   upsertNotificationPreferences(input: NotificationPreference[]): Promise<NotificationPreference[]>;
   createMeeting(input: MeetingInput): Promise<Meeting>;
@@ -1246,6 +1291,89 @@ export function createCollaborationRepository(db: KissPmDatabase): Collaboration
         .orderBy(asc(notificationPreferences.channel), asc(notificationPreferences.notificationType));
       return rows.map(mapNotificationPreference);
     },
+    async listNotificationPreferencesForUsers(tenantId, userIds) {
+      if (userIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(notificationPreferences)
+        .where(
+          and(
+            eq(notificationPreferences.tenantId, tenantId),
+            inArray(notificationPreferences.userId, [...userIds])
+          )
+        )
+        .orderBy(
+          asc(notificationPreferences.userId),
+          asc(notificationPreferences.channel),
+          asc(notificationPreferences.notificationType)
+        );
+      return rows.map(mapNotificationPreference);
+    },
+    async listPendingNotificationDeliveries(input) {
+      const rows = await db
+        .select()
+        .from(userNotifications)
+        .where(
+          and(
+            eq(userNotifications.tenantId, input.tenantId),
+            isNull(userNotifications.archivedAt),
+            isNull(userNotifications.readAt),
+            isNull(userNotifications.deliveredAt)
+          )
+        )
+        // Старые первыми: backlog после простоя воркера разгребается по порядку.
+        // Строки, созданные до миграции 0056, в очередь не попадают: у них
+        // delivered_at = '-infinity' (быстрый DEFAULT), а не NULL — исторический
+        // backlog считается уже врученным без переписывания таблицы.
+        // Строки, исчерпавшие лимит попыток, тоже уходят отсюда: dead-letter
+        // проставляет маркер (см. recordFailedNotificationDeliveries).
+        .orderBy(asc(userNotifications.createdAt), asc(userNotifications.id))
+        .limit(input.limit);
+      return rows.map(mapPendingNotificationDelivery);
+    },
+    async markUserNotificationsDelivered(input) {
+      if (input.notificationIds.length === 0) return 0;
+      const updated = await db
+        .update(userNotifications)
+        .set({ deliveredAt: input.deliveredAt })
+        .where(
+          and(
+            eq(userNotifications.tenantId, input.tenantId),
+            inArray(userNotifications.id, [...input.notificationIds]),
+            // Маркер ставится один раз: повторный прогон никого не «переврученит».
+            isNull(userNotifications.deliveredAt)
+          )
+        )
+        .returning({ id: userNotifications.id });
+      return updated.length;
+    },
+    async recordFailedNotificationDeliveries(input) {
+      if (input.notificationIds.length === 0) return { retried: 0, deadLettered: 0 };
+      const maxAttempts = Math.max(1, Math.trunc(input.maxAttempts));
+      // Один UPDATE: инкремент попытки и, при её исчерпании, маркер вручения.
+      // Считаем по НОВОМУ значению счётчика, поэтому сравнение с maxAttempts
+      // идёт по delivery_attempts + 1.
+      const updated = await db
+        .update(userNotifications)
+        .set({
+          deliveryAttempts: sql`${userNotifications.deliveryAttempts} + 1`,
+          deliveredAt: sql`case when ${userNotifications.deliveryAttempts} + 1 >= ${maxAttempts} then ${input.deadLetteredAt} else ${userNotifications.deliveredAt} end`
+        })
+        .where(
+          and(
+            eq(userNotifications.tenantId, input.tenantId),
+            inArray(userNotifications.id, [...input.notificationIds]),
+            // Уже вручённые/сданные в dead-letter строки не трогаем.
+            isNull(userNotifications.deliveredAt)
+          )
+        )
+        .returning({
+          id: userNotifications.id,
+          deliveredAt: userNotifications.deliveredAt
+        });
+      const deadLettered = updated.filter((row) => row.deliveredAt !== null).length;
+      return { retried: updated.length - deadLettered, deadLettered };
+    },
     async upsertNotificationPreferences(input) {
       if (input.length === 0) return [];
       const first = input[0];
@@ -1909,6 +2037,23 @@ function mapUserNotification(row: typeof userNotifications.$inferSelect): UserNo
     createdAt: row.createdAt,
     readAt: row.readAt,
     archivedAt: row.archivedAt
+  };
+}
+
+function mapPendingNotificationDelivery(
+  row: typeof userNotifications.$inferSelect
+): PendingNotificationDelivery {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    userId: row.userId,
+    notificationType: row.notificationType as NotificationType,
+    sourceEntityType: row.sourceEntityType,
+    sourceEntityId: row.sourceEntityId,
+    title: row.title,
+    body: row.body,
+    route: row.route,
+    createdAt: row.createdAt
   };
 }
 

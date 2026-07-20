@@ -164,6 +164,26 @@ function createAuthFakeDataSource() {
   };
 }
 
+// Активный владелец «tenant-1». Реальная БД не знает credential без строки
+// tenant_users (user_credentials.user_id ссылается на пользователя), а выдача
+// reset-токена теперь опирается на его status — поэтому фикстуры сидируют обе записи.
+function activeOwnerUser(): WorkspaceUserRecord {
+  return {
+    id: "user-1",
+    tenantId: "tenant-1",
+    name: "Owner User",
+    email: "owner@example.com",
+    accessProfileId: "access-profile-1",
+    positionId: null,
+    positionName: null,
+    phone: null,
+    telegram: null,
+    status: "active",
+    theme: "light",
+    accentColor: "#0f766e"
+  };
+}
+
 function createRecordingAuthRateLimiter() {
   const limiter: AuthRateLimiter = {
     reserveAttempt: vi.fn(async () => ({ allowed: true as const })),
@@ -341,6 +361,7 @@ describe("POST /api/auth/register", () => {
 describe("POST /api/auth/password-reset/request", () => {
   it("всегда возвращает 202 и шлёт rawToken для существующего email", async () => {
     const { dataSource, state } = createAuthFakeDataSource();
+    state.users.set("user-1", activeOwnerUser());
     state.credentials.set("owner@example.com", {
       userId: "user-1",
       tenantId: "tenant-1",
@@ -432,6 +453,7 @@ describe("POST /api/auth/password-reset/request", () => {
   });
   it("возвращает 202 delivery email и resetUrl через smtp-like provider для существующего email", async () => {
     const { dataSource, state } = createAuthFakeDataSource();
+    state.users.set("user-1", activeOwnerUser());
     state.credentials.set("owner@example.com", {
       userId: "user-1",
       tenantId: "tenant-1",
@@ -505,6 +527,58 @@ describe("POST /api/auth/password-reset/request", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "invalid_email" });
+  });
+
+  // F4: падение SMTP не должно превращаться в enumeration-оракул. Раньше
+  // зарегистрированный адрес при недоступном SMTP отдавал 500, а незарегистрированный —
+  // 202: разница ответов однозначно выдавала наличие аккаунта. Плюс throw пролетал мимо
+  // recordFailure, поэтому переборные попытки не копились к блокировке.
+  it("отвечает 202 одинаково для существующего и несуществующего email при падении SMTP", async () => {
+    const sendPasswordReset = vi.fn(async (_input: PasswordResetEmailInput) => {
+      throw new Error("smtp_unreachable");
+    });
+    const emailProvider: SmtpEmailProvider = {
+      provider: "smtp",
+      sendPasswordReset,
+      sendNotificationDigest: async () => undefined,
+      sendInvitation: async () => undefined
+    };
+    const { dataSource, state } = createAuthFakeDataSource();
+    state.users.set("user-1", activeOwnerUser());
+    state.credentials.set("owner@example.com", {
+      userId: "user-1",
+      tenantId: "tenant-1",
+      email: "owner@example.com",
+      ...hashPassword("oldpassword")
+    });
+    const authRateLimiter = createRecordingAuthRateLimiter();
+    const app = createApp({ dataSource, emailProvider, authRateLimiter });
+
+    const registered = await app.request("/api/auth/password-reset/request", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ email: "owner@example.com" })
+    });
+    const unknown = await app.request("/api/auth/password-reset/request", {
+      method: "POST",
+      headers: sameOriginHeaders,
+      body: JSON.stringify({ email: "missing@example.com" })
+    });
+
+    // Ответы обязаны совпадать байт в байт — иначе это оракул перечисления.
+    expect(registered.status).toBe(202);
+    expect(unknown.status).toBe(202);
+    const registeredBody = await registered.json();
+    expect(registeredBody).toEqual(await unknown.json());
+    // delivery отражает НАСТРОЙКУ канала (smtp), а не факт удачной отправки:
+    // деградировать его до "none" при ошибке значило бы снова раскрыть аккаунт.
+    expect(registeredBody).toEqual({ status: "ok", delivery: "email" });
+    expect(sendPasswordReset).toHaveBeenCalledTimes(1);
+    // Обе попытки учтены рейт-лимитером, резерв не «прощён» из-за исключения.
+    expect(authRateLimiter.recordFailure).toHaveBeenCalledTimes(2);
+    expect(authRateLimiter.releaseReservedAttempt).not.toHaveBeenCalled();
+    // Токен создан (письмо не ушло, но запись жива — админ может выдать токен вручную).
+    expect(state.resetTokens.size).toBe(1);
   });
 });
 

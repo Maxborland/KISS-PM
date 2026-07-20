@@ -23,6 +23,7 @@ import type {
 const TENANT = "tenant-alpha";
 const ADMIN_ID = "user-alpha-admin";
 const ADMIN_PROFILE = "profile-admin";
+const VIEWER_PROFILE = "profile-viewer";
 const sessionCookie = "kiss_pm_session=" + "a".repeat(64);
 const mutationHeaders = {
   cookie: sessionCookie,
@@ -63,7 +64,9 @@ function createFixture(
   const credentials = new Map<string, UserCredentialRecord>(); // ключ — email
   const resetTokens = new Map<string, PasswordResetTokenRecord>(); // ключ — id
   const accessProfiles = new Map<string, AccessProfileRecord>([
-    [ADMIN_PROFILE, { id: ADMIN_PROFILE, tenantId: TENANT, name: "Владелец", permissions }]
+    [ADMIN_PROFILE, { id: ADMIN_PROFILE, tenantId: TENANT, name: "Владелец", permissions }],
+    // Вторая роль нужна, чтобы проверить понижение прав админом до приёма приглашения.
+    [VIEWER_PROFILE, { id: VIEWER_PROFILE, tenantId: TENANT, name: "Наблюдатель", permissions: ["tenant.users.read"] }]
   ]);
   const positions = new Map<string, PositionRecord>([
     ["position-engineer", { id: "position-engineer", tenantId: TENANT, name: "Инженер", description: null }]
@@ -122,10 +125,36 @@ function createFixture(
       return record;
     },
     async findCredentialByEmail(email) {
-      return credentials.get(email);
+      return credentials.get(email.toLowerCase());
     },
     async upsertCredential(input) {
-      credentials.set(input.email, { ...input });
+      const email = input.email.toLowerCase();
+      const existing = credentials.get(email);
+      // Воспроизводим ГЛОБАЛЬНЫЙ uniqueIndex user_credentials_email_uidx: тот же
+      // email под другим userId — нарушение уникальности (Postgres 23505).
+      if (existing && existing.userId !== input.userId) {
+        throw Object.assign(new Error("duplicate key value violates unique constraint"), {
+          code: "23505",
+          constraint: "user_credentials_email_uidx"
+        });
+      }
+      credentials.set(email, { ...input, email });
+    },
+    async updateCredentialEmail(tenantId, userId, email) {
+      for (const [key, credential] of credentials) {
+        if (credential.tenantId === tenantId && credential.userId === userId) {
+          credentials.delete(key);
+          credentials.set(email.toLowerCase(), { ...credential, email: email.toLowerCase() });
+        }
+      }
+    },
+    async deleteSessionsByUserId() {},
+    async deletePasswordResetTokensByUserId(tenantId, userId) {
+      for (const [id, token] of resetTokens) {
+        if (token.tenantId === tenantId && token.userId === userId) {
+          resetTokens.delete(id);
+        }
+      }
     },
     async createSession(input) {
       sessions.set(input.tokenHash, { ...input });
@@ -187,6 +216,26 @@ function login(app: ReturnType<typeof createFixture>["app"], email: string, pass
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password })
+  });
+}
+
+function patchUser(
+  app: ReturnType<typeof createFixture>["app"],
+  userId: string,
+  body: Record<string, unknown>
+) {
+  return app.request(`/api/workspace/users/${userId}`, {
+    method: "PATCH",
+    headers: mutationHeaders,
+    body: JSON.stringify(body)
+  });
+}
+
+function requestPasswordReset(app: ReturnType<typeof createFixture>["app"], email: string) {
+  return app.request("/api/auth/password-reset/request", {
+    method: "POST",
+    headers: publicHeaders,
+    body: JSON.stringify({ email })
   });
 }
 
@@ -397,5 +446,193 @@ describe("POST /api/auth/invitation/accept → login", () => {
     const response = await accept(app, { token: invitationToken, password: "short" });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "weak_password" });
+  });
+});
+
+/* ============================================================
+   Регрессии предпрод-ревью: F1 (обход оффбординга), F2 (откат
+   правок админа), F3 (кросс-тенантный email ломает приглашение).
+   ============================================================ */
+
+describe("оффбординг: деактивация закрывает путь через invitation/accept (F1)", () => {
+  it("деактивированный сотрудник НЕ возвращает себе доступ новым reset-токеном", async () => {
+    const { app, state } = createFixture();
+
+    // 1. Сотрудник приглашён и принял приглашение — у него есть пароль и status:"active".
+    const { invitationToken, user } = await (await invite(app, invitee)).json();
+    expect((await accept(app, { token: invitationToken, password: "supersecret1" })).status).toBe(200);
+    expect(state.users.get(user.id)?.status).toBe("active");
+
+    // 2. Админ проводит оффбординг: status → "inactive".
+    expect((await patchUser(app, user.id, { status: "inactive" })).status).toBe(200);
+    expect(state.users.get(user.id)?.status).toBe("inactive");
+
+    // 3. Уволенный запрашивает сброс пароля. Ответ всегда 202 (anti-enumeration),
+    //    но токен деактивированному пользователю выдаваться НЕ должен.
+    expect((await requestPasswordReset(app, invitee.email)).status).toBe(202);
+    expect([...state.resetTokens.values()].filter((token) => token.consumedAt === null)).toHaveLength(0);
+
+    // 4. Даже если токен всё же существует (например, выдан админом до увольнения),
+    //    приём приглашения им невозможен: у пользователя уже есть credential,
+    //    то есть это НЕ ожидающее приглашение, а reset-токен.
+    const raw = "d".repeat(64);
+    state.resetTokens.set("token-offboarded", {
+      id: "token-offboarded",
+      tenantId: TENANT,
+      userId: user.id,
+      tokenHash: hashResetToken(raw),
+      expiresAt: new Date(Date.now() + 3_600_000),
+      consumedAt: null,
+      requestedIp: null,
+      createdAt: new Date()
+    });
+    const bypass = await accept(app, { token: raw, password: "attacker-pass-1" });
+    expect(bypass.status).toBe(400);
+    await expect(bypass.json()).resolves.toEqual({ error: "invitation_not_pending" });
+    // Статус не восстановлен, пароль не переписан.
+    expect(state.users.get(user.id)?.status).toBe("inactive");
+    const login = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: invitee.email, password: "attacker-pass-1" })
+    });
+    expect(login.status).toBe(401);
+  });
+
+  it("деактивация удаляет невыданные токены сброса (deletePasswordResetTokensByUserId)", async () => {
+    const { app, state } = createFixture();
+    const { invitationToken, user } = await (await invite(app, invitee)).json();
+    await accept(app, { token: invitationToken, password: "supersecret1" });
+    // Живой невостребованный токен на момент увольнения.
+    state.resetTokens.set("token-live", {
+      id: "token-live",
+      tenantId: TENANT,
+      userId: user.id,
+      tokenHash: hashResetToken("e".repeat(64)),
+      expiresAt: new Date(Date.now() + 3_600_000),
+      consumedAt: null,
+      requestedIp: null,
+      createdAt: new Date()
+    });
+
+    await patchUser(app, user.id, { status: "inactive" });
+
+    // Отзыв доступа обязан отзывать и токены восстановления.
+    expect([...state.resetTokens.values()].some((token) => token.userId === user.id)).toBe(false);
+  });
+
+  it("password-reset/request не выдаёт токен неактивному пользователю, но отвечает 202", async () => {
+    const { app, state } = createFixture();
+    const { invitationToken, user } = await (await invite(app, invitee)).json();
+    await accept(app, { token: invitationToken, password: "supersecret1" });
+    await patchUser(app, user.id, { status: "inactive" });
+    state.resetTokens.clear();
+
+    const response = await requestPasswordReset(app, invitee.email);
+
+    // Ответ неотличим от запроса на несуществующий адрес (anti-enumeration).
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual({ status: "ok", delivery: "none" });
+    expect(state.resetTokens.size).toBe(0);
+  });
+});
+
+describe("приём приглашения не откатывает правки админа (F2)", () => {
+  it("сохраняет accessProfileId, изменённый админом после отправки приглашения", async () => {
+    const { app, state } = createFixture();
+    const { invitationToken, user } = await (await invite(app, invitee)).json();
+    expect(state.users.get(user.id)?.accessProfileId).toBe(ADMIN_PROFILE);
+
+    // Админ заметил ошибку и понизил роль ДО приёма приглашения.
+    const patched = await patchUser(app, user.id, { accessProfileId: VIEWER_PROFILE });
+    expect(patched.status).toBe(200);
+    expect(state.users.get(user.id)?.accessProfileId).toBe(VIEWER_PROFILE);
+
+    const acceptResponse = await accept(app, { token: invitationToken, password: "supersecret1" });
+    expect(acceptResponse.status).toBe(200);
+
+    // Приём приглашения владеет только status/credential — понижение прав держится.
+    expect(state.users.get(user.id)?.accessProfileId).toBe(VIEWER_PROFILE);
+    expect(state.users.get(user.id)?.status).toBe("active");
+  });
+
+  it("пишет credential на актуальный email, а не на устаревший снимок", async () => {
+    const { app, state } = createFixture();
+    const { invitationToken, user } = await (await invite(app, invitee)).json();
+
+    // Админ исправил опечатку в email до приёма приглашения.
+    const patched = await patchUser(app, user.id, { email: "fixed@kiss-pm.local" });
+    expect(patched.status).toBe(200);
+
+    expect((await accept(app, { token: invitationToken, password: "supersecret1" })).status).toBe(200);
+
+    expect(state.credentials.has("fixed@kiss-pm.local")).toBe(true);
+    expect(state.credentials.has(invitee.email)).toBe(false);
+    // Вход идёт по актуальному адресу.
+    const login = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "fixed@kiss-pm.local", password: "supersecret1" })
+    });
+    expect(login.status).toBe(200);
+  });
+});
+
+describe("кросс-тенантный email не ломает приглашение (F3)", () => {
+  it("возвращает 409 на приглашение адреса, занятого в другом тенанте", async () => {
+    const { app, state } = createFixture();
+    // Тот же email уже зарегистрирован в ЧУЖОМ тенанте (глобальный uniqueIndex).
+    state.credentials.set(invitee.email, {
+      userId: "user-beta-owner",
+      tenantId: "tenant-beta",
+      email: invitee.email,
+      ...hashPassword("foreign-secret-1")
+    });
+
+    const response = await invite(app, invitee);
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "user_email_taken" });
+    // Приглашённый пользователь-«призрак» не создан.
+    expect([...state.users.values()].some((user) => user.email === invitee.email)).toBe(false);
+  });
+
+  it("сравнивает занятость email без учёта регистра", async () => {
+    const { app, state } = createFixture();
+    state.credentials.set(invitee.email, {
+      userId: "user-beta-owner",
+      tenantId: "tenant-beta",
+      email: invitee.email,
+      ...hashPassword("foreign-secret-1")
+    });
+
+    const response = await invite(app, { ...invitee, email: "NEW@kiss-pm.local" });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "user_email_taken" });
+  });
+
+  it("отдаёт честный 409 вместо 500 и сохраняет токен, если email заняли после приглашения", async () => {
+    const { app, state } = createFixture();
+    const { invitationToken, user } = await (await invite(app, invitee)).json();
+
+    // Гонка: адрес заняли в другом тенанте уже ПОСЛЕ выдачи приглашения.
+    state.credentials.set(invitee.email, {
+      userId: "user-beta-owner",
+      tenantId: "tenant-beta",
+      email: invitee.email,
+      ...hashPassword("foreign-secret-1")
+    });
+
+    const response = await accept(app, { token: invitationToken, password: "supersecret1" });
+
+    // Раньше здесь был неперехваченный 23505 → 500, и токен оставался непогашенным
+    // навсегда (каждый повтор снова 500).
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "user_email_taken" });
+    // Токен НЕ погашен — после исправления email админом приглашение ещё рабочее.
+    const token = [...state.resetTokens.values()].find((item) => item.userId === user.id);
+    expect(token?.consumedAt).toBeNull();
+    expect(state.users.get(user.id)?.status).toBe("inactive");
   });
 });

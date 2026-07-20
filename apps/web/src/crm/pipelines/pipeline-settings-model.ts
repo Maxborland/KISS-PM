@@ -18,14 +18,18 @@ export function orderedStages(stages: ReadonlyArray<DealStage>, pipelineId: stri
     .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
 }
 
-// План перестановки стадии на одну позицию: меняем местами sortOrder соседей.
-// Возвращает пары {id, sortOrder} для полного обновления обеих стадий, либо null,
-// если двигать некуда (край) или стадия не найдена в своей воронке.
-export function planStageReorder(
+// План перестановки стадии на одну позицию: ПОЛНЫЙ новый порядок id стадий воронки.
+// Возвращает null, если двигать некуда (край) или стадия не найдена в своей воронке.
+//
+// Возвращается именно весь порядок, а не пара «поменять sortOrder местами»: сервер применяет
+// его одним запросом PATCH /api/workspace/pipelines/:id/stage-order. Прежний план из двух
+// {id, sortOrder} применялся клиентом последовательно и всегда падал на immediate-unique
+// (tenant_id, pipeline_id, sort_order) — промежуточное состояние нарушало индекс (23505).
+export function planStageOrder(
   stages: ReadonlyArray<DealStage>,
   stageId: string,
   direction: "up" | "down"
-): Array<{ id: string; sortOrder: number }> | null {
+): string[] | null {
   const stage = stages.find((s) => s.id === stageId);
   if (!stage) return null;
   const ordered = orderedStages(stages, stage.pipelineId ?? "");
@@ -33,18 +37,9 @@ export function planStageReorder(
   if (index < 0) return null;
   const neighborIndex = direction === "up" ? index - 1 : index + 1;
   if (neighborIndex < 0 || neighborIndex >= ordered.length) return null;
-  const current = ordered[index]!;
-  const neighbor = ordered[neighborIndex]!;
-  // Если sortOrder совпадают (вырожденный сид) — раздвигаем детерминированно.
-  if (current.sortOrder === neighbor.sortOrder) {
-    return direction === "up"
-      ? [{ id: current.id, sortOrder: neighbor.sortOrder - 1 }]
-      : [{ id: current.id, sortOrder: neighbor.sortOrder + 1 }];
-  }
-  return [
-    { id: current.id, sortOrder: neighbor.sortOrder },
-    { id: neighbor.id, sortOrder: current.sortOrder }
-  ];
+  const ids = ordered.map((s) => s.id);
+  [ids[index], ids[neighborIndex]] = [ids[neighborIndex]!, ids[index]!];
+  return ids;
 }
 
 // minProbability из формы: пусто → правило без порога (null); иначе целое 0..100.

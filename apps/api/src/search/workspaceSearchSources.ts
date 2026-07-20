@@ -66,7 +66,7 @@ async function searchProjects(input: WorkspaceSearchInput, limit: number): Promi
       snippet: project.status,
       entityType: "project",
       entityId: project.id,
-      route: `/projects/${project.id}`,
+      route: routeForEntity("project", project.id),
       updatedAt: project.activatedAt?.toISOString() ?? project.createdAt.toISOString(),
       score: score(input.query, project.title, project.clientName),
       source: "projects"
@@ -95,10 +95,12 @@ async function searchTasks(input: WorkspaceSearchInput, limit: number): Promise<
       snippet: task.description ?? task.statusName,
       entityType: "task",
       entityId: task.id,
-      // Детальной страницы задачи нет: ведём в карточку проекта (доступна с
-      // tenant.projects.read — как и сам поиск задач; график требовал бы ещё
-      // project_plan.read и давал 403). Без проекта — в «Мои задачи».
-      route: project ? `/projects/${project.id}` : "/my-work",
+      // Канонический маршрут задачи — /tasks/[id] (та же страница, что в
+      // collaborationRoutes для уведомлений). Требует tenant.projects.read — как и
+      // сам поиск задач. Раньше вели в карточку проекта / «Мои задачи», а палитра
+      // команд подменяла это на `/my-work?task=`: маршрут показывал только СВОИ
+      // задачи, поэтому чужая задача из поиска не открывалась.
+      route: routeForEntity("task", task.id),
       updatedAt: task.updatedAt.toISOString(),
       score: score(input.query, task.title, task.description ?? "", task.statusName),
       source: "tasks"
@@ -119,7 +121,7 @@ async function searchOpportunities(input: WorkspaceSearchInput, limit: number): 
       snippet: item.status,
       entityType: "opportunity",
       entityId: item.id,
-      route: `/crm/deals/${item.id}`,
+      route: routeForEntity("opportunity", item.id),
       updatedAt: item.updatedAt.toISOString(),
       score: score(input.query, item.title, item.clientName, item.contactName),
       source: "opportunities"
@@ -182,7 +184,7 @@ async function searchProducts(input: WorkspaceSearchInput, limit: number): Promi
       snippet: item.description ?? item.type,
       entityType: "product",
       entityId: item.id,
-      route: "/crm/products",
+      route: routeForEntity("product", item.id),
       updatedAt: item.updatedAt.toISOString(),
       score: score(input.query, item.name, item.sku ?? "", item.description ?? ""),
       source: "products"
@@ -265,6 +267,7 @@ async function routeForAttachment(
     tenantId: input.actor.tenantId,
     documentId: attachment.entityId
   });
-  if (!document) return routeForEntity(attachment.entityType, attachment.entityId);
-  return `/projects/${document.projectId}/knowledge/documents/${document.id}`;
+  return routeForEntity(attachment.entityType, attachment.entityId, {
+    projectId: document?.projectId
+  });
 }

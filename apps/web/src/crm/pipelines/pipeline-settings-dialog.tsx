@@ -21,7 +21,8 @@ import { makeRuError } from "@/lib/error-messages";
 import { StatusChip } from "@/crm/ui/crm-bits";
 import type { useCrm } from "@/crm/lib/use-crm";
 import type { DealStage, Pipeline, ProjectType, StageTransition } from "@/crm/lib/crm-client";
-import { canCreateTransition, nextSortOrder, orderedStages, parseMinProbabilityInput, planStageReorder } from "./pipeline-settings-model";
+import { guardMutation } from "@/lib/domain-client";
+import { canCreateTransition, nextSortOrder, orderedStages, parseMinProbabilityInput, planStageOrder } from "./pipeline-settings-model";
 
 type Crm = ReturnType<typeof useCrm>;
 
@@ -39,7 +40,11 @@ const ERR: Record<string, string> = {
   project_type_not_found: "Тип проекта не найден",
   stage_not_in_pipeline: "Стадия принадлежит другой воронке",
   stage_transition_conflict: "Такое правило перехода уже есть",
-  invalid_transition_stages: "Стадии перехода должны различаться"
+  invalid_transition_stages: "Стадии перехода должны различаться",
+  // Конфликты уникальности стадий воронки (сервер отвечает 409, а не 500).
+  deal_stage_sort_order_taken: "Позиция в воронке уже занята другой стадией",
+  deal_stage_name_taken: "Стадия с таким названием уже есть в воронке",
+  invalid_stage_order: "Некорректный порядок стадий"
 };
 const ruErr = makeRuError(ERR);
 
@@ -182,13 +187,15 @@ function EditPipelineForm({ crm, pipeline }: { crm: Crm; pipeline: Pipeline }) {
 
 function StagesSection({ crm, pipeline, stages }: { crm: Crm; pipeline: Pipeline; stages: DealStage[] }) {
   const ordered = orderedStages(stages, pipeline.id);
+  // Переупорядочивание — ОДИН атомарный запрос с полным новым порядком стадий.
+  // Последовательные updateDealStage здесь недопустимы: immediate-unique
+  // (tenant_id, pipeline_id, sort_order) отвергает любое промежуточное состояние.
   const move = async (stageId: string, direction: "up" | "down") => {
-    const plan = crm.data ? planReorder(crm.data.dealStages, stageId, direction) : null;
-    if (!plan) return;
-    for (const step of plan.updates) {
-      const res = await crm.updateDealStage(step.id, step.input);
-      if (!res.ok) { toast.error(`Отклонено: ${ruErr(res.code, res.message)}`); return; }
-    }
+    const stageIds = crm.data ? planStageOrder(crm.data.dealStages, stageId, direction) : null;
+    if (!stageIds) return;
+    const res = await guardMutation(async () => { await crm.client.reorderDealStages(pipeline.id, stageIds); });
+    if (!res.ok) { toast.error(`Отклонено: ${ruErr(res.code, res.message)}`); return; }
+    await crm.reload();
     toast.success("Порядок стадий обновлён");
   };
   return (
@@ -233,17 +240,6 @@ function StagesSection({ crm, pipeline, stages }: { crm: Crm; pipeline: Pipeline
       )}
     </section>
   );
-}
-
-// Обёртка planStageReorder → готовые payload'ы updateDealStage (full-replace: name/sortOrder/status).
-function planReorder(stages: DealStage[], stageId: string, direction: "up" | "down"): { updates: Array<{ id: string; input: { name: string; sortOrder: number; status: "active" | "archived" } }> } | null {
-  const plan = planStageReorder(stages, stageId, direction);
-  if (!plan) return null;
-  const updates = plan.map((step) => {
-    const stage = stages.find((s) => s.id === step.id)!;
-    return { id: step.id, input: { name: stage.name, sortOrder: step.sortOrder, status: stage.status } };
-  });
-  return { updates };
 }
 
 function CreateStageForm({ crm, pipeline, sortOrder }: { crm: Crm; pipeline: Pipeline; sortOrder: number }) {

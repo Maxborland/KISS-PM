@@ -91,6 +91,7 @@ const routeDocs: RouteDoc[] = [
   { method: "get", path: "/api/workspace/pipelines", tag: "CRM", summary: "List pipelines", successSchema: "PipelinesResponse" },
   { method: "post", path: "/api/workspace/pipelines", tag: "CRM", summary: "Create pipeline", requestSchema: "PipelineWriteRequest", successSchema: "PipelineResponse", successStatus: 201 },
   { method: "patch", path: "/api/workspace/pipelines/:pipelineId", tag: "CRM", summary: "Update pipeline", requestSchema: "PipelineWriteRequest", successSchema: "PipelineResponse" },
+  { method: "patch", path: "/api/workspace/pipelines/:pipelineId/stage-order", tag: "CRM", summary: "Reorder pipeline deal stages atomically", requestSchema: "DealStageOrderRequest", successSchema: "DealStagesResponse" },
   { method: "get", path: "/api/workspace/pipelines/:pipelineId/stage-transitions", tag: "CRM", summary: "List pipeline stage transitions", successSchema: "StageTransitionsResponse" },
   { method: "post", path: "/api/workspace/pipelines/:pipelineId/stage-transitions", tag: "CRM", summary: "Create pipeline stage transition", requestSchema: "StageTransitionWriteRequest", successSchema: "StageTransitionResponse", successStatus: 201 },
   { method: "delete", path: "/api/workspace/pipelines/:pipelineId/stage-transitions/:transitionId", tag: "CRM", summary: "Delete pipeline stage transition", body: "none", successSchema: "OkResponse" },

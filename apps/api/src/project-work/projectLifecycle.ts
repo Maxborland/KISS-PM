@@ -6,6 +6,10 @@ import type {
   ApiTenantDataSource,
   ManagementAuditEventInput
 } from "../apiTypes";
+import {
+  findUnknownProjectReference,
+  isProjectIdConflict
+} from "./projectLifecycleGuards";
 import type {
   CreateManualProjectFields,
   UpdateProjectFields
@@ -110,47 +114,76 @@ export async function createManualProject(
   });
   if (!auth.ok) return auth;
 
-  const project = await deps.runDataSourceTransaction(async (transactionDataSource) => {
-    if (!transactionDataSource.createManualProject) {
-      throw new Error("manual_project_creation_not_configured");
-    }
-    const created = await transactionDataSource.createManualProject({
-      id: fields.id,
-      tenantId: actor.tenantId,
-      title: fields.title,
-      clientName: fields.clientName,
-      projectTypeId: fields.projectTypeId,
-      templateId: fields.templateId,
-      calendarId: fields.calendarId,
-      plannedStart: fields.plannedStart,
-      plannedFinish: fields.plannedFinish,
-      contractValue: fields.contractValue,
-      plannedHours: fields.plannedHours,
-      demand: []
-    });
-    await deps.appendManagementAuditEvent(
-      {
-        tenantId: actor.tenantId,
-        actorUserId: actor.id,
-        actionType: "project.created",
-        sourceWorkflow: "project_lifecycle",
-        sourceEntity: { type: "Project", id: created.id },
-        commandInput: {
-          title: fields.title,
-          projectTypeId: fields.projectTypeId,
-          templateId: fields.templateId
-        },
-        beforeState: null,
-        afterState: created,
-        permissionResult: auth.decision,
-        executionResult: { status: "succeeded" }
-      },
-      transactionDataSource
-    );
-    return created;
-  });
+  // Проверки ПОСЛЕ RBAC: неавторизованный не должен узнавать о существовании id.
+  const unknownReference = await findUnknownProjectReference(
+    deps.dataSource,
+    actor.tenantId,
+    fields
+  );
+  if (unknownReference) return { ok: false, status: 404, error: unknownReference };
+
+  // Клиентский id: двойной клик, ретрай сети или скриптовый импорт давали 23505 → 500.
+  const existing = await deps.dataSource.findProjectById?.(actor.tenantId, fields.id);
+  if (existing) return { ok: false, status: 409, error: "project_id_taken" };
+
+  const project = await runCreate(deps, actor, fields, auth.decision);
+  if (typeof project === "string") return { ok: false, status: 409, error: project };
 
   return { ok: true, status: 201, project };
+}
+
+// Вставка + аудит в одной транзакции. Гонка между предчеком и insert остаётся
+// возможной, поэтому 23505 на projects_pkey тоже маппится в 409.
+async function runCreate(
+  deps: ProjectLifecycleDeps,
+  actor: TenantUser,
+  fields: CreateManualProjectFields,
+  decision: ReturnType<typeof canManageProjects>
+): Promise<ProjectRecord | "project_id_taken"> {
+  try {
+    return await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      if (!transactionDataSource.createManualProject) {
+        throw new Error("manual_project_creation_not_configured");
+      }
+      const created = await transactionDataSource.createManualProject({
+        id: fields.id,
+        tenantId: actor.tenantId,
+        title: fields.title,
+        clientName: fields.clientName,
+        projectTypeId: fields.projectTypeId,
+        templateId: fields.templateId,
+        calendarId: fields.calendarId,
+        plannedStart: fields.plannedStart,
+        plannedFinish: fields.plannedFinish,
+        contractValue: fields.contractValue,
+        plannedHours: fields.plannedHours,
+        demand: []
+      });
+      await deps.appendManagementAuditEvent(
+        {
+          tenantId: actor.tenantId,
+          actorUserId: actor.id,
+          actionType: "project.created",
+          sourceWorkflow: "project_lifecycle",
+          sourceEntity: { type: "Project", id: created.id },
+          commandInput: {
+            title: fields.title,
+            projectTypeId: fields.projectTypeId,
+            templateId: fields.templateId
+          },
+          beforeState: null,
+          afterState: created,
+          permissionResult: decision,
+          executionResult: { status: "succeeded" }
+        },
+        transactionDataSource
+      );
+      return created;
+    });
+  } catch (error) {
+    if (isProjectIdConflict(error)) return "project_id_taken";
+    throw error;
+  }
 }
 
 export async function updateProjectSettings(
@@ -184,6 +217,16 @@ export async function updateProjectSettings(
     const before = await transactionDataSource.findProjectById(actor.tenantId, projectId);
     if (!before) {
       return { ok: false as const, status: 404 as const, error: "project_not_found" };
+    }
+    // Ссылочные id клиента писались без всякой проверки: неизвестный projectTypeId
+    // падал в 23503 → 500, а templateId/calendarId (FK нет) сохранялись висячими.
+    const unknownReference = await findUnknownProjectReference(
+      transactionDataSource,
+      actor.tenantId,
+      fields
+    );
+    if (unknownReference) {
+      return { ok: false as const, status: 404 as const, error: unknownReference };
     }
     const updated = await transactionDataSource.updateProjectSettings({
       tenantId: actor.tenantId,

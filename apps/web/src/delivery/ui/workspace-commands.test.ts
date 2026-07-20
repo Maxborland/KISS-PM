@@ -48,19 +48,29 @@ describe("workspace palette command registry", () => {
     expect(readableWithoutManage.actions).toEqual([]);
   });
 
-  it("maps task and deal ids to canonical URL-peek routes", () => {
+  // Регрессия: палитра больше НЕ переписывает маршрут — единственный владелец
+  // маршрутизации сущностей это API (apps/api/src/search/searchRouting.ts). Раньше
+  // тут переписывались task/opportunity, и вложения с дайджестом уведомлений
+  // получали другой маршрут, чем палитра.
+  it("passes the API-supplied route through untouched for every entity type", () => {
     expect(paletteRouteForSearchResult({
       id: "task:task/42",
       type: "task",
       entityId: "task/42",
-      route: "/projects/project-1"
-    })).toBe("/my-work?task=task%2F42");
+      route: "/tasks/task%2F42"
+    })).toBe("/tasks/task%2F42");
     expect(paletteRouteForSearchResult({
       id: "opportunity:deal/42",
       type: "opportunity",
       entityId: "deal/42",
-      route: "/crm/deals/deal-42"
-    })).toBe("/crm/deals?deal=deal%2F42");
+      route: "/crm/deals/deal%2F42"
+    })).toBe("/crm/deals/deal%2F42");
+    expect(paletteRouteForSearchResult({
+      id: "document:doc-1",
+      type: "document",
+      entityId: "doc-1",
+      route: "/projects/project-1/knowledge?document=doc-1"
+    })).toBe("/projects/project-1/knowledge?document=doc-1");
     expect(paletteRouteForSearchResult({
       id: "project:project-1",
       type: "project",

@@ -10,7 +10,7 @@ import type { StorageProvider } from "./storageProvider";
 // иначе /health/ready отдаёт READY на базе без свежих миграций. Синхронность
 // закреплена guard-тестом serverReadiness.migrationTag.test.ts (класс ошибки уже
 // повторялся: тег застревал на 0043 при миграциях до 0055).
-export const expectedDatabaseMigrationTag = "0055_planning_run_reject.sql";
+export const expectedDatabaseMigrationTag = "0057_audit_events_tenant_created_at_id_idx.sql";
 
 type ReadinessPostgresClient = (
   strings: TemplateStringsArray,

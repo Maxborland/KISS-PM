@@ -1,5 +1,6 @@
 import { canReadProjects } from "@kiss-pm/access-control";
 
+import { routeForEntity } from "./searchRouting";
 import { matches, rankAndLimit, score } from "./searchScoring";
 import type { SearchResult, WorkspaceSearchInput } from "./searchTypes";
 
@@ -31,7 +32,7 @@ export async function searchKnowledge(
         snippet: document.summary ?? document.documentType,
         entityType: "document",
         entityId: document.id,
-        route: `/projects/${document.projectId}/knowledge?document=${encodeURIComponent(document.id)}`,
+        route: routeForEntity("document", document.id, { projectId: document.projectId }),
         updatedAt: document.updatedAt.toISOString(),
         score: score(input.query, document.title, document.summary ?? "", document.documentType),
         source: "knowledge"
@@ -48,7 +49,7 @@ export async function searchKnowledge(
         snippet: decision.rationale ?? decision.status,
         entityType: "decision",
         entityId: decision.id,
-        route: `/projects/${decision.projectId}/knowledge?decision=${encodeURIComponent(decision.id)}`,
+        route: routeForEntity("decision", decision.id, { projectId: decision.projectId }),
         updatedAt: decision.updatedAt.toISOString(),
         score: score(input.query, decision.title, decision.decision, decision.rationale ?? ""),
         source: "knowledge"
@@ -65,7 +66,7 @@ export async function searchKnowledge(
         snippet: actionItem.description ?? actionItem.status,
         entityType: "knowledge_action_item",
         entityId: actionItem.id,
-        route: `/projects/${actionItem.projectId}/knowledge?actionItem=${encodeURIComponent(actionItem.id)}`,
+        route: routeForEntity("knowledge_action_item", actionItem.id, { projectId: actionItem.projectId }),
         updatedAt: actionItem.updatedAt.toISOString(),
         score: score(input.query, actionItem.title, actionItem.description ?? "", actionItem.status),
         source: "knowledge"

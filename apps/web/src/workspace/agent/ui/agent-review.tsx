@@ -263,13 +263,22 @@ function ChangeHunkCard({
         <span className="mt-4 text-[var(--muted-soft)]" aria-hidden>→</span>
         <div className="min-w-0">
           <span className="block text-[length:var(--text-xs)] uppercase tracking-[0.04em] text-[var(--muted-soft)]">Стало</span>
-          {editing && !busy && !terminal ? (
-            <Textarea
-              value={change.after}
-              onChange={(event) => onUpdate(event.target.value)}
-              aria-label={`Новое значение: ${change.title}`}
-              className="mt-1"
-            />
+          {editing && !busy && !terminal && change.edit ? (
+            // Редактируем ПОЛЕ (change.edit.value), а не отображаемую сводку change.after:
+            // посадив редактор на after, мы писали сводную фразу превью в input.title
+            // и молча создавали задачу с именем-предложением (ревью F2).
+            <>
+              <Textarea
+                value={change.edit.value}
+                onChange={(event) => onUpdate(event.target.value)}
+                aria-label={`${change.edit.label}: ${change.title}`}
+                className="mt-1"
+              />
+              {change.edit.suffix.length > 0 || change.edit.prefix.length > 0 ? (
+                // Остальная часть превью не редактируется — показываем, что применится целиком.
+                <p className="mt-1 break-words text-[length:var(--text-xs)] text-[var(--muted)]">{change.after}</p>
+              ) : null}
+            </>
           ) : (
             <p className="break-words font-medium text-[var(--text)]">{change.after}</p>
           )}

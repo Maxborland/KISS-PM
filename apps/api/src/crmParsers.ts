@@ -414,6 +414,22 @@ export function parseDealStageBody(
   return { ok: true, value: { id, tenantId, pipelineId, name, sortOrder, status } };
 }
 
+// Тело атомарного переупорядочивания стадий воронки: ПОЛНЫЙ новый порядок { stageIds: [...] }.
+// Полный список (а не пара «переставить местами») — единственная форма, которую сервер может
+// применить одной транзакцией, не нарушая immediate-unique (tenant_id, pipeline_id, sort_order).
+export function parseDealStageOrderBody(body: unknown): ParseResult<{ stageIds: string[] }> {
+  if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
+  const raw = (body as Record<string, unknown>).stageIds;
+  if (!Array.isArray(raw) || raw.length === 0) return { ok: false, error: "invalid_stage_order" };
+  const stageIds: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string" || !isId(item)) return { ok: false, error: "invalid_deal_stage_id" };
+    if (stageIds.includes(item)) return { ok: false, error: "invalid_stage_order" };
+    stageIds.push(item);
+  }
+  return { ok: true, value: { stageIds } };
+}
+
 export function parseDealStageChangeBody(body: unknown): ParseResult<{ stageId: string }> {
   if (!body || typeof body !== "object") return { ok: false, error: "invalid_body" };
   const stageId = getOptionalString(body, "stageId");

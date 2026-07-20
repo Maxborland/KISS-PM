@@ -156,7 +156,18 @@ export function serializeAgentConversation(conversation: Conversation) {
   };
 }
 
-/** История для LLM из персистентного треда: user/agent-ходы, error-квитанции пропускаются. */
+/**
+ * История для LLM из персистентного треда: user/agent-ходы, error-квитанции пропускаются.
+ *
+ * Квитанция выбрасывается ВМЕСТЕ с целью, на которую она отвечает. Иначе после сбоя
+ * апстрима в реплее оставался «осиротевший» user-ход: agentLoop дописывает текущую цель
+ * в конец истории, и модель получала два user-хода подряд (по одному лишнему на каждый
+ * сбой). Прямой Anthropic-путь такую последовательность отвергает — тред деградировал бы
+ * навсегда вместо восстановления с первой же удачной попытки.
+ *
+ * Из ТРЕДА цель при этом не исчезает: фильтруется только контекст модели, персистентная
+ * история остаётся полной и переживает reload (ради чего цель и пишется при сбое).
+ */
 export function historyFromThreadMessages(
   messages: Array<{ body: string; metadata: Record<string, unknown> }>
 ): Array<{ role: "user" | "assistant"; content: string }> {
@@ -164,7 +175,11 @@ export function historyFromThreadMessages(
   for (const message of messages) {
     const agent = (message.metadata as { agent?: { role?: unknown; kind?: unknown } }).agent;
     if (!agent) continue;
-    if (agent.kind === "error") continue;
+    if (agent.kind === "error") {
+      // Неотвеченная цель прямо перед квитанцией — вне реплея (см. док выше).
+      if (turns.at(-1)?.role === "user") turns.pop();
+      continue;
+    }
     if (agent.role === "user") turns.push({ role: "user", content: message.body });
     else if (agent.role === "agent") turns.push({ role: "assistant", content: message.body });
   }

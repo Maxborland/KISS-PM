@@ -462,6 +462,18 @@ export const userNotifications = pgTable(
     route: text("route").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     readAt: timestamp("read_at", { withTimezone: true }),
+    // Отметка вручения по offline-каналу (email-дайджест, notification.dispatch).
+    // NULL = уведомление ещё не рассматривалось offline-доставкой. Ставится как
+    // после успешной отправки, так и после терминального отказа (канал выключен,
+    // нет прав на сущность) — чтобы строка не пересканировалась вечно.
+    // In-app остаётся источником истины и на эту колонку не смотрит.
+    // Строки, существовавшие до миграции 0056, имеют '-infinity' (быстрый
+    // DEFAULT без переписывания таблицы) — то есть считаются уже врученными.
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    // Счётчик попыток offline-доставки: транзиентный отказ не ставит маркер, но
+    // увеличивает счётчик. По исчерпании лимита строка уходит в dead-letter,
+    // иначе «мёртвый» ящик одного пользователя навсегда занимает батч тенанта.
+    deliveryAttempts: integer("delivery_attempts").notNull().default(0),
     archivedAt: timestamp("archived_at", { withTimezone: true })
   },
   (table) => [
@@ -484,6 +496,11 @@ export const userNotifications = pgTable(
       table.userId,
       table.readAt
     ),
+    // Скан очереди offline-доставки: один запрос на тенант, а не на пользователя.
+    // Частичный — только ожидающие доставки строки, а не вся история уведомлений.
+    index("user_notifications_tenant_pending_delivery_idx")
+      .on(table.tenantId, table.createdAt, table.id)
+      .where(sql`${table.deliveredAt} is null`),
     check(
       "user_notifications_type_chk",
       sql`${table.notificationType} in ('mention', 'assignment_changed', 'deadline_risk', 'control_signal', 'meeting_invite', 'meeting_action_item')`

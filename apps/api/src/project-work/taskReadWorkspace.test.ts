@@ -141,6 +141,28 @@ describe("taskReadWorkspace.getTaskDetail", () => {
     expect(result.projectName).toBeNull();
   });
 
+  // Регрессия: findProjectName тянул listProjects — весь список проектов тенанта
+  // вместе с position-demand строками каждого проекта — ради одного title. Теперь
+  // сначала дешёвый tenant-scoped findProjectById, как в findReadableProject.
+  it("prefers the cheap findProjectById lookup over listing every tenant project", async () => {
+    let listProjectsCalls = 0;
+    const workspace = createWorkspace({
+      findProjectById: async (tenantId: string, projectId: string) =>
+        tenantId === TENANT_ID && projectId === project.id ? project : undefined,
+      listProjects: async () => {
+        listProjectsCalls += 1;
+        return [project];
+      }
+    });
+
+    const result = await workspace.getTaskDetail({ actor, profile, taskId: task.id });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.projectName).toBe("Производственный портал");
+    expect(listProjectsCalls).toBe(0);
+  });
+
   it("still returns 404 for an unknown task", async () => {
     const workspace = createWorkspace();
 

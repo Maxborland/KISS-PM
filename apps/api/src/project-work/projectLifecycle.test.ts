@@ -70,11 +70,28 @@ type MockStore = {
 
 function makeDeps(
   store: MockStore,
-  options?: { profile?: ReturnType<typeof createAccessProfile> }
+  options?: {
+    profile?: ReturnType<typeof createAccessProfile>;
+    createManualProject?: () => Promise<never>;
+  }
 ): ProjectLifecycleDeps {
   const dataSource = ensureCompleteDataSource({
     async withTransaction(operation) {
       return operation({} as never);
+    },
+    // Справочники ссылок: проверка tenant-scoped и выполняется ДО записи.
+    async findProjectTypeById(tenantId, projectTypeId) {
+      return tenantId === "tenant-alpha" && projectTypeId === "project-type-alpha"
+        ? ({ id: projectTypeId, tenantId, name: "Тип" } as never)
+        : undefined;
+    },
+    async listProjectTemplates(tenantId) {
+      return tenantId === "tenant-alpha"
+        ? ([{ id: "template-beta", tenantId, name: "Шаблон" }] as never)
+        : [];
+    },
+    async getBaseMode() {
+      return { calendarId: "tenant-default", workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 };
     },
     async appendAuditEvent() {
       return undefined;
@@ -84,7 +101,7 @@ function makeDeps(
         (project) => project.tenantId === tenantId && project.id === projectId
       );
     },
-    async createManualProject(input) {
+    createManualProject: options?.createManualProject ?? (async (input) => {
       const created = baseProject({
         id: input.id,
         title: input.title,
@@ -99,7 +116,7 @@ function makeDeps(
       });
       store.projects.push(created);
       return created;
-    },
+    }),
     async updateProjectSettings(input) {
       const project = store.projects.find(
         (candidate) => candidate.tenantId === input.tenantId && candidate.id === input.projectId
@@ -255,5 +272,160 @@ describe("project lifecycle service", () => {
     if (result.ok) return;
     expect(result.status).toBe(409);
     expect(result.error).toBe("project_status_transition_not_allowed");
+  });
+
+  // Регрессия F2: клиентский id вставлялся без предчека и без разбора 23505.
+  // Двойной клик / ретрай / импорт давали необработанный 500 вместо 409.
+  it("returns 409 for a project id that is already taken", async () => {
+    const store: MockStore = { projects: [baseProject()], audits: [] };
+    const deps = makeDeps(store);
+
+    const result = await createManualProject(deps, {
+      actor,
+      fields: { ...createFields, id: "project-alpha" }
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(409);
+    expect(result.error).toBe("project_id_taken");
+    expect(store.projects).toHaveLength(1);
+  });
+
+  it("maps a 23505 projects_pkey race to 409 instead of an unhandled 500", async () => {
+    const store: MockStore = { projects: [], audits: [] };
+    // Гонка: предчек прошёл, конкурентная вставка успела раньше.
+    const conflict = Object.assign(new Error("insert failed"), {
+      cause: { code: "23505", constraint: "projects_pkey" }
+    });
+    const deps = makeDeps(store, {
+      createManualProject: async () => {
+        throw conflict;
+      }
+    });
+
+    const result = await createManualProject(deps, { actor, fields: createFields });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(409);
+    expect(result.error).toBe("project_id_taken");
+  });
+
+  it("rethrows persistence failures that are not an id conflict", async () => {
+    const store: MockStore = { projects: [], audits: [] };
+    const deps = makeDeps(store, {
+      createManualProject: async () => {
+        throw new Error("connection_lost");
+      }
+    });
+
+    await expect(createManualProject(deps, { actor, fields: createFields })).rejects.toThrow(
+      "connection_lost"
+    );
+  });
+
+  // Регрессия F1: ссылочные id уходили в запись как есть. projectTypeId имеет FK и
+  // давал 23503 → 500; у templateId FK нет вообще — неизвестное значение
+  // молча сохранялось висячей ссылкой (200 + мусор в данных).
+  // calendarId сюда НЕ входит: перечислить легальные календари проекта на уровне API
+  // нечем (см. шапку projectLifecycleGuards.ts, блок 3).
+  it.each([
+    ["projectTypeId", "project-type-ghost", "project_type_not_found"],
+    ["templateId", "template-ghost", "project_template_not_found"]
+  ])("rejects an unknown %s on create with 404 and writes nothing", async (field, value, error) => {
+    const store: MockStore = { projects: [], audits: [] };
+    const deps = makeDeps(store);
+
+    const result = await createManualProject(deps, {
+      actor,
+      fields: { ...createFields, [field]: value }
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(404);
+    expect(result.error).toBe(error);
+    expect(store.projects).toHaveLength(0);
+  });
+
+  it.each([
+    ["projectTypeId", "project-type-ghost", "project_type_not_found"],
+    ["templateId", "template-ghost", "project_template_not_found"]
+  ])("rejects an unknown %s on patch with 404 and leaves the project intact", async (field, value, error) => {
+    const store: MockStore = { projects: [baseProject()], audits: [] };
+    const deps = makeDeps(store);
+
+    const result = await updateProjectSettings(deps, {
+      actor,
+      projectId: "project-alpha",
+      fields: { [field]: value }
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(404);
+    expect(result.error).toBe(error);
+    expect(store.projects[0]?.projectTypeId).toBe("project-type-alpha");
+    expect(store.projects[0]?.templateId).toBeNull();
+    expect(store.audits.map((event) => event.actionType)).not.toContain(
+      "project.settings_updated"
+    );
+  });
+
+  it("accepts known references and still allows clearing them with null", async () => {
+    const store: MockStore = { projects: [baseProject()], audits: [] };
+    const deps = makeDeps(store);
+
+    const set = await updateProjectSettings(deps, {
+      actor,
+      projectId: "project-alpha",
+      fields: { templateId: "template-beta", calendarId: "tenant-default" }
+    });
+    expect(set.ok).toBe(true);
+
+    const cleared = await updateProjectSettings(deps, {
+      actor,
+      projectId: "project-alpha",
+      fields: { projectTypeId: null, templateId: null, calendarId: null }
+    });
+    expect(cleared.ok).toBe(true);
+  });
+
+  // Регрессия: страж календаря считал единственным валидным id производственный
+  // календарь тенанта и отдавал 404 на пер-проектные календари, которые
+  // planningRepository (selectProjectCalendarId / defaultProjectCalendarId) считает
+  // законными и которые planning-команда project.settings.update пишет успешно.
+  it.each([
+    ["синтетический default проекта", "project-alpha-default-calendar"],
+    ["строка project_calendars", "calendar-project-alpha-night-shift"]
+  ])("accepts a per-project calendarId on patch (%s)", async (_label, calendarId) => {
+    const store: MockStore = { projects: [baseProject()], audits: [] };
+    const deps = makeDeps(store);
+
+    const result = await updateProjectSettings(deps, {
+      actor,
+      projectId: "project-alpha",
+      fields: { calendarId }
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.status).toBe(200);
+    expect(store.audits.map((event) => event.actionType)).toContain("project.settings_updated");
+  });
+
+  it("accepts a per-project calendarId on create", async () => {
+    const store: MockStore = { projects: [], audits: [] };
+    const deps = makeDeps(store);
+
+    const result = await createManualProject(deps, {
+      actor,
+      fields: { ...createFields, calendarId: "project-manual-default-calendar" }
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(store.projects).toHaveLength(1);
   });
 });

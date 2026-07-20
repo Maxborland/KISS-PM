@@ -310,6 +310,193 @@ describe("AgentSurface production shell contract", () => {
     });
   });
 
+  // ── Ревью F2: ручная правка правит ПОЛЕ, а не отрисованную сводку превью ──
+  // Раньше редактор засевался из preview.after (у create_task это сводная фраза
+  // «Название» · проект … · 8 ч · приоритет: normal · исполнитель: вы, ~116 символов —
+  // под лимитом 160), и она уходила в input.title целиком: задача молча создавалась
+  // с именем-предложением.
+  const CREATE_TASK_SUFFIX = "» · проект «Стройка» · 2026-07-20 → 2026-07-24 · 8 ч · приоритет: normal · исполнитель: вы";
+
+  function createTaskProposal() {
+    return {
+      ok: true,
+      data: {
+        analyzeResults: [],
+        goal: "Заведи задачу",
+        iterations: 1,
+        model: "test-model",
+        proposedActions: [
+          {
+            capability: { allowed: true, reason: "allowed" },
+            input: { title: "Согласовать смету", projectId: "project-1", plannedWork: 8 },
+            preview: {
+              before: "Задачи не существует",
+              after: `«Согласовать смету${CREATE_TASK_SUFFIX}`,
+              editable: {
+                field: "title",
+                label: "Название задачи",
+                value: "Согласовать смету",
+                prefix: "«",
+                suffix: CREATE_TASK_SUFFIX
+              }
+            },
+            title: "Создать задачу: «Согласовать смету» · проект «Стройка»",
+            tool: "create_task"
+          }
+        ],
+        reasoning: "Одно действие."
+      }
+    };
+  }
+
+  async function editFirstCard(value: string): Promise<void> {
+    const editButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Изменить");
+    expect(editButton).toBeDefined();
+    await act(async () => {
+      editButton!.click();
+    });
+    const textarea = document.querySelector<HTMLTextAreaElement>("[data-testid='agent-change-card'] textarea");
+    expect(textarea).not.toBeNull();
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(textarea!, value);
+      textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  it("правка create_task меняет input.title, а не всю сводку превью", async () => {
+    agentMock.proposeStream.mockResolvedValueOnce(createTaskProposal());
+    agentMock.execute.mockResolvedValueOnce({
+      ok: true,
+      data: { applied: true, results: [{ ok: true, status: "applied", tool: "create_task" }], summary: { applied: 1, denied: 0, conflict: 0, failed: 0 } }
+    });
+    const root = await renderAgent();
+
+    await submitGoal("Заведи задачу");
+
+    // Редактор засеян СЫРЫМ названием, а не сводной фразой превью.
+    const editButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Изменить");
+    await act(async () => {
+      editButton!.click();
+    });
+    expect(document.querySelector<HTMLTextAreaElement>("[data-testid='agent-change-card'] textarea")?.value)
+      .toBe("Согласовать смету");
+
+    await editFirstCard("Согласовать смету с заказчиком");
+
+    const textarea = document.querySelector<HTMLTextAreaElement>("[data-testid='agent-change-card'] textarea");
+    expect(textarea!.value).toBe("Согласовать смету с заказчиком");
+    // Превью пересобрано и остаётся честным: изменилось только название.
+    expect(document.querySelector("[data-testid='agent-change-card']")?.textContent)
+      .toContain(`«Согласовать смету с заказчиком${CREATE_TASK_SUFFIX}`);
+
+    const applyButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Применить"));
+    await act(async () => {
+      applyButton!.click();
+    });
+
+    expect(agentMock.execute).toHaveBeenCalledWith([
+      { tool: "create_task", input: { title: "Согласовать смету с заказчиком", projectId: "project-1", plannedWork: 8 } }
+    ]);
+    // Ключевая регрессия: в title не уходит сводка превью.
+    const sentTitle = (agentMock.execute.mock.calls[0]![0] as Array<{ input: { title: string } }>)[0]!.input.title;
+    expect(sentTitle).not.toContain("приоритет");
+    expect(sentTitle).not.toContain("·");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("правка comment_task меняет input.body (после = сырое тело, без сводки)", async () => {
+    agentMock.proposeStream.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        analyzeResults: [],
+        goal: "Прокомментируй задачу",
+        iterations: 1,
+        model: "test-model",
+        proposedActions: [
+          {
+            capability: { allowed: true, reason: "allowed" },
+            input: { taskId: "task-1", body: "Смета уточнена." },
+            preview: {
+              before: "Комментариев: 2",
+              after: "Смета уточнена.",
+              editable: { field: "body", label: "Текст комментария", value: "Смета уточнена.", prefix: "", suffix: "" }
+            },
+            title: "Прокомментировать задачу: «Смета» · проект project-1, задача task-1",
+            tool: "comment_task"
+          }
+        ],
+        reasoning: "Одно действие."
+      }
+    });
+    agentMock.execute.mockResolvedValueOnce({
+      ok: true,
+      data: { applied: true, results: [{ ok: true, status: "applied", tool: "comment_task" }], summary: { applied: 1, denied: 0, conflict: 0, failed: 0 } }
+    });
+    const root = await renderAgent();
+
+    await submitGoal("Прокомментируй задачу");
+    await editFirstCard("Смета уточнена, жду подтверждения заказчика.");
+
+    const applyButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Применить"));
+    await act(async () => {
+      applyButton!.click();
+    });
+
+    expect(agentMock.execute).toHaveBeenCalledWith([
+      { tool: "comment_task", input: { taskId: "task-1", body: "Смета уточнена, жду подтверждения заказчика." } }
+    ]);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("действие без объявленного сервером редактируемого поля правку не открывает", async () => {
+    agentMock.proposeStream.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        analyzeResults: [],
+        goal: "Смени статус",
+        iterations: 1,
+        model: "test-model",
+        proposedActions: [
+          {
+            capability: { allowed: true, reason: "allowed" },
+            input: { taskId: "task-1", projectId: "project-1", statusId: "status-review" },
+            // preview.editable отсутствует — структурное действие правке не подлежит.
+            preview: { before: "В работе", after: "На проверке" },
+            title: "Сменить статус задачи: task-1",
+            tool: "change_task_status"
+          }
+        ],
+        reasoning: "Одно действие."
+      }
+    });
+    const root = await renderAgent();
+
+    await submitGoal("Смени статус");
+    const editButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Изменить");
+    await act(async () => {
+      editButton!.click();
+    });
+
+    expect(document.querySelector("[data-testid='agent-change-card'] textarea")).toBeNull();
+    expect(document.body.textContent).toContain("нельзя отредактировать вручную");
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it("не преселектит доменную mutation с пустым diff — apply не уходит вслепую", async () => {
     agentMock.proposeStream.mockResolvedValueOnce({
       ok: true,

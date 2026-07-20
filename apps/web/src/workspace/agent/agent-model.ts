@@ -13,6 +13,22 @@ export type AgentChangeStatus =
   | "ошибка"
   | "неизвестно";
 
+/**
+ * Редактируемое поле карточки сверки — контракт сервера (preview.editable).
+ *
+ * Редактор ОБЯЗАН править `value` (сырое значение поля action.input[field]), а не отображаемое
+ * `after`: у create_task `after` — сводная фраза превью, и её присвоение в input.title молча
+ * создавало задачу с именем-предложением (ревью F2). Отображение пересобирается как
+ * prefix + value + suffix — превью остаётся честным и после правки.
+ */
+export type AgentChangeEdit = {
+  field: string;
+  label: string;
+  value: string;
+  prefix: string;
+  suffix: string;
+};
+
 export type AgentChange = {
   id: string;
   number: number;
@@ -21,9 +37,15 @@ export type AgentChange = {
   after: string;
   status: AgentChangeStatus;
   selected: boolean;
-  /** Ручная правка разрешена только действиям с явным текстовым полем (EDITABLE_FIELD). */
+  /** Ручная правка разрешена только действиям, для которых сервер объявил редактируемое поле. */
   editable: boolean;
+  /** Присутствует ⇔ editable: что именно правим и чем пересобрать отображение. */
+  edit?: AgentChangeEdit;
 };
+
+/** Отображение «Стало» из редактируемого поля: единственная точка сборки превью на клиенте. */
+export const composeAfter = (edit: AgentChangeEdit, value: string): string =>
+  `${edit.prefix}${value}${edit.suffix}`;
 
 /** Статусы, после которых карточка терминальна (никаких select/edit/reject). */
 export const TERMINAL_STATUSES: readonly AgentChangeStatus[] = [

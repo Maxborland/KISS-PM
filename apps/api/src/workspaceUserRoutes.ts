@@ -13,7 +13,8 @@ import { invalidateCapacityCacheForTenant } from "./capacity/registerCapacityRou
 import { readLimitedJsonBody } from "./jsonBody";
 import { authorizeRoute } from "./routeAuth";
 import { parseUserIdParam } from "./routeParamParsers";
-import type { WorkspaceUserRecord } from "./apiTypes";
+import { workspaceUserUniqueConflict } from "./uniqueConstraintConflicts";
+import type { ApiTenantDataSource, WorkspaceUserRecord } from "./apiTypes";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
   parseWorkspaceInvitationBody,
@@ -225,6 +226,7 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       capabilities: [
         "createWorkspaceUser",
         "createPasswordResetToken",
+        "findCredentialByEmail",
         "listWorkspaceUsers",
         "listAccessProfilesByTenantId",
         "listPositions",
@@ -250,7 +252,17 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
     if (existingUsers.some((user) => user.id === parsed.value.id)) {
       return context.json({ error: "user_id_taken" }, 409);
     }
-    if (existingUsers.some((user) => user.email === parsed.value.email)) {
+    // Занятость email — по общим правилам (см. workspaceEmailTaken): регистро-
+    // независимо внутри тенанта + ГЛОБАЛЬНО по credential. Без глобальной части
+    // инвайт на чужой адрес отвечал 201, а /api/auth/invitation/accept затем падал
+    // 23505 → 500, и приглашение становилось нерабочим навсегда.
+    // Порт здесь гарантирован capabilities маршрута ("findCredentialByEmail").
+    if (
+      await workspaceEmailTaken(dataSource.findCredentialByEmail, {
+        email: parsed.value.email,
+        existingUsers
+      })
+    ) {
       return context.json({ error: "user_email_taken" }, 409);
     }
     if (!(await emailDomainAllowed(dataSource, actor.tenantId, parsed.value.email))) {
@@ -418,14 +430,34 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
       return context.json({ error: "self_access_change_forbidden" }, 400);
     }
 
+    // Глобальная часть правила занятости email требует findCredentialByEmail.
+    // Порт НЕ объявлен в capabilities маршрута намеренно: capability-проба даёт
+    // 501 ДО RBAC-шага и тем самым съела бы 403-ветку у неполных источников.
+    // Поэтому проверяем здесь, после преамбулы, и тоже громко — молча ослабить
+    // правило до «как было» нельзя, иначе оно опять разъедется с инвайтом.
+    if (!dataSource.findCredentialByEmail) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+    // Те же правила занятости email, что и на пути инвайта: расхождение давало
+    // 409 из generic-catch по 23505 вместо точной предпроверки (см. workspaceEmailTaken).
     if (
-      workspaceUsers.some(
-        (user) =>
-          user.id !== userId &&
-          user.email === parsed.value.email
-      )
+      await workspaceEmailTaken(dataSource.findCredentialByEmail, {
+        email: parsed.value.email,
+        existingUsers: workspaceUsers,
+        excludeUserId: userId
+      })
     ) {
       return context.json({ error: "user_email_taken" }, 409);
+    }
+    // Оффбординг обязан отзывать токены сброса пароля (см. транзакцию ниже).
+    // Требуем порт РОВНО когда контроль применяется — деактивация без
+    // возможности отозвать токены обязана быть отказом, а не тихим 200.
+    if (
+      beforeState.status === "active" &&
+      parsed.value.status !== "active" &&
+      !dataSource.deletePasswordResetTokensByUserId
+    ) {
+      return context.json({ error: "persistence_not_configured" }, 501);
     }
     // Смена email тоже обязана уважать домен-allowlist политики безопасности.
     if (
@@ -474,6 +506,21 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
           transactionDataSource.deleteSessionsByUserId
         ) {
           await transactionDataSource.deleteSessionsByUserId(
+            updatedUser.tenantId,
+            updatedUser.id
+          );
+        }
+        // Оффбординг обязан отзывать НЕ ТОЛЬКО сессии: невостребованный токен
+        // восстановления пароля переживал деактивацию и позволял уволенному
+        // задать новый пароль. Отзыв доступа = отзыв всех токенов доступа.
+        if (beforeState.status === "active" && updatedUser.status !== "active") {
+          // Падаем громко, как transactional_invitation_accept_not_configured в
+          // authRegistrationRoutes: пропустить отзыв «потому что порта нет» —
+          // значит молча вернуть 200 с живым токеном уволенного сотрудника.
+          if (!transactionDataSource.deletePasswordResetTokensByUserId) {
+            throw new Error("transactional_user_offboarding_not_configured");
+          }
+          await transactionDataSource.deletePasswordResetTokensByUserId(
             updatedUser.tenantId,
             updatedUser.id
           );
@@ -709,31 +756,6 @@ async function appendWorkspaceUserDeniedAudit(
   });
 }
 
-function workspaceUserUniqueConflict(
-  error: unknown
-): "user_id_taken" | "user_email_taken" | null {
-  let current: unknown = error;
-  for (let depth = 0; current != null && depth < 8; depth += 1) {
-    const rec = current as {
-      code?: unknown;
-      constraint?: unknown;
-      constraint_name?: unknown;
-      message?: unknown;
-      cause?: unknown;
-    };
-    if (rec.code === "23505") {
-      const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
-      if (
-        marker.includes("tenant_users_tenant_id_id_uidx") ||
-        marker.includes("tenant_users_pkey")
-      ) return "user_id_taken";
-      if (marker.includes("tenant_users_tenant_id_email_uidx")) return "user_email_taken";
-      if (marker.includes("user_credentials_email_uidx")) return "user_email_taken";
-    }
-    current = rec.cause;
-  }
-  return null;
-}
 function shouldRevokeSessionsAfterUserUpdate(
   before: {
     accessProfileId: string;
@@ -751,6 +773,39 @@ function shouldRevokeSessionsAfterUserUpdate(
     before.email !== after.email ||
     before.status !== after.status
   );
+}
+
+/**
+ * Единые правила занятости email для ОБОИХ путей записи (инвайт и обновление).
+ * Раньше правила расходились: инвайт сверял регистронезависимо и глобально, а
+ * PATCH — точным равенством внутри тенанта, поэтому смена адреса на "A@x.com"
+ * при живом "a@x.com" (или на адрес чужого тенанта) проскакивала предпроверку и
+ * ловилась только 23505 из updateCredentialEmail, спасённым generic-catch.
+ *
+ * 1) Сравнение регистронезависимое: upsertCredential/updateCredentialEmail
+ *    приводят email к нижнему регистру, поэтому "A@x" и "a@x" — один адрес для
+ *    уникального индекса.
+ * 2) Проверка credential ГЛОБАЛЬНАЯ: user_credentials_email_uidx уникален по
+ *    ВСЕМ тенантам, а не в пределах текущего.
+ *
+ * excludeUserId — обновляемый пользователь: собственный адрес не считается
+ * занятым (иначе PATCH без смены email всегда падал бы в 409).
+ */
+async function workspaceEmailTaken(
+  findCredentialByEmail: NonNullable<ApiTenantDataSource["findCredentialByEmail"]>,
+  input: {
+    email: string;
+    existingUsers: WorkspaceUserRecord[];
+    excludeUserId?: string;
+  }
+): Promise<boolean> {
+  const email = input.email.toLowerCase();
+  const takenByTenantUser = input.existingUsers.some(
+    (user) => user.id !== input.excludeUserId && user.email.toLowerCase() === email
+  );
+  if (takenByTenantUser) return true;
+  const credential = await findCredentialByEmail(email);
+  return credential !== undefined && credential.userId !== input.excludeUserId;
 }
 
 // Домен email против политики безопасности тенанта (G6-01: allowlist теперь

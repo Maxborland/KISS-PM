@@ -35,6 +35,14 @@ export const auditEvents = pgTable(
   },
   (table) => [
     index("audit_events_tenant_id_idx").on(table.tenantId),
-    index("audit_events_correlation_id_idx").on(table.correlationId)
+    index("audit_events_correlation_id_idx").on(table.correlationId),
+    // Лента журнала: keyset-пагинация внутри тенанта с order by created_at desc, id desc.
+    // Без композита Postgres берёт tenant_id-индекс и досортировывает — дёшево сейчас
+    // (окно ≤ 100 строк), но деградирует по мере роста append-only таблицы (purge нет).
+    index("audit_events_tenant_created_at_id_idx").on(
+      table.tenantId,
+      table.createdAt.desc(),
+      table.id.desc()
+    )
   ]
 );

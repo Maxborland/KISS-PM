@@ -20,6 +20,7 @@ import type {
 import {
   parseContactBody,
   parseDealStageBody,
+  parseDealStageOrderBody,
   parsePipelineBody,
   parseProductBody,
   parseProjectTypeBody,
@@ -43,7 +44,14 @@ import {
 
 // Дубликаты CRM-уникальных полей нарушают Postgres 23505. Распознаём, чтобы вернуть 409 вместо 500
 // (house-паттерн, как isCredentialEmailConflict в authRegistrationRoutes). Обходим error.cause.
-function crmUniqueConflict(error: unknown): "product_sku_taken" | "product_name_taken" | "contact_email_taken" | null {
+type CrmUniqueConflictCode =
+  | "product_sku_taken"
+  | "product_name_taken"
+  | "contact_email_taken"
+  | "deal_stage_sort_order_taken"
+  | "deal_stage_name_taken";
+
+function crmUniqueConflict(error: unknown): CrmUniqueConflictCode | null {
   let current: unknown = error;
   for (let depth = 0; current != null && depth < 8; depth += 1) {
     const rec = current as { code?: unknown; constraint?: unknown; constraint_name?: unknown; message?: unknown; cause?: unknown };
@@ -52,6 +60,10 @@ function crmUniqueConflict(error: unknown): "product_sku_taken" | "product_name_
       if (marker.includes("products_tenant_id_sku_uidx")) return "product_sku_taken";
       if (marker.includes("products_tenant_id_name_uidx")) return "product_name_taken";
       if (marker.includes("contacts_tenant_id_email_uidx")) return "contact_email_taken";
+      // Стадии воронки: (tenant_id, pipeline_id, sort_order) и (tenant_id, pipeline_id, name)
+      // — оба индекса immediate. Раньше 23505 отсюда улетал в app.onError как 500.
+      if (marker.includes("crm_pipeline_stages_tenant_pipeline_sort_order_uidx")) return "deal_stage_sort_order_taken";
+      if (marker.includes("crm_pipeline_stages_tenant_pipeline_name_uidx")) return "deal_stage_name_taken";
     }
     current = rec.cause;
   }
@@ -602,7 +614,9 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
       return context.json({ error: "persistence_not_configured" }, 501);
     }
 
-    const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
+    let dealStage;
+    try {
+      dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.createDealStage) {
         throw new Error("transactional_deal_stage_create_not_configured");
       }
@@ -666,7 +680,12 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         transactionDataSource
       );
       return created;
-    });
+      });
+    } catch (error) {
+      const conflict = crmUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ dealStage }, 201);
   });
@@ -713,7 +732,9 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
     );
     if (!parsed.ok) return context.json({ error: parsed.error }, 400);
 
-    const dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
+    let dealStage;
+    try {
+      dealStage = await runDataSourceTransaction(async (transactionDataSource) => {
       if (!transactionDataSource.updateDealStage) {
         throw new Error("transactional_deal_stage_update_not_configured");
       }
@@ -737,9 +758,133 @@ export function registerCrmRoutes(app: Hono, deps: CrmRouteDeps) {
         transactionDataSource
       );
       return updated;
-    });
+      });
+    } catch (error) {
+      const conflict = crmUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
 
     return context.json({ dealStage });
+  });
+
+  // Мультиворонки: атомарное переупорядочивание стадий воронки.
+  //
+  // Почему отдельная ручка, а не N последовательных PATCH /deal-stages/:id: индекс
+  // crm_pipeline_stages_tenant_pipeline_sort_order_uidx — immediate (не DEFERRABLE), поэтому
+  // перестановка соседей A(1)<->B(2) НЕ выражается последовательностью независимых запросов:
+  // любой порядок из двух шагов даёт промежуточное состояние с дублем sort_order → 23505.
+  // Здесь весь новый порядок применяется одной транзакцией в две фазы (сначала во временный
+  // свободный диапазон, затем в финальные 1..N), поэтому коллизии не возникает ни на одном шаге.
+  app.patch("/api/workspace/pipelines/:pipelineId/stage-order", async (context) => {
+    const parsedPipelineId = parsePipelineIdParam(context.req.param("pipelineId"));
+    if (!parsedPipelineId.ok) {
+      return context.json({ error: parsedPipelineId.error }, 400);
+    }
+
+    const pipelineId = parsedPipelineId.value;
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageDealStages,
+      capabilities: ["findPipelineById", "listDealStages", "updateDealStage", "appendAuditEvent", "withTransaction"],
+      onDenied: ({ actor, decision }) =>
+        appendDeniedAudit({
+          actor,
+          actionType: "deal_stage.reorder_denied",
+          sourceEntity: { type: "Pipeline", id: pipelineId },
+          commandInput: { endpoint: "reorderDealStages", pipelineId },
+          permissionResult: decision,
+          error: decision.reason
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
+
+    if (!dataSource.findPipelineById) {
+      return context.json({ error: "persistence_not_configured" }, 501);
+    }
+    const pipeline = await dataSource.findPipelineById(actor.tenantId, pipelineId);
+    if (!pipeline) return context.json({ error: "pipeline_not_found" }, 404);
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseDealStageOrderBody(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+
+    const beforeStages = (await dataSource.listDealStages(actor.tenantId))
+      .filter((stage) => stage.pipelineId === pipelineId)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+    // Требуем ПОЛНЫЙ порядок: частичный список оставил бы дыры/дубли sort_order.
+    const requested = parsed.value.stageIds;
+    const known = new Set(beforeStages.map((stage) => stage.id));
+    if (requested.length !== beforeStages.length || requested.some((id) => !known.has(id))) {
+      return context.json({ error: "invalid_stage_order" }, 400);
+    }
+
+    let dealStages;
+    try {
+      dealStages = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (!transactionDataSource.updateDealStage) {
+          throw new Error("transactional_deal_stage_update_not_configured");
+        }
+        // Перечитываем стадии ВНУТРИ транзакции. Снимок beforeStages снят до неё и уже
+        // мог устареть: параллельный PATCH /deal-stages/:id успевает переименовать стадию
+        // или сменить её статус, а updateDealStage перезаписывает строку целиком
+        // (pipeline_id, name, sort_order, status). Запись устаревшего снимка молча
+        // откатывала бы чужой коммит (lost update) и отдавала 200 без следов в аудите.
+        const currentStages = (await transactionDataSource.listDealStages(actor.tenantId))
+          .filter((stage) => stage.pipelineId === pipelineId)
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+        const byId = new Map(currentStages.map((stage) => [stage.id, stage]));
+        // Состав стадий тоже мог измениться (создание/удаление/перенос в другую воронку).
+        // Фаза 1 рассчитана на ПОЛНЫЙ порядок, поэтому по устаревшему списку не переставляем.
+        if (
+          currentStages.length !== requested.length ||
+          requested.some((stageId) => !byId.has(stageId))
+        ) {
+          return "stage_order_conflict" as const;
+        }
+        // Фаза 1 — во временные слоты выше любого занятого, чтобы освободить 1..N.
+        const temporaryBase = currentStages.reduce((max, stage) => Math.max(max, stage.sortOrder), 0) + 1;
+        for (const [index, stageId] of requested.entries()) {
+          const stage = byId.get(stageId)!;
+          await transactionDataSource.updateDealStage({ ...stage, sortOrder: temporaryBase + index });
+        }
+        // Фаза 2 — финальная плотная нумерация 1..N в запрошенном порядке. Берём строку из
+        // свежей карты, а не из beforeStages: остальные колонки должны остаться чужими.
+        const reordered = [];
+        for (const [index, stageId] of requested.entries()) {
+          const stage = byId.get(stageId)!;
+          reordered.push(await transactionDataSource.updateDealStage({ ...stage, sortOrder: index + 1 }));
+        }
+        if (transactionDataSource.refreshCrmPipelineLifecycleGraph) {
+          await transactionDataSource.refreshCrmPipelineLifecycleGraph(actor.tenantId, pipelineId);
+        }
+        await appendManagementAuditEvent(
+          auditInput({
+            actor,
+            actionType: "deal_stage.reordered",
+            sourceEntity: { type: "Pipeline", id: pipelineId },
+            commandInput: { pipelineId, stageIds: requested },
+            beforeState: { stageIds: currentStages.map((stage) => stage.id) },
+            afterState: { stageIds: requested },
+            permissionResult: decision
+          }),
+          transactionDataSource
+        );
+        return reordered;
+      });
+    } catch (error) {
+      const conflict = crmUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
+
+    // Набор стадий изменился под нами — клиент обязан перечитать воронку и повторить.
+    if (dealStages === "stage_order_conflict") {
+      return context.json({ error: "stage_order_conflict" }, 409);
+    }
+
+    return context.json({ dealStages });
   });
 
   // Мультиворонки: список воронок (право чтения стадий).

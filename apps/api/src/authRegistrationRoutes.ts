@@ -12,6 +12,10 @@ import type { Context } from "hono";
 import { getClientIp } from "./authRateLimit";
 import { buildSessionCookieHeader, sessionTtlMs } from "./authSession";
 import { readLimitedJsonBody } from "./jsonBody";
+import {
+  isCredentialEmailConflict,
+  workspaceUserUniqueConflict
+} from "./uniqueConstraintConflicts";
 import type { PasswordResetTokenRecord } from "./apiTypes";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import type { TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -44,23 +48,6 @@ export async function issuePasswordResetToken(
     createdAt: now
   });
   return { tokenId, rawToken, expiresAt };
-}
-
-// Гонка регистрации одного email (TOCTOU): pre-check прошёл, но глобальный uniqueIndex
-// user_credentials_email_uidx отверг параллельную вставку. Распознаём нарушение уникальности
-// (Postgres 23505), чтобы вернуть чистый 409 email_taken вместо 500 (house-паттерн, как
-// isActiveSessionConflictError). Обходим error.cause на случай обёрток драйвера.
-function isCredentialEmailConflict(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; current != null && depth < 8; depth += 1) {
-    const rec = current as { code?: unknown; constraint?: unknown; constraint_name?: unknown; message?: unknown; cause?: unknown };
-    if (rec.code === "23505") {
-      const marker = String(rec.constraint ?? rec.constraint_name ?? rec.message ?? "");
-      if (marker.includes("user_credentials_email_uidx")) return true;
-    }
-    current = rec.cause;
-  }
-  return false;
 }
 
 // Регистрирует ручки самостоятельной регистрации нового тенанта и сброса пароля.
@@ -291,7 +278,8 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
   app.post("/api/auth/password-reset/request", async (context) => {
     if (
       !dataSource.findCredentialByEmail ||
-      !dataSource.createPasswordResetToken
+      !dataSource.createPasswordResetToken ||
+      !dataSource.listWorkspaceUsers
     ) {
       return context.json({ error: "auth_not_configured" }, 501);
     }
@@ -322,9 +310,18 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
 
     try {
       const credential = await dataSource.findCredentialByEmail(email);
+      // Оффбординг: у деактивированного сотрудника credential остаётся, поэтому одной
+      // проверки существования кредов мало — уволенный мог выпустить свежий токен уже
+      // ПОСЛЕ отзыва доступа. Токен выдаём только активному пользователю; ответ при
+      // этом не меняется, иначе появился бы оракул «аккаунт есть, но заблокирован».
+      const resetUser = credential
+        ? (await dataSource.listWorkspaceUsers(credential.tenantId)).find(
+            (user) => user.id === credential.userId
+          ) ?? null
+        : null;
       // Токен создаём и письмо шлём только если email существует. Ответ всегда 202 —
       // не раскрываем наличие/отсутствие аккаунта (anti-enumeration).
-      if (credential) {
+      if (credential && resetUser?.status === "active") {
         const { rawToken } = await issuePasswordResetToken(
           dataSource.createPasswordResetToken,
           {
@@ -333,11 +330,24 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
             requestedIp: rateLimitInput.ip ?? null
           }
         );
-        await emailProvider.sendPasswordReset({
-          email,
-          rawToken,
-          resetUrl: buildResetUrl(context, rawToken)
-        });
+        // Отправка письма НЕ должна влиять на код ответа: раньше падение SMTP давало
+        // 500 для зарегистрированного адреса против 202 для незарегистрированного —
+        // готовый оракул перечисления, прямо противоречащий комментарию выше. Плюс
+        // throw пролетал мимо recordFailure, и перебор не копился к блокировке.
+        // ВАЖНО: в отличие от инвайта (workspaceUserRoutes), здесь НЕЛЬЗЯ
+        // деградировать delivery в "none" — отправка вызывается только для
+        // существующего аккаунта, поэтому иной ответ снова раскрыл бы его наличие.
+        try {
+          await emailProvider.sendPasswordReset({
+            email,
+            rawToken,
+            resetUrl: buildResetUrl(context, rawToken)
+          });
+        } catch (error) {
+          // Токен в БД остаётся валидным: админ может выдать его вручную через
+          // POST /api/workspace/users/:userId/password-reset-token.
+          console.warn("password_reset_email_delivery_failed", error);
+        }
       }
       // Каждый reset-request считаем попыткой (recordFailure), а НЕ успехом:
       // recordSuccess удаляет email-bucket, обнуляя накопление к maxFailures,
@@ -505,6 +515,7 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
     if (
       !dataSource.findPasswordResetTokenByHash ||
       !dataSource.listWorkspaceUsers ||
+      !dataSource.findCredentialByEmail ||
       !dataSource.upsertCredential ||
       !dataSource.updateWorkspaceUser ||
       !dataSource.markPasswordResetTokenConsumed ||
@@ -564,11 +575,33 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
         return context.json({ error: "invitation_not_pending" }, 400);
       }
 
+      // Токены приглашения и сброса живут в ОДНОЙ таблице без колонки-дискриминатора,
+      // поэтому «это приглашение?» приходится решать по состоянию аккаунта. Рабочий
+      // признак — наличие credential: приглашённый пароля ещё не имеет (credential
+      // создаётся именно здесь), а у деактивированного сотрудника он остаётся.
+      // Без этой проверки уволенный запрашивал обычный reset-токен и через
+      // /invitation/accept задавал пароль и возвращал себе status:"active".
+      const existingCredential = await dataSource.findCredentialByEmail(invitedUser.email);
+      if (existingCredential && existingCredential.userId === invitedUser.id) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "invitation_not_pending" }, 400);
+      }
+      // Адрес занят ДРУГИМ аккаунтом (глобальный user_credentials_email_uidx).
+      // Отвечаем честным 409 ДО транзакции: раньше здесь падал 23505 → 500, причём
+      // markPasswordResetTokenConsumed откатывался вместе с транзакцией, и каждая
+      // повторная попытка снова давала 500. Сейчас токен остаётся валидным, и после
+      // исправления email админом приглашение можно принять.
+      if (existingCredential) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "user_email_taken" }, 409);
+      }
+
       const accepted = await dataSource.withTransaction(async (tx) => {
         if (
           !tx.markPasswordResetTokenConsumed ||
           !tx.upsertCredential ||
           !tx.updateWorkspaceUser ||
+          !tx.listWorkspaceUsers ||
           !tx.deleteOtherPasswordResetTokensByUserId
         ) {
           throw new Error("transactional_invitation_accept_not_configured");
@@ -579,16 +612,32 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           record.id,
           now
         );
-        if (affected === 0) return false;
+        if (affected === 0) return { ok: false, reason: "token_used" } as const;
+
+        // Перечитываем пользователя ВНУТРИ транзакции. Снимок, прочитанный до
+        // withTransaction, успевал устареть: updateWorkspaceUser переписывает ВСЕ
+        // колонки без версии, поэтому запись устаревшего снимка молча откатывала
+        // правки админа (например, понижение accessProfileId), сделанные между
+        // приглашением и приёмом.
+        const freshUser =
+          (await tx.listWorkspaceUsers(record.tenantId)).find(
+            (user) => user.id === record.userId
+          ) ?? null;
+        if (!freshUser || freshUser.status !== "inactive") {
+          return { ok: false, reason: "not_pending" } as const;
+        }
 
         await tx.upsertCredential({
-          userId: invitedUser.id,
-          tenantId: invitedUser.tenantId,
-          email: invitedUser.email,
+          userId: freshUser.id,
+          tenantId: freshUser.tenantId,
+          // Актуальный email, а не устаревший: админ мог исправить опечатку.
+          email: freshUser.email,
           ...hashPassword(password)
         });
-        const { positionName: _positionName, ...userWithoutPositionName } = invitedUser;
-        await tx.updateWorkspaceUser({ ...userWithoutPositionName, status: "active" });
+        // Приём приглашения владеет ровно одним полем — status. Остальные колонки
+        // переносим из свежей строки, прочитанной этой же транзакцией.
+        const { positionName: _positionName, ...freshWithoutPositionName } = freshUser;
+        await tx.updateWorkspaceUser({ ...freshWithoutPositionName, status: "active" });
         await tx.deleteOtherPasswordResetTokensByUserId(
           record.tenantId,
           record.userId,
@@ -610,17 +659,26 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
           tx
         );
 
-        return true;
+        return { ok: true } as const;
       });
 
-      if (!accepted) {
+      if (!accepted.ok) {
         await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
-        return context.json({ error: "invitation_token_used" }, 400);
+        return accepted.reason === "not_pending"
+          ? context.json({ error: "invitation_not_pending" }, 400)
+          : context.json({ error: "invitation_token_used" }, 400);
       }
 
       await deps.authRateLimiter.recordSuccess(rateLimitInput, { reserved: reservedAttempt });
       return context.json({ status: "ok" });
     } catch (error) {
+      // Страховка на гонку: адрес могли занять между pre-check и вставкой credential.
+      // Отдаём тот же честный 409, что и на не-гоночном пути, вместо 500.
+      const conflict = workspaceUserUniqueConflict(error);
+      if (conflict) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: conflict }, 409);
+      }
       if (reservedAttempt) {
         await deps.authRateLimiter.releaseReservedAttempt?.(rateLimitInput);
       }

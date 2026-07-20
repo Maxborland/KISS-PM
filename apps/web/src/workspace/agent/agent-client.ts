@@ -25,7 +25,13 @@ export type ProposedAction = {
   title: string;
   input: Record<string, unknown>;
   capability: AgentCapability;
-  preview: { before: string; after: string };
+  // editable — контракт ручной правки: какое поле input править и как пересобрать
+  // отображение (after = prefix + value + suffix). Отсутствует → правка запрещена.
+  preview: {
+    before: string;
+    after: string;
+    editable?: { field: string; label: string; value: string; prefix: string; suffix: string };
+  };
   preconditionVersions?: { taskUpdatedAt?: string; planVersion?: number };
 };
 export type AnalyzeResult = { tool: string; input: Record<string, unknown>; result: unknown };

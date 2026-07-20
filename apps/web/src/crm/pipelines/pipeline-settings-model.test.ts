@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DealStage, StageTransition } from "@/crm/lib/crm-client";
-import { canCreateTransition, nextSortOrder, orderedStages, parseMinProbabilityInput, planStageReorder } from "./pipeline-settings-model";
+import { canCreateTransition, nextSortOrder, orderedStages, parseMinProbabilityInput, planStageOrder } from "./pipeline-settings-model";
 
 const t = "2026-01-01T00:00:00.000Z";
 const stage = (id: string, pipelineId: string, sortOrder: number, status: "active" | "archived" = "active"): DealStage => ({
@@ -22,32 +22,31 @@ describe("orderedStages", () => {
   });
 });
 
-describe("planStageReorder", () => {
+describe("planStageOrder", () => {
   const stages = [stage("a", "p1", 1), stage("b", "p1", 2), stage("c", "p1", 3)];
 
-  it("swaps sortOrder values with the neighbour above", () => {
-    expect(planStageReorder(stages, "b", "up")).toEqual([
-      { id: "b", sortOrder: 1 },
-      { id: "a", sortOrder: 2 }
-    ]);
+  it("returns the full new ordering when moving up", () => {
+    expect(planStageOrder(stages, "b", "up")).toEqual(["b", "a", "c"]);
   });
 
-  it("swaps sortOrder values with the neighbour below", () => {
-    expect(planStageReorder(stages, "b", "down")).toEqual([
-      { id: "b", sortOrder: 3 },
-      { id: "c", sortOrder: 2 }
-    ]);
+  it("returns the full new ordering when moving down", () => {
+    expect(planStageOrder(stages, "b", "down")).toEqual(["a", "c", "b"]);
   });
 
   it("returns null at the edges or for an unknown stage", () => {
-    expect(planStageReorder(stages, "a", "up")).toBeNull();
-    expect(planStageReorder(stages, "c", "down")).toBeNull();
-    expect(planStageReorder(stages, "zzz", "up")).toBeNull();
+    expect(planStageOrder(stages, "a", "up")).toBeNull();
+    expect(planStageOrder(stages, "c", "down")).toBeNull();
+    expect(planStageOrder(stages, "zzz", "up")).toBeNull();
   });
 
-  it("nudges deterministically when neighbours share a sortOrder", () => {
+  it("keeps other pipelines' stages out of the ordering", () => {
+    const mixed = [...stages, stage("x", "p2", 1)];
+    expect(planStageOrder(mixed, "b", "up")).toEqual(["b", "a", "c"]);
+  });
+
+  it("orders deterministically when neighbours share a sortOrder", () => {
     const tied = [stage("a", "p1", 1), stage("b", "p1", 1)];
-    expect(planStageReorder(tied, "b", "up")).toEqual([{ id: "b", sortOrder: 0 }]);
+    expect(planStageOrder(tied, "b", "up")).toEqual(["b", "a"]);
   });
 });
 

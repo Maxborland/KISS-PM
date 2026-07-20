@@ -160,6 +160,10 @@ export function createCrmClient(options: CrmApiClientOptions) {
     createDealStage(input: { name: string; sortOrder: number; pipelineId?: string | null; status?: CrmStatus }) { return requestJson<{ dealStage: DealStage }>("/api/workspace/deal-stages", { method: "POST", body: JSON.stringify(input) }); },
     // Стадия (PATCH /deal-stages/:id): full-replace name/sortOrder/status — воронка сохраняется сервером (боевой parseDealStageBody + before-state). Нужна конструктору для переименования/переупорядочивания/архивации стадий.
     updateDealStage(stageId: string, input: { name: string; sortOrder: number; status?: CrmStatus }) { return requestJson<{ dealStage: DealStage }>(`/api/workspace/deal-stages/${enc(stageId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
+    // Переупорядочивание стадий воронки — ОДИН атомарный запрос с полным новым порядком.
+    // Последовательные PATCH /deal-stages/:id здесь запрещены: immediate-unique
+    // (tenant_id, pipeline_id, sort_order) отвергает любое промежуточное состояние.
+    reorderDealStages(pipelineId: string, stageIds: string[]) { return requestJson<{ dealStages: DealStage[] }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-order`, { method: "PATCH", body: JSON.stringify({ stageIds }) }); },
     updatePipeline(pipelineId: string, input: { name: string; sortOrder: number; description?: string | null; isDefault?: boolean; status?: CrmStatus }) { return requestJson<{ pipeline: Pipeline }>(`/api/workspace/pipelines/${enc(pipelineId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     listStageTransitions(pipelineId: string) { return requestJson<{ stageTransitions: StageTransition[] }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`); },
     createStageTransition(pipelineId: string, input: { fromStageId: string; toStageId: string; requireFeasibilityOk?: boolean; minProbability?: number | null; guardNote?: string | null }) { return requestJson<{ stageTransition: StageTransition }>(`/api/workspace/pipelines/${enc(pipelineId)}/stage-transitions`, { method: "POST", body: JSON.stringify(input) }); },
