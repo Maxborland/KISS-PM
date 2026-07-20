@@ -40,7 +40,9 @@ target="$BACKUP_DIR/kiss-pm-$timestamp.sql.gz"
 # --no-owner/--no-privileges: дамп переносим между окружениями без привязки к
 # конкретным ролям. pg_dump сам читает DATABASE_URL как позиционный dbname URI.
 # gzip на лету, без промежуточного .sql на диске.
-pg_dump --no-owner --no-privileges "$DATABASE_URL" | gzip -c > "$target"
+# --clean --if-exists: дамп сам дропает существующие объекты перед CREATE,
+# чтобы restore.sh поверх непустой БД не падал на дубликатах.
+pg_dump --no-owner --no-privileges --clean --if-exists "$DATABASE_URL" | gzip -c > "$target"
 
 # Абсолютный путь для оператора/скрипта-обёртки.
 case "$target" in

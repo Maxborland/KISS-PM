@@ -15,7 +15,9 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  // wss:/https: — сигналинг LiveKit/медиа-плоскость на отдельном хосте (KISS_PM_VIDEO_LIVEKIT_URL);
+  // без них room.connect(joinUrl) блокируется CSP. self покрывает SSE/fetch к /api того же origin.
+  "connect-src 'self' https: wss:",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "frame-ancestors 'none'",
