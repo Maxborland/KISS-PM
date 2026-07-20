@@ -327,6 +327,205 @@ describe("knowledge routes", () => {
     expect(fixture.decisions).toHaveLength(0);
     expect(fixture.auditEvents).toHaveLength(0);
   });
+
+  it("deletes a decision log entry and records a delete audit", async () => {
+    const fixture = createKnowledgeFixture();
+    const app = createKnowledgeApp(fixture);
+    const created = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/decisions`,
+      {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({ title: "Решение", decision: "Делаем так" })
+      }
+    );
+    const decisionId = ((await created.json()) as { decision: DecisionLogEntry }).decision.id;
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/decisions/${decisionId}`,
+      { method: "DELETE", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      decision: { id: decisionId, archivedAt: expect.any(String) }
+    });
+    expect(fixture.decisions.every((decision) => decision.archivedAt)).toBe(true);
+    expect(fixture.auditEvents.map((event) => event.actionType)).toContain("knowledge.decision_deleted");
+  });
+
+  it("returns 404 when deleting a missing decision", async () => {
+    const fixture = createKnowledgeFixture();
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/decisions/decision-missing`,
+      { method: "DELETE", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "knowledge_decision_not_found" });
+  });
+
+  it("writes denied audit when deleting a decision without manage rights", async () => {
+    const fixture = createKnowledgeFixture({ permissions: ["tenant.projects.read"] });
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/decisions/decision-any`,
+      { method: "DELETE", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(403);
+    expect(fixture.auditEvents).toEqual([
+      expect.objectContaining({
+        actionType: "knowledge.denied",
+        executionResult: { status: "denied" }
+      })
+    ]);
+  });
+
+  it("deletes an action item and records a delete audit", async () => {
+    const fixture = createKnowledgeFixture();
+    const app = createKnowledgeApp(fixture);
+    const created = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/action-items`,
+      {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({ title: "Подготовить ADR", ownerUserId: fixture.actor.id })
+      }
+    );
+    const actionItemId = ((await created.json()) as { actionItem: KnowledgeActionItem }).actionItem.id;
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/action-items/${actionItemId}`,
+      { method: "DELETE", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      actionItem: { id: actionItemId, archivedAt: expect.any(String) }
+    });
+    expect(fixture.actionItems.every((actionItem) => actionItem.archivedAt)).toBe(true);
+    expect(fixture.auditEvents.map((event) => event.actionType)).toContain("knowledge.action_item_deleted");
+  });
+
+  it("returns 404 when deleting a missing action item", async () => {
+    const fixture = createKnowledgeFixture();
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/action-items/action-missing`,
+      { method: "DELETE", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "knowledge_action_item_not_found" });
+  });
+
+  it("restores a past document version as a new current version without losing history", async () => {
+    const fixture = createKnowledgeFixture();
+    const dataSource = fixtureDataSource(fixture);
+    const document = await dataSource.createKnowledgeDocument!(baseDocumentInput(fixture));
+    const first = await dataSource.createKnowledgeDocumentVersion!({
+      id: "knowledge-doc-version-1",
+      tenantId: fixture.actor.tenantId,
+      documentId: document.id,
+      title: "Версия 1",
+      body: "Тело первой версии",
+      summary: "Резюме 1",
+      changeReason: "Первая",
+      createdByUserId: fixture.actor.id
+    });
+    await dataSource.createKnowledgeDocumentVersion!({
+      id: "knowledge-doc-version-2",
+      tenantId: fixture.actor.tenantId,
+      documentId: document.id,
+      title: "Версия 2",
+      body: "Тело второй версии",
+      summary: "Резюме 2",
+      changeReason: "Вторая",
+      createdByUserId: fixture.actor.id
+    });
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/documents/${document.id}/versions/${first.version.id}/restore`,
+      { method: "POST", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as {
+      document: KnowledgeDocument;
+      version: KnowledgeDocumentVersion;
+    };
+    expect(body.version.versionNumber).toBe(3);
+    expect(body.version.body).toBe("Тело первой версии");
+    expect(body.document.currentVersionId).toBe(body.version.id);
+    expect(fixture.versions).toHaveLength(3);
+    expect(fixture.transactionCount).toBe(1);
+    expect(fixture.auditEvents.map((event) => event.actionType)).toContain(
+      "knowledge.document_version_restored"
+    );
+  });
+
+  it("returns 404 when restoring a version that does not exist", async () => {
+    const fixture = createKnowledgeFixture();
+    const dataSource = fixtureDataSource(fixture);
+    const document = await dataSource.createKnowledgeDocument!(baseDocumentInput(fixture));
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/documents/${document.id}/versions/knowledge-doc-version-missing/restore`,
+      { method: "POST", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "knowledge_document_version_not_found" });
+    expect(fixture.auditEvents).toHaveLength(0);
+  });
+
+  it("returns 404 when restoring a version of a missing document", async () => {
+    const fixture = createKnowledgeFixture();
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/documents/knowledge-doc-missing/versions/knowledge-doc-version-1/restore`,
+      { method: "POST", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "knowledge_document_not_found" });
+  });
+
+  it("returns a stable conflict when restore collides on version numbering", async () => {
+    const fixture = createKnowledgeFixture();
+    const dataSource = fixtureDataSource(fixture);
+    const document = await dataSource.createKnowledgeDocument!(baseDocumentInput(fixture));
+    const first = await dataSource.createKnowledgeDocumentVersion!({
+      id: "knowledge-doc-version-1",
+      tenantId: fixture.actor.tenantId,
+      documentId: document.id,
+      title: "Версия 1",
+      body: "Тело первой версии",
+      summary: "Резюме 1",
+      changeReason: "Первая",
+      createdByUserId: fixture.actor.id
+    });
+    fixture.versionConflict = true;
+    const app = createKnowledgeApp(fixture);
+
+    const response = await app.request(
+      `/api/workspace/projects/${fixture.project.id}/knowledge/documents/${document.id}/versions/${first.version.id}/restore`,
+      { method: "POST", headers: jsonHeaders() }
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: "knowledge_version_conflict" });
+    expect(fixture.versions).toHaveLength(1);
+    expect(fixture.auditEvents).toHaveLength(0);
+  });
 });
 
 type KnowledgeFixture = {
@@ -490,6 +689,46 @@ function createKnowledgeDataSource(fixture: KnowledgeFixture): ApiTenantDataSour
       document.summary = version.summary;
       return { document, version };
     },
+    restoreKnowledgeDocumentVersion: async (input) => {
+      if (fixture.versionConflict) {
+        const error = new Error("duplicate key value violates unique constraint");
+        Object.assign(error, {
+          code: "23505",
+          constraint: "knowledge_document_versions_document_number_uidx"
+        });
+        throw error;
+      }
+      const document = fixture.documents.find((candidate) =>
+        candidate.tenantId === input.tenantId &&
+        candidate.projectId === input.projectId &&
+        candidate.id === input.documentId &&
+        !candidate.archivedAt
+      );
+      if (!document) return undefined;
+      const source = fixture.versions.find((candidate) =>
+        candidate.tenantId === input.tenantId &&
+        candidate.documentId === input.documentId &&
+        candidate.id === input.versionId
+      );
+      if (!source) return undefined;
+      const version: KnowledgeDocumentVersion = {
+        id: input.newVersionId,
+        tenantId: input.tenantId,
+        documentId: input.documentId,
+        versionNumber: fixture.versions.filter((item) => item.documentId === input.documentId).length + 1,
+        title: source.title,
+        body: source.body,
+        summary: source.summary,
+        changeReason: source.changeReason,
+        createdByUserId: input.createdByUserId,
+        createdAt: new Date("2026-05-26T06:06:00.000Z")
+      };
+      fixture.versions.push(version);
+      document.currentVersionId = version.id;
+      document.title = version.title;
+      document.summary = version.summary;
+      return { document, version };
+    },
     listKnowledgeDocumentVersions: async (input) =>
       fixture.versions.filter((version) =>
         version.tenantId === input.tenantId &&
@@ -521,6 +760,18 @@ function createKnowledgeDataSource(fixture: KnowledgeFixture): ApiTenantDataSour
       );
       if (!decision) return undefined;
       Object.assign(decision, input, { updatedAt: new Date("2026-05-26T06:03:00.000Z") });
+      return decision;
+    },
+    deleteKnowledgeDecision: async (input) => {
+      const decision = fixture.decisions.find((candidate) =>
+        candidate.tenantId === input.tenantId &&
+        candidate.projectId === input.projectId &&
+        candidate.id === input.decisionId &&
+        !candidate.archivedAt
+      );
+      if (!decision) return undefined;
+      decision.archivedAt = new Date("2026-05-26T06:07:00.000Z");
+      decision.updatedAt = decision.archivedAt;
       return decision;
     },
     listDecisionLogEntries: async (input) =>
@@ -555,6 +806,18 @@ function createKnowledgeDataSource(fixture: KnowledgeFixture): ApiTenantDataSour
       );
       if (!actionItem) return undefined;
       Object.assign(actionItem, input, { updatedAt: new Date("2026-05-26T06:05:00.000Z") });
+      return actionItem;
+    },
+    deleteKnowledgeActionItem: async (input) => {
+      const actionItem = fixture.actionItems.find((candidate) =>
+        candidate.tenantId === input.tenantId &&
+        candidate.projectId === input.projectId &&
+        candidate.id === input.actionItemId &&
+        !candidate.archivedAt
+      );
+      if (!actionItem) return undefined;
+      actionItem.archivedAt = new Date("2026-05-26T06:08:00.000Z");
+      actionItem.updatedAt = actionItem.archivedAt;
       return actionItem;
     },
     listKnowledgeActionItems: async (input) =>
@@ -598,6 +861,22 @@ function restoreFixtureState(fixture: KnowledgeFixture, snapshot: ReturnType<typ
   fixture.decisions.splice(0, fixture.decisions.length, ...snapshot.decisions);
   fixture.actionItems.splice(0, fixture.actionItems.length, ...snapshot.actionItems);
   fixture.auditEvents.splice(0, fixture.auditEvents.length, ...snapshot.auditEvents);
+}
+
+function baseDocumentInput(fixture: KnowledgeFixture) {
+  return {
+    id: "knowledge-doc-existing",
+    tenantId: fixture.actor.tenantId,
+    projectId: fixture.project.id,
+    title: "Исходный документ",
+    summary: null,
+    documentType: "general" as const,
+    status: "active" as const,
+    sourceMeetingId: null,
+    approvalStatus: "none" as const,
+    approvalRequestedByUserId: null,
+    createdByUserId: fixture.actor.id
+  };
 }
 
 function project(id: string): ProjectRecord {

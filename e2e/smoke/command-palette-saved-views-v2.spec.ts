@@ -38,7 +38,7 @@ test("admin uses the keyboard palette for task/deal/project peeks and the real c
   palette = await openPalette(page);
   const taskResponse = page.waitForResponse((response) => {
     const url = new URL(response.url());
-    return url.pathname === "/api/workspace/search" && url.searchParams.get("types") === "project,task,opportunity,client,contact,product";
+    return url.pathname === "/api/workspace/search" && url.searchParams.get("types") === "project,task,opportunity,client,contact,product,document,decision,knowledge_action_item";
   });
   await palette.input.fill("ресурсную оценку");
   expect((await taskResponse).status()).toBe(200);

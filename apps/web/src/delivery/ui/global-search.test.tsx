@@ -116,7 +116,7 @@ describe("GlobalSearch command palette", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = new URL(String(fetchMock.mock.calls[0]?.[0]), "http://localhost");
-    expect(url.searchParams.get("types")).toBe("project,task,opportunity,client,contact,product");
+    expect(url.searchParams.get("types")).toBe("project,task,opportunity,client,contact,product,document,decision,knowledge_action_item");
     expect(url.searchParams.get("limit")).toBe("15");
     expect(document.body.textContent).toContain("Ничего не найдено по «вектор»");
   });
@@ -143,6 +143,32 @@ describe("GlobalSearch command palette", () => {
     expect(item).not.toBeNull();
     expect(item?.closest("[cmdk-group]")?.hasAttribute("hidden")).toBe(false);
     expect(document.body.textContent).not.toContain("Ничего не найдено");
+  });
+
+  it("groups a knowledge result and navigates to its route on select", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([{
+      id: "document:launch-brief",
+      type: "document",
+      title: "Бриф запуска",
+      subtitle: "База знаний",
+      snippet: "Документ по запуску",
+      route: "/projects/project-alpha/knowledge?document=launch-brief",
+      entityId: "launch-brief"
+    }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await pressShortcut();
+    await setCommandInput("бриф");
+    await waitForDebounce();
+    await act(async () => Promise.resolve());
+
+    expect(document.body.textContent).toContain("Документы");
+    const item = document.querySelector<HTMLElement>('[cmdk-item][data-value="document:launch-brief"]');
+    expect(item).not.toBeNull();
+    expect(item?.closest("[cmdk-group]")?.hasAttribute("hidden")).toBe(false);
+
+    await act(async () => item?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(push).toHaveBeenCalledWith("/projects/project-alpha/knowledge?document=launch-brief");
   });
 
   it("does not let a stale response replace a newer query", async () => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BookOpen, CheckSquare, FilePlus2, GitBranch, Plus, Scale } from "lucide-react";
 import { toast } from "sonner";
 
@@ -135,6 +136,33 @@ export function ProjectKnowledge({
   const [section, setSection] = useState<Section>("documents");
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Deep-link из глобального поиска: /projects/:id/knowledge?document=|decision=|actionItem=<id>.
+  // Открываем нужную секцию (и выделяем документ) — иначе клик по knowledge-результату
+  // вёл бы на несуществующий под-путь /knowledge/documents/:id (Next 404). Реагируем на
+  // смену searchParams и guard'им по ЗНАЧЕНИЮ (ref), а не по жизни компонента — чтобы
+  // повторный клик по другому knowledge-результату при уже открытой странице срабатывал
+  // (образец — commits-surface). В Storybook хук отдаёт null → fallback на location.search.
+  const searchParams = useSearchParams();
+  const resolvedDeepLinkRef = useRef<string | null>(null);
+  useEffect(() => {
+    const search = searchParams ? searchParams.toString() : (typeof window === "undefined" ? "" : window.location.search);
+    const params = new URLSearchParams(search);
+    const doc = params.get("document");
+    const decision = params.get("decision");
+    const actionItem = params.get("actionItem");
+    const key = doc ? `document:${doc}` : decision ? `decision:${decision}` : actionItem ? `actionItem:${actionItem}` : "";
+    if (resolvedDeepLinkRef.current === key) return;
+    resolvedDeepLinkRef.current = key;
+    if (doc) {
+      setSection("documents");
+      setSelectedDocumentId(doc);
+    } else if (decision) {
+      setSection("decisions");
+    } else if (actionItem) {
+      setSection("actions");
+    }
+  }, [searchParams]);
 
   const documents = useMemo(
     () => [...(knowledge.data?.documents ?? [])].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),

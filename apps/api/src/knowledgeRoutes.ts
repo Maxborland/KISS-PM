@@ -188,6 +188,72 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     }, 201);
   });
 
+  app.post(
+    "/api/workspace/projects/:projectId/knowledge/documents/:documentId/versions/:versionId/restore",
+    async (context) => {
+      const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+      if (!actor) return context.json({ error: "session_required" }, 401);
+      const documentId = parseKnowledgeId(context.req.param("documentId"), "knowledge_document_id_invalid");
+      if (!documentId.ok) return context.json({ error: documentId.error }, 400);
+      const versionId = parseKnowledgeId(context.req.param("versionId"), "knowledge_document_version_id_invalid");
+      if (!versionId.ok) return context.json({ error: versionId.error }, 400);
+      const access = await requireProjectManage(context.req.param("projectId"), actor, deps, {
+        actionType: "knowledge.document_version_restored",
+        commandInput: { documentId: documentId.value, versionId: versionId.value }
+      });
+      if (!access.ok) return context.json({ error: access.error }, access.status);
+      if (!deps.dataSource.findKnowledgeDocument || !deps.dataSource.restoreKnowledgeDocumentVersion) {
+        return context.json({ error: "knowledge_not_configured" }, 501);
+      }
+      const document = await deps.dataSource.findKnowledgeDocument({
+        tenantId: actor.tenantId,
+        projectId: access.value.project.id,
+        documentId: documentId.value
+      });
+      if (!document) return context.json({ error: "knowledge_document_not_found" }, 404);
+      let result: Awaited<ReturnType<NonNullable<ApiTenantDataSource["restoreKnowledgeDocumentVersion"]>>>;
+      try {
+        result = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+          const restored = await requireMethod(transactionDataSource.restoreKnowledgeDocumentVersion).call(
+            transactionDataSource,
+            {
+              tenantId: actor.tenantId,
+              projectId: access.value.project.id,
+              documentId: documentId.value,
+              versionId: versionId.value,
+              newVersionId: `knowledge-doc-version-${randomUUID()}`,
+              createdByUserId: actor.id
+            }
+          );
+          if (!restored) return undefined;
+          await deps.appendManagementAuditEvent(knowledgeAudit({
+            actionType: "knowledge.document_version_restored",
+            actor,
+            projectId: access.value.project.id,
+            commandInput: { documentId: restored.document.id, restoredFromVersionId: versionId.value },
+            permissionResult: access.value.manageDecision,
+            afterState: {
+              versionId: restored.version.id,
+              versionNumber: restored.version.versionNumber,
+              currentVersionId: restored.document.currentVersionId
+            }
+          }), transactionDataSource);
+          return restored;
+        });
+      } catch (error) {
+        if (isKnowledgeVersionConflict(error)) {
+          return context.json({ error: "knowledge_version_conflict" }, 409);
+        }
+        throw error;
+      }
+      if (!result) return context.json({ error: "knowledge_document_version_not_found" }, 404);
+      return context.json({
+        document: serializeDocument(result.document),
+        version: serializeVersion(result.version)
+      }, 201);
+    }
+  );
+
   app.delete("/api/workspace/projects/:projectId/knowledge/documents/:documentId", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -329,6 +395,44 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     return context.json({ decision: serializeDecision(decision) });
   });
 
+  app.delete("/api/workspace/projects/:projectId/knowledge/decisions/:decisionId", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const decisionId = parseKnowledgeId(context.req.param("decisionId"), "knowledge_decision_id_invalid");
+    if (!decisionId.ok) return context.json({ error: decisionId.error }, 400);
+    const access = await requireProjectManage(context.req.param("projectId"), actor, deps, {
+      actionType: "knowledge.decision_deleted",
+      commandInput: { decisionId: decisionId.value }
+    });
+    if (!access.ok) return context.json({ error: access.error }, access.status);
+    if (!deps.dataSource.deleteKnowledgeDecision) {
+      return context.json({ error: "knowledge_not_configured" }, 501);
+    }
+    const deleted = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const removed = await requireMethod(transactionDataSource.deleteKnowledgeDecision).call(
+        transactionDataSource,
+        {
+          tenantId: actor.tenantId,
+          projectId: access.value.project.id,
+          decisionId: decisionId.value
+        }
+      );
+      if (!removed) return undefined;
+      await deps.appendManagementAuditEvent(knowledgeAudit({
+        actionType: "knowledge.decision_deleted",
+        actor,
+        projectId: access.value.project.id,
+        commandInput: { decisionId: removed.id },
+        permissionResult: access.value.manageDecision,
+        beforeState: { status: removed.status, title: removed.title },
+        afterState: { archivedAt: removed.archivedAt?.toISOString() ?? null }
+      }), transactionDataSource);
+      return removed;
+    });
+    if (!deleted) return context.json({ error: "knowledge_decision_not_found" }, 404);
+    return context.json({ decision: serializeDecision(deleted) });
+  });
+
   app.get("/api/workspace/projects/:projectId/knowledge/action-items", async (context) => {
     const actor = await requireActor(context.req.header("cookie") ?? null, deps);
     if (!actor) return context.json({ error: "session_required" }, 401);
@@ -428,6 +532,44 @@ export function registerKnowledgeRoutes(app: Hono, deps: ApiRouteDeps) {
     });
     if (!actionItem) return context.json({ error: "knowledge_action_item_not_found" }, 404);
     return context.json({ actionItem: serializeActionItem(actionItem) });
+  });
+
+  app.delete("/api/workspace/projects/:projectId/knowledge/action-items/:actionItemId", async (context) => {
+    const actor = await requireActor(context.req.header("cookie") ?? null, deps);
+    if (!actor) return context.json({ error: "session_required" }, 401);
+    const actionItemId = parseKnowledgeId(context.req.param("actionItemId"), "knowledge_action_item_id_invalid");
+    if (!actionItemId.ok) return context.json({ error: actionItemId.error }, 400);
+    const access = await requireProjectManage(context.req.param("projectId"), actor, deps, {
+      actionType: "knowledge.action_item_deleted",
+      commandInput: { actionItemId: actionItemId.value }
+    });
+    if (!access.ok) return context.json({ error: access.error }, access.status);
+    if (!deps.dataSource.deleteKnowledgeActionItem) {
+      return context.json({ error: "knowledge_not_configured" }, 501);
+    }
+    const deleted = await deps.runDataSourceTransaction(async (transactionDataSource) => {
+      const removed = await requireMethod(transactionDataSource.deleteKnowledgeActionItem).call(
+        transactionDataSource,
+        {
+          tenantId: actor.tenantId,
+          projectId: access.value.project.id,
+          actionItemId: actionItemId.value
+        }
+      );
+      if (!removed) return undefined;
+      await deps.appendManagementAuditEvent(knowledgeAudit({
+        actionType: "knowledge.action_item_deleted",
+        actor,
+        projectId: access.value.project.id,
+        commandInput: { actionItemId: removed.id },
+        permissionResult: access.value.manageDecision,
+        beforeState: { status: removed.status, title: removed.title },
+        afterState: { archivedAt: removed.archivedAt?.toISOString() ?? null }
+      }), transactionDataSource);
+      return removed;
+    });
+    if (!deleted) return context.json({ error: "knowledge_action_item_not_found" }, 404);
+    return context.json({ actionItem: serializeActionItem(deleted) });
   });
 }
 

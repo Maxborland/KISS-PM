@@ -139,7 +139,7 @@ describe("unified search routes", () => {
       results: [
         expect.objectContaining({
           id: "document:knowledge-doc-1",
-          route: "/projects/project-first/knowledge/documents/knowledge-doc-1",
+          route: "/projects/project-first/knowledge?document=knowledge-doc-1",
           source: "knowledge"
         })
       ]
