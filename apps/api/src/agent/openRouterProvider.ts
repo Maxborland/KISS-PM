@@ -66,8 +66,12 @@ export function fromOpenAiResponse(data: unknown): LlmResponse {
   return usage ? { ...base, usage: { inputTokens: usage.prompt_tokens ?? 0, outputTokens: usage.completion_tokens ?? 0 } } : base;
 }
 
-export function createOpenRouterLlmProvider(opts: { apiKey: string; model: string; maxTokens?: number; fetchImpl?: typeof fetch }): LlmProvider {
+export function createOpenRouterLlmProvider(opts: { apiKey: string; model: string; maxTokens?: number; reasoningEffort?: string; fetchImpl?: typeof fetch }): LlmProvider {
   const fetchImpl = opts.fetchImpl ?? fetch;
+  // Reasoning-effort (low|medium|high) для reasoning-моделей передаём как top-level
+  // `reasoning.effort` — OpenRouter нормализует его под конкретный провайдер. Пусто —
+  // не отправляем ключ, модель берёт свой дефолт.
+  const reasoning = opts.reasoningEffort ? { reasoning: { effort: opts.reasoningEffort } } : {};
   return {
     model: opts.model,
     async createMessage(input) {
@@ -85,7 +89,8 @@ export function createOpenRouterLlmProvider(opts: { apiKey: string; model: strin
           max_tokens: opts.maxTokens ?? 1024,
           messages: toOpenAiMessages(input.system, input.messages),
           tools: toOpenAiTools(input.tools),
-          tool_choice: "auto"
+          tool_choice: "auto",
+          ...reasoning
         })
       });
       if (!response.ok) {

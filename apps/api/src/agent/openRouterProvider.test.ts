@@ -62,6 +62,26 @@ describe("openRouterProvider translation", () => {
     expect((init as RequestInit).headers).toMatchObject({ authorization: "Bearer key" });
   });
 
+  it("createOpenRouterLlmProvider: reasoningEffort → top-level reasoning.effort в теле", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "ок" } }] }), { status: 200 })
+    );
+    const provider = createOpenRouterLlmProvider({ apiKey: "key", model: "openai/gpt-5.6-luna", reasoningEffort: "medium", fetchImpl: fetchImpl as unknown as typeof fetch });
+    await provider.createMessage({ system: "s", messages: [{ role: "user", content: "hi" }], tools: [] });
+    const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.reasoning).toEqual({ effort: "medium" });
+  });
+
+  it("createOpenRouterLlmProvider: без reasoningEffort ключ reasoning отсутствует", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "ок" } }] }), { status: 200 })
+    );
+    const provider = createOpenRouterLlmProvider({ apiKey: "key", model: "m", fetchImpl: fetchImpl as unknown as typeof fetch });
+    await provider.createMessage({ system: "s", messages: [], tools: [] });
+    const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body).not.toHaveProperty("reasoning");
+  });
+
   it("createOpenRouterLlmProvider: не-2xx → ошибка с кодом", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response("rate limited", { status: 429 }));
     const provider = createOpenRouterLlmProvider({ apiKey: "key", model: "m", fetchImpl: fetchImpl as unknown as typeof fetch });
