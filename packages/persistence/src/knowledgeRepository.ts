@@ -64,6 +64,14 @@ export type KnowledgeRepository = {
   createKnowledgeDocumentVersion(
     input: KnowledgeDocumentVersionInput
   ): Promise<{ document: KnowledgeDocument; version: KnowledgeDocumentVersion }>;
+  restoreKnowledgeDocumentVersion(input: {
+    tenantId: TenantId;
+    projectId: string;
+    documentId: string;
+    versionId: string;
+    newVersionId: string;
+    createdByUserId: UserId;
+  }): Promise<{ document: KnowledgeDocument; version: KnowledgeDocumentVersion } | undefined>;
   listKnowledgeDocumentVersions(input: {
     tenantId: TenantId;
     documentId: string;
@@ -79,6 +87,11 @@ export type KnowledgeRepository = {
     status: DecisionLogStatus;
   }): Promise<DecisionLogEntry | undefined>;
   findDecisionLogEntry(input: {
+    tenantId: TenantId;
+    projectId: string;
+    decisionId: string;
+  }): Promise<DecisionLogEntry | undefined>;
+  deleteKnowledgeDecision(input: {
     tenantId: TenantId;
     projectId: string;
     decisionId: string;
@@ -99,6 +112,11 @@ export type KnowledgeRepository = {
     status: KnowledgeActionItemStatus;
   }): Promise<KnowledgeActionItem | undefined>;
   findKnowledgeActionItem(input: {
+    tenantId: TenantId;
+    projectId: string;
+    actionItemId: string;
+  }): Promise<KnowledgeActionItem | undefined>;
+  deleteKnowledgeActionItem(input: {
     tenantId: TenantId;
     projectId: string;
     actionItemId: string;
@@ -243,6 +261,85 @@ export function createKnowledgeRepository(db: KissPmDatabase): KnowledgeReposito
         version: mapKnowledgeDocumentVersion(versionRow)
       };
     },
+    async restoreKnowledgeDocumentVersion(input) {
+      const now = new Date();
+      // Восстановление не переписывает историю: берём содержимое выбранной
+      // прошлой версии и публикуем его как новую текущую версию документа.
+      const [documentRow] = await db
+        .select()
+        .from(knowledgeDocuments)
+        .where(
+          and(
+            eq(knowledgeDocuments.tenantId, input.tenantId),
+            eq(knowledgeDocuments.projectId, input.projectId),
+            eq(knowledgeDocuments.id, input.documentId),
+            isNull(knowledgeDocuments.archivedAt)
+          )
+        )
+        .limit(1);
+      if (!documentRow) return undefined;
+      const [sourceRow] = await db
+        .select()
+        .from(knowledgeDocumentVersions)
+        .where(
+          and(
+            eq(knowledgeDocumentVersions.tenantId, input.tenantId),
+            eq(knowledgeDocumentVersions.documentId, input.documentId),
+            eq(knowledgeDocumentVersions.id, input.versionId)
+          )
+        )
+        .limit(1);
+      if (!sourceRow) return undefined;
+      const [latest] = await db
+        .select({ versionNumber: knowledgeDocumentVersions.versionNumber })
+        .from(knowledgeDocumentVersions)
+        .where(
+          and(
+            eq(knowledgeDocumentVersions.tenantId, input.tenantId),
+            eq(knowledgeDocumentVersions.documentId, input.documentId)
+          )
+        )
+        .orderBy(desc(knowledgeDocumentVersions.versionNumber))
+        .limit(1);
+      const versionNumber = (latest?.versionNumber ?? 0) + 1;
+      const [versionRow] = await db
+        .insert(knowledgeDocumentVersions)
+        .values({
+          id: input.newVersionId,
+          tenantId: input.tenantId,
+          documentId: input.documentId,
+          versionNumber,
+          title: sourceRow.title,
+          body: sourceRow.body,
+          summary: sourceRow.summary,
+          changeReason: sourceRow.changeReason,
+          createdByUserId: input.createdByUserId,
+          createdAt: now
+        })
+        .returning();
+      if (!versionRow) throw new Error("Knowledge document version insert returned no row");
+      const [updatedDocumentRow] = await db
+        .update(knowledgeDocuments)
+        .set({
+          title: sourceRow.title,
+          summary: sourceRow.summary,
+          currentVersionId: versionRow.id,
+          updatedAt: now
+        })
+        .where(
+          and(
+            eq(knowledgeDocuments.tenantId, input.tenantId),
+            eq(knowledgeDocuments.id, input.documentId),
+            isNull(knowledgeDocuments.archivedAt)
+          )
+        )
+        .returning();
+      if (!updatedDocumentRow) throw new Error("Knowledge document not found");
+      return {
+        document: mapKnowledgeDocument(updatedDocumentRow),
+        version: mapKnowledgeDocumentVersion(versionRow)
+      };
+    },
     async listKnowledgeDocumentVersions(input) {
       const rows = await db
         .select()
@@ -299,6 +396,24 @@ export function createKnowledgeRepository(db: KissPmDatabase): KnowledgeReposito
           )
         )
         .limit(1);
+      return row ? mapDecisionLogEntry(row) : undefined;
+    },
+    async deleteKnowledgeDecision(input) {
+      // Мягкое удаление: выставляем archivedAt, чтобы запись исчезла из всех
+      // выборок (все они фильтруют isNull(archivedAt)), но история/аудит целы.
+      const now = new Date();
+      const [row] = await db
+        .update(decisionLogEntries)
+        .set({ archivedAt: now, updatedAt: now })
+        .where(
+          and(
+            eq(decisionLogEntries.tenantId, input.tenantId),
+            eq(decisionLogEntries.projectId, input.projectId),
+            eq(decisionLogEntries.id, input.decisionId),
+            isNull(decisionLogEntries.archivedAt)
+          )
+        )
+        .returning();
       return row ? mapDecisionLogEntry(row) : undefined;
     },
     async listDecisionLogEntries(input) {
@@ -359,6 +474,23 @@ export function createKnowledgeRepository(db: KissPmDatabase): KnowledgeReposito
           )
         )
         .limit(1);
+      return row ? mapKnowledgeActionItem(row) : undefined;
+    },
+    async deleteKnowledgeActionItem(input) {
+      // Мягкое удаление: выставляем archivedAt (аналогично решениям журнала).
+      const now = new Date();
+      const [row] = await db
+        .update(knowledgeActionItems)
+        .set({ archivedAt: now, updatedAt: now })
+        .where(
+          and(
+            eq(knowledgeActionItems.tenantId, input.tenantId),
+            eq(knowledgeActionItems.projectId, input.projectId),
+            eq(knowledgeActionItems.id, input.actionItemId),
+            isNull(knowledgeActionItems.archivedAt)
+          )
+        )
+        .returning();
       return row ? mapKnowledgeActionItem(row) : undefined;
     },
     async listKnowledgeActionItems(input) {

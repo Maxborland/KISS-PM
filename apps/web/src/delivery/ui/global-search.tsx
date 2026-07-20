@@ -2,27 +2,31 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Compass, FolderKanban, Loader2, Package, Plus, Search, SquareCheckBig, Target, UserRound } from "lucide-react";
+import { Building2, Compass, FileText, FolderKanban, Gavel, ListChecks, Loader2, Package, Plus, Search, SquareCheckBig, Target, UserRound } from "lucide-react";
 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSessionState } from "@/shell/use-session-user";
 import { getPaletteCommands, paletteRouteForSearchResult, type PaletteCommand } from "@/delivery/ui/workspace-commands";
 
-const SEARCH_RESULT_TYPES = ["project", "task", "opportunity", "client", "contact", "product"] as const;
+const SEARCH_RESULT_TYPES = ["project", "task", "opportunity", "client", "contact", "product", "document", "decision", "knowledge_action_item"] as const;
 type SearchResultType = (typeof SEARCH_RESULT_TYPES)[number];
 type SearchResult = { id: string; type: SearchResultType; title: string; subtitle: string; snippet: string; route: string; entityId?: string };
 
 const SEARCH_TYPES = SEARCH_RESULT_TYPES.join(",");
 // Маршруты результатов — серверный searchRouting.ts: сделка/проект — карточка,
-// клиент/контакт — список с подсветкой ?entity=, продукт — список продуктов (Р16).
+// клиент/контакт — список с подсветкой ?entity=, продукт — список продуктов (Р16),
+// knowledge (документ/решение/пункт действий) — карточки /knowledge/... по result.route.
 const RESULT_GROUPS: Array<{ type: SearchResultType; title: string; icon: typeof FolderKanban }> = [
   { type: "task", title: "Задачи", icon: SquareCheckBig },
   { type: "opportunity", title: "Сделки", icon: Target },
   { type: "project", title: "Проекты", icon: FolderKanban },
   { type: "client", title: "Клиенты", icon: Building2 },
   { type: "contact", title: "Контакты", icon: UserRound },
-  { type: "product", title: "Продукты", icon: Package }
+  { type: "product", title: "Продукты", icon: Package },
+  { type: "document", title: "Документы", icon: FileText },
+  { type: "decision", title: "Решения", icon: Gavel },
+  { type: "knowledge_action_item", title: "Пункты действий", icon: ListChecks }
 ];
 
 export function GlobalSearch() {
