@@ -264,6 +264,74 @@ describe("contract-mock CRM backend", () => {
     expect(pipelines.find((p) => p.id === pipeline.id)).toBeTruthy();
   });
 
+  it("renames a pipeline via full-replace PATCH", async () => {
+    const c = client();
+    const { pipeline } = await c.updatePipeline("pipeline-partner", { name: "Партнёры v2", sortOrder: 2 });
+    expect(pipeline).toMatchObject({ id: "pipeline-partner", name: "Партнёры v2", sortOrder: 2 });
+    const { pipelines } = await c.listPipelines();
+    expect(pipelines.find((p) => p.id === "pipeline-partner")?.name).toBe("Партнёры v2");
+  });
+
+  // ===== конструктор CRM: стадии (create / update) =====
+  it("creates a deal stage under a pipeline and lists it (pipelineId derived)", async () => {
+    const c = client();
+    const { dealStage } = await c.createDealStage({ name: "Демо", sortOrder: 6, pipelineId: "pipeline-main" });
+    expect(dealStage).toMatchObject({ name: "Демо", sortOrder: 6, pipelineId: "pipeline-main", status: "active" });
+    const { dealStages } = await c.listDealStages();
+    expect(dealStages.find((s) => s.id === dealStage.id)).toBeTruthy();
+  });
+
+  it("rejects a deal stage under an unknown pipeline (404 pipeline_not_found)", async () => {
+    const c = client();
+    await expect(c.createDealStage({ name: "Демо", sortOrder: 6, pipelineId: "pipeline-zzz" })).rejects.toMatchObject({ status: 404, code: "pipeline_not_found" });
+  });
+
+  it("validates deal stage body: empty name → 400 invalid_deal_stage_name, bad order → 400 invalid_sort_order", async () => {
+    const c = client();
+    await expect(c.createDealStage({ name: "  ", sortOrder: 1, pipelineId: "pipeline-main" })).rejects.toMatchObject({ status: 400, code: "invalid_deal_stage_name" });
+    await expect(c.createDealStage({ name: "Демо", sortOrder: 0, pipelineId: "pipeline-main" })).rejects.toMatchObject({ status: 400, code: "invalid_sort_order" });
+  });
+
+  it("renames/reorders/archives a deal stage via full-replace PATCH (pipeline preserved)", async () => {
+    const c = client();
+    const renamed = await c.updateDealStage("stage-qual", { name: "Квалификация лида", sortOrder: 2 });
+    expect(renamed.dealStage).toMatchObject({ id: "stage-qual", name: "Квалификация лида", sortOrder: 2, pipelineId: "pipeline-main", status: "active" });
+    const archived = await c.updateDealStage("stage-qual", { name: "Квалификация лида", sortOrder: 2, status: "archived" });
+    expect(archived.dealStage.status).toBe("archived");
+    // отсутствие status в теле сохраняет прежний (архивный) статус
+    const kept = await c.updateDealStage("stage-qual", { name: "Квалификация лида", sortOrder: 9 });
+    expect(kept.dealStage).toMatchObject({ status: "archived", sortOrder: 9 });
+  });
+
+  it("update deal stage: malformed id → 400, unknown id → 404 deal_stage_not_found", async () => {
+    const c = client();
+    await expect(c.updateDealStage("Bad Id", { name: "X", sortOrder: 1 })).rejects.toMatchObject({ status: 400, code: "invalid_deal_stage_id" });
+    await expect(c.updateDealStage("stage-zzz", { name: "X", sortOrder: 1 })).rejects.toMatchObject({ status: 404, code: "deal_stage_not_found" });
+  });
+
+  // ===== конструктор CRM: типы проектов (create / update) =====
+  it("creates a project type and lists it", async () => {
+    const c = client();
+    const { projectType } = await c.createProjectType({ name: "Миграция", description: "Переезд систем" });
+    expect(projectType).toMatchObject({ name: "Миграция", description: "Переезд систем", status: "active" });
+    const { projectTypes } = await c.listProjectTypes();
+    expect(projectTypes.find((p) => p.id === projectType.id)).toBeTruthy();
+  });
+
+  it("validates project type name (400 invalid_project_type_name)", async () => {
+    const c = client();
+    await expect(c.createProjectType({ name: "   " })).rejects.toMatchObject({ status: 400, code: "invalid_project_type_name" });
+  });
+
+  it("renames/archives a project type via full-replace PATCH; unknown id → 404", async () => {
+    const c = client();
+    const renamed = await c.updateProjectType("pt-support", { name: "Сопровождение 24/7", status: "active" });
+    expect(renamed.projectType).toMatchObject({ id: "pt-support", name: "Сопровождение 24/7", status: "active" });
+    const archived = await c.updateProjectType("pt-support", { name: "Сопровождение 24/7", status: "archived" });
+    expect(archived.projectType.status).toBe("archived");
+    await expect(c.updateProjectType("pt-zzz", { name: "X" })).rejects.toMatchObject({ status: 404, code: "project_type_not_found" });
+  });
+
   // ===== Карточка сделки: full-replace update =====
   const updateInput = (over: Partial<OpportunityUpdateInput> = {}): OpportunityUpdateInput => ({
     ...baseInput(over),

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2, SlidersHorizontal } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { Input } from "@/components/ui/input";
 import { FormDialog } from "@/components/domain/form-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SurfaceState, surfaceStatusOf } from "@/components/domain/surface-state";
 import { AdminFrame } from "@/admin/ui/admin-frame";
 import { useProductionCalendar } from "@/admin/lib/use-admin-ops";
@@ -20,10 +22,12 @@ const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium t
 
 // RU-коды ошибок календаря (зеркало productionCalendarRoutes).
 const calendarErr = makeRuError({
-  production_calendar_invalid: "Некорректные данные календаря: дата, минуты 0…1440, причина до 240 символов"
+  production_calendar_invalid: "Некорректные данные календаря: дата, минуты 0…1440, причина до 240 символов",
+  production_calendar_exception_not_found: "Исключение уже удалено — обновите страницу"
 }, "Не удалось выполнить действие");
 
 const WEEKDAY_LABEL: Record<number, string> = { 1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс" };
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 7] as const;
 
 const fmtDay = (iso: string): string => {
   const d = new Date(`${iso}T00:00:00.000Z`);
@@ -39,15 +43,15 @@ const fmtMinutes = (minutes: number): string => {
 
 /**
  * Admin «Произв. календарь» (Н3) — рабочие дни/часы тенанта и исключения
- * (праздники, сокращённые дни) на боевом контракте
- * GET /api/tenant/current/production-calendar + POST /bulk (upsert).
+ * (праздники, сокращённые дни) на боевом контракте:
+ * GET /api/tenant/current/production-calendar, PATCH (базовый режим недели),
+ * POST /bulk (upsert исключений), DELETE /exceptions/:id (удаление исключения).
  * Чтение — tenant.workspace_config.read, правка — tenant.workspace_config.manage.
- * ЧЕСТНОСТЬ: ручки удаления исключения в API нет — UI не рисует псевдо-удаление.
  */
 export function AdminProductionCalendarSurface() {
   const { live } = useAdminRuntime();
   const [year, setYear] = useState(new Date().getUTCFullYear());
-  const { calendar, status, error, reload, upsertExceptions } = useProductionCalendar(year);
+  const { calendar, status, error, reload, upsertExceptions, updateBaseMode, deleteException } = useProductionCalendar(year);
   const [busy, setBusy] = useState(false);
   const sessionUser = useSessionUser();
 
@@ -57,6 +61,14 @@ export function AdminProductionCalendarSurface() {
   const surfaceStatus = surfaceStatusOf(status, calendar !== null);
   const currentYear = new Date().getUTCFullYear();
   const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+
+  const removeException = async (exceptionId: string) => {
+    setBusy(true);
+    const res = await deleteException(exceptionId);
+    setBusy(false);
+    if (res.ok) toast.success("Исключение календаря удалено");
+    else toast.error(`Отклонено: ${calendarErr(res.code, res.message)}`);
+  };
 
   return (
     <AdminFrame
@@ -68,7 +80,7 @@ export function AdminProductionCalendarSurface() {
         {!live ? (
           <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
             <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-            <span>Реальный контракт: GET /api/tenant/current/production-calendar?year=YYYY + POST /bulk (upsert исключений; ручки удаления в API нет). Чтение — tenant.workspace_config.read, правка — tenant.workspace_config.manage.</span>
+            <span>Реальный контракт: GET /api/tenant/current/production-calendar?year=YYYY, PATCH (базовый режим), POST /bulk (upsert исключений), DELETE /exceptions/:id. Чтение — tenant.workspace_config.read, правка — tenant.workspace_config.manage.</span>
           </div>
         ) : null}
 
@@ -89,7 +101,7 @@ export function AdminProductionCalendarSurface() {
           {calendar ? (
             <>
               {/* Базовый режим недели тенанта */}
-              <div className="mb-3 flex flex-wrap gap-2">
+              <div className="mb-3 flex flex-wrap items-stretch gap-2">
                 <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] px-3 py-2 shadow-[var(--shadow-card)]">
                   <div className="text-[length:var(--text-2xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">Рабочие дни</div>
                   <div className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">
@@ -106,6 +118,15 @@ export function AdminProductionCalendarSurface() {
                     <div className="v4-mono text-[length:var(--text-xs)] text-[var(--muted-soft)]">{calendar.calendarId}</div>
                   </div>
                 ) : null}
+                <div className="flex items-center">
+                  <EditBaseModeDialog
+                    busy={busy}
+                    setBusy={setBusy}
+                    update={updateBaseMode}
+                    current={{ workingWeekdays: calendar.workingWeekdays, workingMinutesPerDay: calendar.workingMinutesPerDay }}
+                    disabledReason={manageDisabledReason}
+                  />
+                </div>
               </div>
 
               {calendar.exceptions.length === 0 ? (
@@ -123,6 +144,7 @@ export function AdminProductionCalendarSurface() {
                         <th className="px-3 py-2 font-semibold">Режим</th>
                         <th className="px-3 py-2 font-semibold">Причина</th>
                         <th className="px-3 py-2 font-semibold">Область</th>
+                        <th className="px-3 py-2" />
                       </tr>
                     </thead>
                     <tbody>
@@ -136,15 +158,26 @@ export function AdminProductionCalendarSurface() {
                           </td>
                           <td className="px-3 py-2 text-[var(--muted)]">{e.reason ?? "—"}</td>
                           <td className="px-3 py-2 text-[var(--muted-strong)]">{e.resourceId ? `Участник ${e.resourceId.slice(-4)}` : "Вся команда"}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center justify-end">
+                              <ConfirmDialog
+                                title={`Сбросить день ${fmtDay(e.date)}?`}
+                                description={`Исключение${e.reason ? ` «${e.reason}»` : ""} будет удалено — на эту дату вернётся базовый режим недели, и ёмкость пересчитается автоматически.`}
+                                confirmLabel="Удалить"
+                                onConfirm={() => removeException(e.id)}
+                              >
+                                <Button data-testid={`production-calendar-delete-${e.id}`} variant="ghost" size="sm" disabled={busy || !canManage} title={canManage ? "Удалить/Сбросить день" : manageDisabledReason}><Trash2 className="size-3.5" aria-hidden /></Button>
+                              </ConfirmDialog>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
-              {/* Честная подпись: удаление исключений в API отсутствует. */}
               <p className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-                Исключение на ту же дату можно уточнить повторным добавлением; ручки удаления исключений в API пока нет.
+                Ошибочный праздник или сокращённый день можно удалить кнопкой «Сбросить день» — на эту дату вернётся базовый режим недели.
               </p>
             </>
           ) : <></>}
@@ -206,6 +239,76 @@ function AddExceptionDialog({ busy, setBusy, upsert, existing, disabledReason }:
         ) : null}
         <label className={labelCls}>Причина (необязательно)<Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="например, государственный праздник" maxLength={240} /></label>
         <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Исключение действует на всю команду и сразу учитывается в расчётах ёмкости и сроков.</p>
+      </div>
+    </FormDialog>
+  );
+}
+
+/**
+ * Редактирование базового режима недели тенанта (PATCH …/production-calendar):
+ * рабочие дни (ISO 1..7) + длительность рабочего дня в минутах (1…1440).
+ * От базового режима считаются ёмкость ресурсов, CPM и осуществимость планов.
+ */
+function EditBaseModeDialog({ busy, setBusy, update, current, disabledReason }: {
+  busy: boolean; setBusy: (v: boolean) => void;
+  update: ReturnType<typeof useProductionCalendar>["updateBaseMode"];
+  current: { workingWeekdays: number[]; workingMinutesPerDay: number };
+  disabledReason?: string | undefined;
+}) {
+  const [weekdays, setWeekdays] = useState<number[]>(current.workingWeekdays);
+  const [minutes, setMinutes] = useState(String(current.workingMinutesPerDay));
+
+  const reset = () => { setWeekdays(current.workingWeekdays); setMinutes(String(current.workingMinutesPerDay)); };
+  const toggle = (day: number) =>
+    setWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort((a, b) => a - b)));
+
+  const parsedMinutes = Number.parseInt(minutes, 10);
+  const minutesValid = Number.isInteger(parsedMinutes) && parsedMinutes >= 1 && parsedMinutes <= 1440;
+  const valid = weekdays.length >= 1 && minutesValid;
+
+  return (
+    <FormDialog
+      title="Базовый режим недели"
+      trigger={<Button data-testid="production-calendar-edit-base-mode" variant="outline" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Изменить базовый режим"}><SlidersHorizontal className="size-3.5" aria-hidden />Базовый режим</Button>}
+      submitLabel="Сохранить"
+      submitDisabled={!valid || busy || Boolean(disabledReason)}
+      contentClassName="max-w-[440px]"
+      successToast="Базовый режим недели обновлён"
+      onSubmit={async () => {
+        if (disabledReason) return disabledReason;
+        if (!valid) return null;
+        setBusy(true);
+        const res = await update({ workingWeekdays: weekdays, workingMinutesPerDay: parsedMinutes });
+        setBusy(false);
+        return res.ok ? null : calendarErr(res.code, res.message);
+      }}
+      onOpenChange={(open) => { if (open) reset(); }}
+    >
+      <div data-testid="production-calendar-base-mode-dialog" className="flex flex-col gap-3">
+        <div className={labelCls}>Рабочие дни недели
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {WEEKDAY_ORDER.map((day) => {
+              const on = weekdays.includes(day);
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  data-testid={`production-calendar-weekday-${day}`}
+                  aria-pressed={on}
+                  onClick={() => toggle(day)}
+                  className={`h-8 min-w-9 rounded-[var(--radius-md)] border px-2 text-[length:var(--text-xs)] font-semibold transition-colors ${on ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted-strong)]"}`}
+                >
+                  {WEEKDAY_LABEL[day]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <label className={labelCls}>Минут в рабочем дне (1…1440)
+          <Input type="number" min={1} max={1440} value={minutes} onChange={(e) => setMinutes(e.target.value)} aria-invalid={!minutesValid} />
+          {minutesValid ? <span className="text-[length:var(--text-2xs)] font-normal text-[var(--muted-soft)]">≈ {fmtMinutes(parsedMinutes)}</span> : null}
+        </label>
+        <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Новый режим сразу применяется к расчёту ёмкости, сроков и осуществимости планов.</p>
       </div>
     </FormDialog>
   );

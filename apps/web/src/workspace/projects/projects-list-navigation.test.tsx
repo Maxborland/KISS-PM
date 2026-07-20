@@ -38,7 +38,10 @@ vi.mock("@/workspace/lib/use-workspace", () => ({
     data: harness.data,
     status: harness.status,
     error: harness.error,
-    reload: vi.fn()
+    reload: vi.fn(),
+    createProject: vi.fn(async () => ({ ok: true })),
+    updateProject: vi.fn(async () => ({ ok: true })),
+    setProjectStatus: vi.fn(async () => ({ ok: true }))
   }),
   useWorkspaceUsers: () => ({ indexOf: () => -1 })
 }));
@@ -72,7 +75,7 @@ const nonReadyStates: Array<{
 }> = [
   { status: "loading", data: null, error: null, expectedText: "Загрузка проектов" },
   { status: "error", data: null, error: "load_failed", expectedText: "Не удалось загрузить проекты" },
-  { status: "ready", data: { projects: [] }, error: null, expectedText: "Нет проектов" }
+  { status: "ready", data: { projects: [] }, error: null, expectedText: "Нет активных проектов" }
 ];
 
 let root: Root | null = null;
@@ -96,15 +99,17 @@ afterEach(async () => {
 });
 
 describe("projects list navigation", () => {
-  it("offers the CRM-backed project creation workflow even when projects already exist", async () => {
+  it("offers a manual project creation trigger even when projects already exist", async () => {
     harness.data = { projects: [project("project-alpha", "Alpha project")] };
     harness.status = "ready";
 
     await renderSurface();
 
-    const createLink = [...document.querySelectorAll<HTMLAnchorElement>("a")]
-      .find((link) => link.textContent === "Создать проект");
-    expect(createLink?.getAttribute("href")).toBe("/crm/deals");
+    // Создание — реальная мутация через диалог (кнопка), а не ссылка на CRM.
+    const createButton = [...document.querySelectorAll<HTMLButtonElement>("button")]
+      .find((button) => button.textContent === "Новый проект");
+    expect(createButton).toBeInstanceOf(HTMLButtonElement);
+    expect(document.querySelector('a[href="/crm/deals"]')).toBeNull();
   });
 
   it("gives every available project title a native, keyboard-focusable detail link", async () => {

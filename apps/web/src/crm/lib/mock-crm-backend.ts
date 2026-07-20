@@ -320,6 +320,32 @@ function parseStageTransitionBody(body: Record<string, unknown>): StageTransitio
   return { ok: true, fromStageId, toStageId, requireFeasibilityOk, minProbability, guardNote };
 }
 
+type DealStageParse = { ok: true; name: string; sortOrder: number; status: "active" | "archived"; pipelineId: string | null } | { ok: false; error: string };
+// Стадия сделки (create/full-replace). Зеркало parseDealStageBody (crmParsers): порядок кодов name → sortOrder → status → pipelineId.
+function parseDealStageInput(body: Record<string, unknown>): DealStageParse {
+  const name = str(body.name);
+  const sortOrder = body.sortOrder;
+  const status = body.status === undefined ? "active" : body.status;
+  const pipelineId = body.pipelineId == null ? null : str(body.pipelineId);
+  if (!name || !safeSingleLine(name, 160)) return { ok: false, error: "invalid_deal_stage_name" };
+  if (!posInt(sortOrder)) return { ok: false, error: "invalid_sort_order" };
+  if (status !== "active" && status !== "archived") return { ok: false, error: "invalid_status" };
+  if (pipelineId !== null && !ID_RE.test(pipelineId)) return { ok: false, error: "invalid_pipeline_id" };
+  return { ok: true, name, sortOrder: sortOrder as number, status, pipelineId };
+}
+
+type ProjectTypeParse = { ok: true; name: string; description: string | null; status: "active" | "archived" } | { ok: false; error: string };
+// Тип проекта (create/full-replace). Зеркало parseProjectTypeBody (crmParsers): name → description → status.
+function parseProjectTypeInput(body: Record<string, unknown>): ProjectTypeParse {
+  const name = str(body.name);
+  const description = body.description == null ? null : str(body.description) || null;
+  const status = body.status === undefined ? "active" : body.status;
+  if (!name || !safeSingleLine(name, 160)) return { ok: false, error: "invalid_project_type_name" };
+  if (description !== null && !safeMultiline(description)) return { ok: false, error: "invalid_description" };
+  if (status !== "active" && status !== "archived") return { ok: false, error: "invalid_status" };
+  return { ok: true, name, description, status };
+}
+
 type OppUpdateParse =
   | { ok: true; clientId: string; primaryContactId: string; projectTypeId: string; stageId: string; title: string; description: string | null; plannedStart: string; plannedFinish: string; contractValue: number; plannedHourlyRate: number; probability: number; ownerProvided: boolean; ownerUserId: string | null; templateId: string | null; demand: PositionDemand[]; customFieldValues: Record<string, string> }
   | { ok: false; error: string };
@@ -407,7 +433,57 @@ export function createMockCrmFetch(): typeof fetch {
 
     /* ---- справочники: deal-stages, project-types, users (read-only сид) ---- */
     if (method === "GET" && path === "/api/workspace/deal-stages") return json({ dealStages: [...db.dealStages].sort((a, b) => a.sortOrder - b.sortOrder) });
+    // Конструктор CRM: создание стадии (POST /deal-stages). Зеркало боевого — при pipelineId воронка
+    // должна существовать (404), при отсутствии — падаем на дефолтную воронку (создаём при нужде).
+    if (method === "POST" && path === "/api/workspace/deal-stages") {
+      const parsed = parseDealStageInput(body);
+      if (!parsed.ok) return err(parsed.error, 400);
+      let pipelineId = parsed.pipelineId;
+      if (pipelineId !== null) {
+        if (!db.pipelines.some((p) => p.id === pipelineId)) return err("pipeline_not_found", 404);
+      } else {
+        let def = db.pipelines.find((p) => p.isDefault);
+        if (!def) { def = { id: genId("pipeline"), tenantId: TENANT, name: "Основная воронка", description: null, isDefault: true, sortOrder: 1, status: "active", createdAt: nowIso(), updatedAt: nowIso() }; db.pipelines.push(def); }
+        pipelineId = def.id;
+      }
+      const s: DealStage = { id: genId("stage"), tenantId: TENANT, pipelineId, name: parsed.name, sortOrder: parsed.sortOrder, status: parsed.status, createdAt: nowIso(), updatedAt: nowIso() };
+      db.dealStages.push(s);
+      return json({ dealStage: s }, 201);
+    }
+    // Конструктор CRM: переименование/переупорядочивание/архивация стадии (PATCH /deal-stages/:id).
+    // full-replace name/sortOrder; воронку и (при отсутствии в теле) статус сохраняем из before-state.
+    const dealStagePatch = method === "PATCH" ? path.match(/^\/api\/workspace\/deal-stages\/([^/]+)$/) : null;
+    if (dealStagePatch) {
+      const stageId = decodeURIComponent(dealStagePatch[1]!);
+      if (!ID_RE.test(stageId)) return err("invalid_deal_stage_id", 400);
+      const s = db.dealStages.find((x) => x.id === stageId);
+      if (!s) return err("deal_stage_not_found", 404);
+      const parsed = parseDealStageInput({ ...body, pipelineId: s.pipelineId, status: body.status ?? s.status });
+      if (!parsed.ok) return err(parsed.error, 400);
+      s.name = parsed.name; s.sortOrder = parsed.sortOrder; s.status = parsed.status; s.updatedAt = nowIso();
+      return json({ dealStage: s });
+    }
     if (method === "GET" && path === "/api/workspace/project-types") return json({ projectTypes: db.projectTypes });
+    // Конструктор CRM: создание типа проекта (POST /project-types).
+    if (method === "POST" && path === "/api/workspace/project-types") {
+      const parsed = parseProjectTypeInput(body);
+      if (!parsed.ok) return err(parsed.error, 400);
+      const p: ProjectType = { id: genId("project-type"), tenantId: TENANT, name: parsed.name, description: parsed.description, status: parsed.status, createdAt: nowIso(), updatedAt: nowIso() };
+      db.projectTypes.push(p);
+      return json({ projectType: p }, 201);
+    }
+    // Конструктор CRM: переименование/архивация типа проекта (PATCH /project-types/:id, full-replace).
+    const projectTypePatch = method === "PATCH" ? path.match(/^\/api\/workspace\/project-types\/([^/]+)$/) : null;
+    if (projectTypePatch) {
+      const projectTypeId = decodeURIComponent(projectTypePatch[1]!);
+      if (!ID_RE.test(projectTypeId)) return err("invalid_project_type_id", 400);
+      const p = db.projectTypes.find((x) => x.id === projectTypeId);
+      if (!p) return err("project_type_not_found", 404);
+      const parsed = parseProjectTypeInput(body);
+      if (!parsed.ok) return err(parsed.error, 400);
+      p.name = parsed.name; p.description = parsed.description; p.status = parsed.status; p.updatedAt = nowIso();
+      return json({ projectType: p });
+    }
     // Пользователи рабочей области — отдаём сид CRM_USERS (боевой эквивалент GET /api/workspace/users).
     if (method === "GET" && path === "/api/workspace/users") return json({ users: CRM_USERS });
 

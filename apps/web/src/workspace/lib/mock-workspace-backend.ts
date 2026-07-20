@@ -175,6 +175,19 @@ function seed(): Store {
       sourceOpportunityId: "opp-gamma-bi", clientId: "client-gamma",
       plannedStart: "2026-04-20", plannedFinish: "2026-07-30", contractValue: 1_950_000, plannedHours: 464,
       demand: [{ positionId: "backend", requiredHours: 460 }]
+    }),
+    // Закрытый и приостановленный проекты — чтобы фильтры «Закрытые»/«Приостановленные»/«Все»
+    // и переоткрытие/возобновление имели демо-данные (Блок 5).
+    project({
+      id: "proj-archived-crm", title: "Внедрение CRM (архив)", clientName: "ООО «Ромашка»",
+      sourceType: "manual", sourceOpportunityId: null, projectTypeId: "pt-impl", status: "closed",
+      plannedStart: "2025-09-01", plannedFinish: "2025-12-20", contractValue: 2_100_000, plannedHours: 520,
+      closedAt: "2026-01-10T09:00:00.000Z"
+    }),
+    project({
+      id: "proj-paused-mobile", title: "Мобильное приложение (на паузе)", clientName: "Гамма Системс",
+      sourceType: "manual", sourceOpportunityId: null, projectTypeId: "pt-impl", status: "paused",
+      plannedStart: "2026-02-01", plannedFinish: "2026-06-30", contractValue: 1_500_000, plannedHours: 380
     })
   ];
 
@@ -321,6 +334,77 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const err = (error: string, status: number) => json({ error }, status);
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
+/* ---- Парсеры жизненного цикла проекта (зеркало projectLifecycleParsers) ---- */
+const PROJECT_ID_RE = /^[a-z][a-z0-9-]{2,80}$/;
+const isIsoDay = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
+const dayDiff = (a: string, b: string) => Math.floor((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+
+type CreateProjectParse =
+  | { ok: true; value: { id: string; title: string; clientName: string; projectTypeId: string | null; templateId: string | null; calendarId: string | null; plannedStart: string; plannedFinish: string; contractValue: number; plannedHours: number } }
+  | { ok: false; error: string };
+
+function parseCreateProjectBody(body: Record<string, unknown>): CreateProjectParse {
+  const id = str(body.id) || genId("project");
+  const title = str(body.title);
+  const clientName = str(body.clientName) || "Внутренний проект";
+  const projectTypeId = body.projectTypeId == null ? null : str(body.projectTypeId);
+  const templateId = body.templateId == null ? null : str(body.templateId);
+  const calendarId = body.calendarId == null ? null : str(body.calendarId);
+  const plannedStart = str(body.plannedStart);
+  const plannedFinish = str(body.plannedFinish);
+  const contractValue = body.contractValue === undefined ? 0 : Number(body.contractValue);
+  const plannedHours = body.plannedHours === undefined ? 0 : Number(body.plannedHours);
+
+  if (!PROJECT_ID_RE.test(id)) return { ok: false, error: "invalid_project_id" };
+  if (!title || title.length > 160 || hasControlChar(title)) return { ok: false, error: "invalid_project_title" };
+  if (clientName.length > 120 || hasControlChar(clientName)) return { ok: false, error: "invalid_client_name" };
+  if (projectTypeId !== null && !PROJECT_ID_RE.test(projectTypeId)) return { ok: false, error: "invalid_project_type_id" };
+  if (templateId !== null && !PROJECT_ID_RE.test(templateId)) return { ok: false, error: "invalid_template_id" };
+  if (calendarId !== null && !PROJECT_ID_RE.test(calendarId)) return { ok: false, error: "invalid_calendar_id" };
+  if (!isIsoDay(plannedStart) || !isIsoDay(plannedFinish) || dayDiff(plannedStart, plannedFinish) < 0 || dayDiff(plannedStart, plannedFinish) > 730) {
+    return { ok: false, error: "invalid_planned_dates" };
+  }
+  if (!Number.isInteger(contractValue) || contractValue < 0) return { ok: false, error: "invalid_contract_value" };
+  if (!Number.isInteger(plannedHours) || plannedHours < 0) return { ok: false, error: "invalid_planned_hours" };
+
+  return { ok: true, value: { id, title, clientName, projectTypeId, templateId, calendarId, plannedStart, plannedFinish, contractValue, plannedHours } };
+}
+
+type UpdateProjectParse =
+  | { ok: true; value: { title?: string; projectTypeId?: string | null; templateId?: string | null; calendarId?: string | null } }
+  | { ok: false; error: string };
+
+function parseUpdateProjectBody(body: Record<string, unknown>): UpdateProjectParse {
+  const value: { title?: string; projectTypeId?: string | null; templateId?: string | null; calendarId?: string | null } = {};
+  const nullableId = (raw: unknown): string | null | "invalid" => {
+    if (raw === null) return null;
+    if (typeof raw !== "string") return "invalid";
+    return PROJECT_ID_RE.test(raw) ? raw : "invalid";
+  };
+  if ("title" in body) {
+    const title = str(body.title);
+    if (!title || title.length > 160 || hasControlChar(title)) return { ok: false, error: "invalid_project_title" };
+    value.title = title;
+  }
+  if ("projectTypeId" in body) {
+    const parsed = nullableId(body.projectTypeId);
+    if (parsed === "invalid") return { ok: false, error: "invalid_project_type_id" };
+    value.projectTypeId = parsed;
+  }
+  if ("templateId" in body) {
+    const parsed = nullableId(body.templateId);
+    if (parsed === "invalid") return { ok: false, error: "invalid_template_id" };
+    value.templateId = parsed;
+  }
+  if ("calendarId" in body) {
+    const parsed = nullableId(body.calendarId);
+    if (parsed === "invalid") return { ok: false, error: "invalid_calendar_id" };
+    value.calendarId = parsed;
+  }
+  if (Object.keys(value).length === 0) return { ok: false, error: "empty_project_update" };
+  return { ok: true, value };
+}
+
 export function createMockWorkspaceFetch(): typeof fetch {
   const db = seed();
 
@@ -331,9 +415,45 @@ export function createMockWorkspaceFetch(): typeof fetch {
     let body: Record<string, unknown> = {};
     if (init?.body) { try { const p: unknown = JSON.parse(String(init.body)); if (p && typeof p === "object" && !Array.isArray(p)) body = p as Record<string, unknown>; } catch { return err("invalid_json", 400); } }
 
-    /* ---- GET /api/workspace/projects: только активные (как боевой projectIntakeRoutes.filter status==="active") ---- */
+    /* ---- GET /api/workspace/projects: фильтр статуса active|closed|paused|all
+       (как боевой projectIntakeRoutes: неизвестное/пустое → active) ---- */
     if (method === "GET" && path === "/api/workspace/projects") {
-      return json({ projects: db.projects.filter((p) => p.status === "active") });
+      const statusRaw = (new URLSearchParams(url.split("?")[1] ?? "").get("status") ?? "").trim();
+      const statusFilter =
+        statusRaw === "closed" || statusRaw === "paused" || statusRaw === "all" ? statusRaw : "active";
+      const projects =
+        statusFilter === "all" ? db.projects : db.projects.filter((p) => p.status === statusFilter);
+      return json({ projects });
+    }
+
+    /* ---- POST /api/workspace/projects: ручное создание внутреннего проекта (Блок 5) ---- */
+    if (method === "POST" && path === "/api/workspace/projects") {
+      const parsed = parseCreateProjectBody(body);
+      if (!parsed.ok) return err(parsed.error, 400);
+      if (db.projects.some((p) => p.id === parsed.value.id)) return err("project_id_taken", 409);
+      const createdAt = new Date().toISOString();
+      const project: ProjectRecord = {
+        id: parsed.value.id,
+        tenantId: TENANT,
+        sourceType: "manual",
+        sourceOpportunityId: null,
+        clientId: null,
+        projectTypeId: parsed.value.projectTypeId,
+        title: parsed.value.title,
+        clientName: parsed.value.clientName,
+        status: "active",
+        plannedStart: parsed.value.plannedStart,
+        plannedFinish: parsed.value.plannedFinish,
+        contractValue: parsed.value.contractValue,
+        plannedHours: parsed.value.plannedHours,
+        templateId: parsed.value.templateId,
+        createdAt,
+        activatedAt: createdAt,
+        closedAt: null,
+        demand: []
+      };
+      db.projects.unshift(project);
+      return json({ project }, 201);
     }
 
     /* ---- GET /api/workspace/my-work: задачи текущего пользователя (исполнитель = CURRENT_USER_ID) ---- */
@@ -484,6 +604,43 @@ export function createMockWorkspaceFetch(): typeof fetch {
       if (before.status === "archived") return json({ taskStatus: before });
       before.status = "archived";
       return json({ taskStatus: before });
+    }
+
+    /* ---- POST /api/workspace/projects/:projectId/reopen|pause|resume (Блок 5) ---- */
+    const statusTransition = method === "POST"
+      ? path.match(/^\/api\/workspace\/projects\/([^/]+)\/(reopen|pause|resume)$/)
+      : null;
+    if (statusTransition) {
+      const projectId = decodeURIComponent(statusTransition[1]!);
+      const action = statusTransition[2] as "reopen" | "pause" | "resume";
+      if (!ROUTE_ID_RE.test(projectId)) return err("invalid_project_id", 400);
+      const project = db.projects.find((p) => p.id === projectId);
+      if (!project) return err("project_not_found", 404);
+      const rule = {
+        reopen: { from: ["closed", "cancelled"], to: "active" as const },
+        pause: { from: ["active"], to: "paused" as const },
+        resume: { from: ["paused"], to: "active" as const }
+      }[action];
+      if (!rule.from.includes(project.status)) return err("project_status_transition_not_allowed", 409);
+      project.status = rule.to;
+      // reopen/pause/resume ведут только в active/paused — метка закрытия снимается.
+      project.closedAt = null;
+      return json({ project });
+    }
+
+    /* ---- PATCH /api/workspace/projects/:projectId: редактирование параметров (Блок 5) ---- */
+    const projectPatch = method === "PATCH" ? path.match(/^\/api\/workspace\/projects\/([^/]+)$/) : null;
+    if (projectPatch) {
+      const projectId = decodeURIComponent(projectPatch[1]!);
+      if (!ROUTE_ID_RE.test(projectId)) return err("invalid_project_id", 400);
+      const parsed = parseUpdateProjectBody(body);
+      if (!parsed.ok) return err(parsed.error, 400);
+      const project = db.projects.find((p) => p.id === projectId);
+      if (!project) return err("project_not_found", 404);
+      if (parsed.value.title !== undefined) project.title = parsed.value.title;
+      if (parsed.value.projectTypeId !== undefined) project.projectTypeId = parsed.value.projectTypeId;
+      if (parsed.value.templateId !== undefined) project.templateId = parsed.value.templateId;
+      return json({ project });
     }
 
     /* ---- GET /api/workspace/projects/:projectId: проект + его задачи; 404 на чужой/неактивный ---- */

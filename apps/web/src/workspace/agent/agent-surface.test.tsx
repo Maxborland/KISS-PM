@@ -309,4 +309,62 @@ describe("AgentSurface production shell contract", () => {
       root.unmount();
     });
   });
+
+  it("не преселектит доменную mutation с пустым diff — apply не уходит вслепую", async () => {
+    agentMock.proposeStream.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        analyzeResults: [],
+        goal: "Заведи клиента и обнови задачу",
+        iterations: 1,
+        model: "test-model",
+        proposedActions: [
+          {
+            capability: { allowed: true, reason: "allowed" },
+            input: { taskId: "task-1", projectId: "project-1", statusId: "status-review" },
+            preview: { before: "В работе", after: "На проверке" },
+            title: "Сменить статус задачи: task-1",
+            tool: "change_task_status"
+          },
+          {
+            // Пустой «после» — честный diff не отрисован: карточка не должна преселектиться.
+            capability: { allowed: true, reason: "allowed" },
+            input: { fields: { name: "Acme" } },
+            preview: { before: "Текущее значение определяется целевым маршрутом", after: "" },
+            title: "Создать клиента: Acme",
+            tool: "create_crm_client"
+          }
+        ],
+        reasoning: "Два действия."
+      }
+    });
+    agentMock.execute.mockResolvedValueOnce({
+      ok: true,
+      data: {
+        applied: true,
+        results: [{ ok: true, status: "applied", tool: "change_task_status" }],
+        summary: { applied: 1, denied: 0, conflict: 0, failed: 0 }
+      }
+    });
+    const root = await renderAgent();
+
+    await submitGoal("Заведи клиента и обнови задачу");
+
+    const applyButton = Array.from(document.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes("Применить выбранное"));
+    expect(applyButton).toBeDefined();
+    await act(async () => {
+      applyButton!.click();
+    });
+
+    // Уходит только действие с честным diff; mutation с пустым «после» осталась невыбранной.
+    expect(agentMock.execute).toHaveBeenCalledTimes(1);
+    expect(agentMock.execute).toHaveBeenCalledWith([
+      { tool: "change_task_status", input: { taskId: "task-1", projectId: "project-1", statusId: "status-review" } }
+    ]);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });

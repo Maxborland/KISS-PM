@@ -90,6 +90,10 @@ export type ClosureClient = {
     projectId: string,
     lesson: ClosureLessonInput
   ): Promise<{ lesson: RetrospectiveLesson; auditEventId: string }>;
+  applyTemplateImprovement(
+    projectId: string,
+    actionId: string
+  ): Promise<{ action: TemplateImprovementAction; auditEventId: string }>;
   getTemplateInsights(templateId: string): Promise<TemplateInsights>;
 };
 
@@ -117,6 +121,13 @@ export function createClosureClient(options?: { fetchImpl?: typeof fetch }): Clo
       requestJson<{ lesson: RetrospectiveLesson; auditEventId: string }>(
         `${base(projectId)}/lessons`,
         { method: "POST", body: JSON.stringify(lesson) }
+      ),
+    // POST …/closure/template-improvement-actions/:id/apply — применить предложенное
+    // улучшение шаблона (боевой retrospectiveRoutes; 409, если уже применено).
+    applyTemplateImprovement: (projectId, actionId) =>
+      requestJson<{ action: TemplateImprovementAction; auditEventId: string }>(
+        `${base(projectId)}/template-improvement-actions/${encodeURIComponent(actionId)}/apply`,
+        { method: "POST", body: JSON.stringify({}) }
       ),
     getTemplateInsights: (templateId) =>
       requestJson<TemplateInsights>(

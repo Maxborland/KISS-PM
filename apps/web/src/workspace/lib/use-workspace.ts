@@ -8,8 +8,12 @@ import { useResource, type LoadStatus } from "../../lib/use-resource";
 import {
   WorkspaceApiError,
   createWorkspaceClient,
+  type CreateProjectInput,
   type ProjectRecord,
+  type ProjectStatusAction,
+  type ProjectStatusFilter,
   type TaskRecord,
+  type UpdateProjectInput,
   type UpdateTaskInput,
   type WorkspaceClient,
   type WorkspaceTaskStatus,
@@ -31,12 +35,43 @@ function useWorkspaceClient(): WorkspaceClient {
   return useDomainClient(live, createWorkspaceClient, createMockWorkspaceFetch);
 }
 
-// ---- useProjects: активные проекты рабочей области ----
-export function useProjects() {
+// ---- useProjects: проекты рабочей области с фильтром статуса + мутации жизненного цикла ----
+export function useProjects(statusFilter: ProjectStatusFilter = "active") {
   const client = useWorkspaceClient();
-  const loader = useCallback(async () => ({ projects: (await client.listProjects()).projects }), [client]);
+  const loader = useCallback(
+    async () => ({ projects: (await client.listProjects(statusFilter)).projects }),
+    [client, statusFilter]
+  );
   const { data, status, error, reload: load } = useResource(loader);
-  return { data, status, error, reload: load };
+
+  const wrap = useCallback(
+    async (run: () => Promise<unknown>): Promise<WorkspaceMutationResult> => {
+      try {
+        await run();
+        await load();
+        return { ok: true };
+      } catch (e) {
+        if (e instanceof WorkspaceApiError) return { ok: false, code: e.code, message: e.code };
+        return { ok: false, message: e instanceof Error ? e.message : "request_failed" };
+      }
+    },
+    [load]
+  );
+
+  const createProject = useCallback(
+    (input: CreateProjectInput) => wrap(() => client.createProject(input)),
+    [client, wrap]
+  );
+  const updateProject = useCallback(
+    (projectId: string, input: UpdateProjectInput) => wrap(() => client.updateProject(projectId, input)),
+    [client, wrap]
+  );
+  const setProjectStatus = useCallback(
+    (projectId: string, action: ProjectStatusAction) => wrap(() => client.setProjectStatus(projectId, action)),
+    [client, wrap]
+  );
+
+  return { data, status, error, reload: load, createProject, updateProject, setProjectStatus };
 }
 
 // ---- useProjectDetail: карточка проекта + его задачи ----

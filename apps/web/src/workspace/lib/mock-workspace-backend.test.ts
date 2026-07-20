@@ -289,4 +289,57 @@ describe("contract-mock workspace backend: task status definitions CRUD", () => 
     await expect(c.updateTaskStatus(MOCK_PROJECT_ID, task.id, "status-limbo"))
       .rejects.toMatchObject({ status: 400, code: "task_status_not_found" });
   });
+
+  describe("project lifecycle (Блок 5)", () => {
+    it("filters the project list by status", async () => {
+      const c = client();
+      expect((await c.listProjects("closed")).projects.every((p) => p.status === "closed")).toBe(true);
+      expect((await c.listProjects("paused")).projects.every((p) => p.status === "paused")).toBe(true);
+      const all = (await c.listProjects("all")).projects.map((p) => p.status);
+      expect(all).toContain("closed");
+      expect(all).toContain("paused");
+      expect(all).toContain("active");
+    });
+
+    it("creates a manual project without an opportunity", async () => {
+      const c = client();
+      const { project } = await c.createProject({
+        title: "Внутренний R&D",
+        plannedStart: "2026-08-01",
+        plannedFinish: "2026-09-01"
+      });
+      expect(project.sourceType).toBe("manual");
+      expect(project.sourceOpportunityId).toBeNull();
+      expect(project.status).toBe("active");
+      expect((await c.listProjects("active")).projects.some((p) => p.id === project.id)).toBe(true);
+    });
+
+    it("rejects an invalid create payload", async () => {
+      const c = client();
+      await expect(c.createProject({ title: "", plannedStart: "2026-08-01", plannedFinish: "2026-09-01" }))
+        .rejects.toMatchObject({ status: 400, code: "invalid_project_title" });
+    });
+
+    it("renames a project via PATCH", async () => {
+      const c = client();
+      const { project } = await c.updateProject(MOCK_PROJECT_ID, { title: "Переименованный релиз" });
+      expect(project.title).toBe("Переименованный релиз");
+    });
+
+    it("reopens a closed project", async () => {
+      const c = client();
+      const { project } = await c.setProjectStatus("proj-archived-crm", "reopen");
+      expect(project.status).toBe("active");
+      expect(project.closedAt).toBeNull();
+    });
+
+    it("resumes a paused project and rejects an illegal transition", async () => {
+      const c = client();
+      const { project } = await c.setProjectStatus("proj-paused-mobile", "resume");
+      expect(project.status).toBe("active");
+      // active → resume недопустимо.
+      await expect(c.setProjectStatus("proj-paused-mobile", "resume"))
+        .rejects.toMatchObject({ status: 409, code: "project_status_transition_not_allowed" });
+    });
+  });
 });

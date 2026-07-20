@@ -112,6 +112,16 @@ export const capacityCalendarSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  ProductionCalendarBaseModeRequest: {
+    type: "object",
+    required: ["workingWeekdays", "workingMinutesPerDay"],
+    properties: {
+      // ISO рабочие дни недели (1=Пн..7=Вс), 1..7 уникальных значений.
+      workingWeekdays: { type: "array", items: { type: "integer", minimum: 1, maximum: 7 }, minItems: 1, maxItems: 7 },
+      workingMinutesPerDay: { type: "integer", minimum: 1, maximum: 1440 }
+    },
+    additionalProperties: false
+  },
   ResourceAbsence: {
     type: "object",
     required: ["id", "tenantId", "userId", "type", "dateFrom", "dateTo", "status", "reason", "createdBy", "approvedBy", "createdAt", "updatedAt"],

@@ -22,6 +22,7 @@ import { CrmListFilterChip, CrmListParamResolver } from "@/crm/ui/list-url-param
 import { getCrmWriteCapability } from "@/crm/ui/permissions";
 import { useCrm, useCrmUsers, type CrmData } from "@/crm/lib/use-crm";
 import { useCrmRuntime } from "@/crm/lib/crm-runtime";
+import { PipelineSettingsDialog } from "@/crm/pipelines/pipeline-settings-dialog";
 import { DealPeek } from "@/crm/deals/deal-peek";
 import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
 import type { DealStage, Opportunity, Pipeline, StageTransition } from "@/crm/lib/crm-client";
@@ -96,8 +97,12 @@ export function ProjectDeals() {
   const createDealCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.opportunities.manage" });
   const createPipelineCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.crm_pipelines.manage" });
   const createStageCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.deal_stages.manage" });
+  const projectTypeCapability = getCrmWriteCapability({ live, permissions: sessionUser?.permissions ?? [], permission: "tenant.project_types.manage" });
   const canManageDeals = createDealCapability.allowed;
   const createPipelineDisabledReason = createPipelineCapability.disabledReason ?? createStageCapability.disabledReason;
+  // Конструктор доступен, если есть хотя бы одно из прав управления (воронки/стадии/типы);
+  // отдельные действия внутри всё равно фейлятся-закрыто на сервере с честным тостом.
+  const constructorDisabledReason = createPipelineCapability.allowed || createStageCapability.allowed || projectTypeCapability.allowed ? null : createPipelineCapability.disabledReason;
   const crm = useCrm();
   const { data, status, error, reload, moveStage, movePipeline, createOpportunity, loadActivities } = crm;
   const users = useCrmUsers();
@@ -280,9 +285,15 @@ export function ProjectDeals() {
 
   const demandPositionId = users.byId.get(sessionUser?.id ?? "")?.positionId ?? users.list.find((user) => user.positionId)?.positionId ?? null;
   const createDealDialog = <CreateDealDialog stages={model.stages} data={data} busy={busy} setBusy={setBusy} create={createOpportunity} demandPositionId={demandPositionId} disabledReason={createDealCapability.disabledReason} />;
+  const toolbarActions = (
+    <>
+      <PipelineSettingsDialog crm={crm} disabledReason={constructorDisabledReason} />
+      {createDealDialog}
+    </>
+  );
 
   return (
-    <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={createDealDialog}>
+    <CrmFrame activeTab="Сделки" subtitle="Воронка продаж и активные сделки" actions={toolbarActions}>
       {/* Резолв deep-link ?deal=/?client= — только в ready-ветке: useSearchParams внутри
           резолверов не исполняется при prerender страницы (иначе Next требует Suspense-границу). */}
       <DealDeepLinkResolver data={data} setPipelineId={setPipelineId} />
@@ -644,6 +655,8 @@ export function CreateDealDialog({ stages, data, busy, setBusy, create, demandPo
   const [clientId, setClientId] = useState("");
   const [contactId, setContactId] = useState("");
   const [stageId, setStageId] = useState("");
+  // Тип проекта выбирается из активных типов (мультитиповый тенант); дефолт — первый активный.
+  const [projectTypeId, setProjectTypeId] = useState("");
   // Суммы не предзаполняем фиктивными значениями — пользователь вводит реальные (G4-15).
   const [contractValue, setContractValue] = useState("");
   const [rate, setRate] = useState("");
@@ -669,6 +682,11 @@ export function CreateDealDialog({ stages, data, busy, setBusy, create, demandPo
     if (!next && createRequested) clearCreateParam();
     setOpen(next);
   };
+  // Предвыбор первого активного типа проекта при открытии (одно-типовой тенант — авто-выбор как раньше).
+  const firstActiveProjectTypeId = data?.projectTypes.find((t) => t.status === "active")?.id ?? "";
+  useEffect(() => {
+    if (open && !projectTypeId && firstActiveProjectTypeId) setProjectTypeId(firstActiveProjectTypeId);
+  }, [open, projectTypeId, firstActiveProjectTypeId]);
   // Разумные дефолты дат: старт = сегодня, финиш = +3 месяца (G4-15).
   const [start, setStart] = useState(() => isoToday());
   const [finish, setFinish] = useState(() => isoPlusMonths(3));
@@ -676,7 +694,7 @@ export function CreateDealDialog({ stages, data, busy, setBusy, create, demandPo
   if (!data) return null;
   const clients = data.clients.filter((c) => c.status === "active");
   const contacts = data.contacts.filter((c) => c.clientId === clientId && c.status === "active");
-  const projectTypeId = data.projectTypes[0]?.id ?? "";
+  const activeProjectTypes = data.projectTypes.filter((t) => t.status === "active");
   const valid = title.trim() && clientId && contactId && stageId && hasCreateDealReferenceData(projectTypeId, demandPositionId) && Number(contractValue) > 0 && Number(rate) > 0 && finish >= start && isValidOpportunityProbability(probability);
 
   // Онбординг пустого тенанта (G8-12): честно объясняем, чего не хватает для создания
@@ -726,6 +744,9 @@ export function CreateDealDialog({ stages, data, busy, setBusy, create, demandPo
           </label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Стадия
             <select data-testid="deal-stage" value={stageId} onChange={(e) => setStageId(e.target.value)} className={selCls}><option value="" disabled>Выберите…</option>{stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+          </label>
+          <label className="col-span-2 flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Тип проекта
+            <select data-testid="deal-project-type" value={projectTypeId} onChange={(e) => setProjectTypeId(e.target.value)} className={selCls}><option value="" disabled>Выберите…</option>{activeProjectTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
           </label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Вероятность, %<Input type="number" min={0} max={100} value={probability} onChange={(e) => setProbability(e.target.value)} className="text-right" /></label>
           <label className="flex flex-col gap-1 text-[length:var(--text-xs)] font-medium text-[var(--muted-strong)]">Сумма, ₽<Input type="number" min={1} value={contractValue} onChange={(e) => setContractValue(e.target.value)} placeholder="1 000 000" className="text-right" /></label>

@@ -63,6 +63,8 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
   const [editDeadline, setEditDeadline] = useState(false);
   const [draftDeadline, setDraftDeadline] = useState("");
   const [reason, setReason] = useState("");
+  const [editCalendar, setEditCalendar] = useState(false);
+  const [draftCalendarId, setDraftCalendarId] = useState("");
 
   const model = useMemo(() => {
     if (!readModel) return null;
@@ -125,6 +127,20 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
     setReason("");
     setEditDeadline(true);
   };
+  const openCalendarEdit = () => {
+    if (!canManageSettings) return;
+    setDraftCalendarId(project.calendarId ?? "");
+    setEditCalendar(true);
+  };
+  const calendarChanged = draftCalendarId !== "" && draftCalendarId !== (project.calendarId ?? "");
+  const submitCalendar = () => {
+    if (!canManageSettings || !calendarChanged) return;
+    void applyCmd(
+      createPlanningCommand({ type: "project.settings.update", payload: { calendarId: draftCalendarId } }),
+      "Календарь проекта обновлён",
+      () => setEditCalendar(false)
+    );
+  };
   const submitDeadline = () => {
     if (!canManageSettings) return;
     void applyCmd(createPlanningCommand({ type: "project.deadline.move", payload: { deadline: draftDeadline, reason: reason.trim() } }), "Дедлайн перенесён", () => { setEditDeadline(false); setReason(""); });
@@ -151,17 +167,42 @@ export function ProjectSettings({ projectId = MOCK_PROJECT_ID }: { projectId?: s
         ) : null}
 
         <div className="flex flex-col gap-3">
-          {/* Календарь по умолчанию — read-only из project.calendarId (каталог календарей вне планировочного read-model) */}
+          {/* Календарь по умолчанию — рабочий выбор через боевую команду project.settings.update */}
           <Section title="Календарь по умолчанию" hint="Используется для всех задач без явного переопределения.">
-            <div className="flex flex-wrap items-end gap-2">
-              <Field label="Календарь проекта">
-                <div className="flex h-9 min-w-[260px] items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)]">
-                  <CalendarDays className="size-4 shrink-0 text-[var(--muted)]" aria-hidden />{calendarText}
+            {editCalendar ? (
+              <div className="rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] p-3">
+                <label className="flex flex-col gap-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+                  Календарь проекта
+                  <select
+                    className="h-9 min-w-[260px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)]"
+                    value={draftCalendarId}
+                    disabled={busy}
+                    onChange={(e) => setDraftCalendarId(e.target.value)}
+                  >
+                    <option value="" disabled>Выберите календарь</option>
+                    {model.calendars.map((c) => (
+                      <option key={c.id} value={c.id}>{calLabel(c)}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="mt-2.5 flex items-center gap-2">
+                  <Button variant="default" size="sm" disabled={busy || !calendarChanged} onClick={submitCalendar}>Применить календарь</Button>
+                  <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditCalendar(false)}><X className="size-3.5" aria-hidden />Отмена</Button>
+                  {!calendarChanged && draftCalendarId !== "" ? <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">Календарь не изменился</span> : null}
                 </div>
-              </Field>
-              <Button asChild variant="secondary" size="sm"><Link href={`/projects/${projectId}/calendars`}>Открыть Календарь</Link></Button>
-            </div>
-            <p className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Смена календаря по умолчанию появится в одном из следующих обновлений — пока поле только для чтения. Исключения и рабочая неделя — на вкладке «Календари».</p>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-end gap-2">
+                <Field label="Календарь проекта">
+                  <div className="flex h-9 min-w-[260px] items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-2.5 text-[length:var(--text-sm)] text-[var(--text)]">
+                    <CalendarDays className="size-4 shrink-0 text-[var(--muted)]" aria-hidden />{calendarText}
+                  </div>
+                </Field>
+                {canManageSettings ? <Button variant="secondary" size="sm" disabled={busy} onClick={openCalendarEdit}><Pencil className="size-3.5" aria-hidden />Сменить календарь</Button> : null}
+                <Button asChild variant="ghost" size="sm"><Link href={`/projects/${projectId}/calendars`}>Открыть Календарь</Link></Button>
+              </div>
+            )}
+            <p className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">Смена календаря по умолчанию применяется командой project.settings.update (preview/apply, bump версии плана) и переназначает календарь всем задачам без явного переопределения. Исключения и рабочая неделя — на вкладке «Календари».</p>
           </Section>
 
           {/* Поля проекта — read-only + редактируемый дедлайн */}

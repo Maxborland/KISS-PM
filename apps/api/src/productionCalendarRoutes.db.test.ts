@@ -108,6 +108,128 @@ describe("production calendar routes (db)", () => {
     expect(body.exceptions.some((item) => item.date === "2026-01-01")).toBe(true);
   });
 
+  it("bulk response reflects the edited items' year, not the current year", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const app = createApp({ dataSource });
+    const editedYear = new Date().getUTCFullYear() + 1;
+
+    const bulk = await app.request("/api/tenant/current/production-calendar/bulk", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
+      body: JSON.stringify({
+        exceptions: [
+          { id: "holiday-next-year", date: `${editedYear}-01-01`, workingMinutes: 0, reason: "Следующий год" }
+        ]
+      })
+    });
+    expect(bulk.status).toBe(200);
+    const view = (await bulk.json()) as { year: number; exceptions: Array<{ id: string }> };
+    expect(view.year).toBe(editedYear);
+    expect(view.exceptions.some((item) => item.id === "holiday-next-year")).toBe(true);
+  });
+
+  it("PATCH updates the base weekly mode with audit (6-day / 12h)", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const app = createApp({ dataSource });
+
+    const patch = await app.request("/api/tenant/current/production-calendar", {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
+      body: JSON.stringify({ workingWeekdays: [1, 2, 3, 4, 5, 6], workingMinutesPerDay: 720 })
+    });
+    expect(patch.status).toBe(200);
+
+    const read = await app.request("/api/tenant/current/production-calendar?year=2026", {
+      headers: { cookie }
+    });
+    expect(read.status).toBe(200);
+    const body = (await read.json()) as { workingWeekdays: number[]; workingMinutesPerDay: number };
+    expect(body.workingWeekdays).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(body.workingMinutesPerDay).toBe(720);
+
+    const audit = await app.request("/api/tenant/current/audit-events", { headers: { cookie } });
+    const auditBody = (await audit.json()) as { auditEvents: Array<{ actionType: string }> };
+    expect(auditBody.auditEvents.map((event) => event.actionType))
+      .toContain("tenant.production_calendar.base_mode_updated");
+  });
+
+  it("rejects malformed base mode input (empty weekdays / bad minutes)", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const app = createApp({ dataSource });
+
+    const emptyWeekdays = await app.request("/api/tenant/current/production-calendar", {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
+      body: JSON.stringify({ workingWeekdays: [], workingMinutesPerDay: 480 })
+    });
+    expect(emptyWeekdays.status).toBe(400);
+    expect(await emptyWeekdays.json()).toEqual({ error: "production_calendar_invalid" });
+
+    const badMinutes = await app.request("/api/tenant/current/production-calendar", {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
+      body: JSON.stringify({ workingWeekdays: [1, 2, 3], workingMinutesPerDay: 0 })
+    });
+    expect(badMinutes.status).toBe(400);
+    expect(await badMinutes.json()).toEqual({ error: "production_calendar_invalid" });
+
+    const duplicateDay = await app.request("/api/tenant/current/production-calendar", {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
+      body: JSON.stringify({ workingWeekdays: [1, 1, 2], workingMinutesPerDay: 480 })
+    });
+    expect(duplicateDay.status).toBe(400);
+    expect(await duplicateDay.json()).toEqual({ error: "production_calendar_invalid" });
+  });
+
+  it("deletes an exception with audit; invalid id → 400, missing → 404", async () => {
+    const dataSource = createPostgresTenantDataSource(createDatabase(client));
+    const app = createApp({ dataSource });
+
+    const create = await app.request("/api/tenant/current/production-calendar/bulk", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", "x-kiss-pm-action": "same-origin" },
+      body: JSON.stringify({
+        exceptions: [
+          { id: "holiday-to-delete", date: "2026-06-12", workingMinutes: 0, reason: "Ошибочный праздник" }
+        ]
+      })
+    });
+    expect(create.status).toBe(200);
+
+    const badId = await app.request("/api/tenant/current/production-calendar/exceptions/bad%2Fid", {
+      method: "DELETE",
+      headers: { cookie, "x-kiss-pm-action": "same-origin" }
+    });
+    expect(badId.status).toBe(400);
+    expect(await badId.json()).toEqual({ error: "production_calendar_invalid" });
+
+    const missing = await app.request("/api/tenant/current/production-calendar/exceptions/holiday-absent-x", {
+      method: "DELETE",
+      headers: { cookie, "x-kiss-pm-action": "same-origin" }
+    });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({ error: "production_calendar_exception_not_found" });
+
+    const del = await app.request("/api/tenant/current/production-calendar/exceptions/holiday-to-delete", {
+      method: "DELETE",
+      headers: { cookie, "x-kiss-pm-action": "same-origin" }
+    });
+    expect(del.status).toBe(200);
+    expect(await del.json()).toEqual({ ok: true });
+
+    const read = await app.request("/api/tenant/current/production-calendar?year=2026", {
+      headers: { cookie }
+    });
+    const body = (await read.json()) as { exceptions: Array<{ id: string }> };
+    expect(body.exceptions.some((item) => item.id === "holiday-to-delete")).toBe(false);
+
+    const audit = await app.request("/api/tenant/current/audit-events", { headers: { cookie } });
+    const auditBody = (await audit.json()) as { auditEvents: Array<{ actionType: string }> };
+    expect(auditBody.auditEvents.map((event) => event.actionType))
+      .toContain("tenant.production_calendar.exception_deleted");
+  });
+
   it("rejects malformed production calendar query and bulk input", async () => {
     const dataSource = createPostgresTenantDataSource(createDatabase(client));
     const app = createApp({ dataSource });

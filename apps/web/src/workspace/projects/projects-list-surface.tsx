@@ -1,37 +1,60 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 import { BemAvatar, type BemAvatarColor } from "@/components/domain/bem-avatar";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { SurfaceState } from "@/components/domain/surface-state";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { useProjects, useWorkspaceUsers } from "@/workspace/lib/use-workspace";
-import type { ProjectRecord } from "@/workspace/lib/workspace-client";
+import type {
+  ProjectRecord,
+  ProjectStatusAction,
+  ProjectStatusFilter
+} from "@/workspace/lib/workspace-client";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
 
 /* ============================================================
-   Workspace — поверхность «Проекты» (список активных проектов
-   рабочей области). Каркас: WorkspaceShell (левая навигация + топбар),
-   внутренний экран рабочего пространства.
+   Workspace — поверхность «Проекты» (список проектов рабочей области).
+   Каркас: WorkspaceShell (левая навигация + топбар).
 
    ЧЕСТНОСТЬ:
-   - Баннер «Прототип»: боевой контракт GET /api/workspace/projects
-     (только status === "active"); транспорт — contract-mock,
-     переключение на боевой = apiOrigin; данные in-memory.
-   - Контракт отдаёт ТОЛЬКО активные проекты, поэтому список не показывает
-     фильтр «Все»: архив/закрытые в этой ручке недоступны.
-   - Название каждого проекта — нативная ссылка на его карточку.
+   - Боевой контракт GET /api/workspace/projects?status=active|closed|paused|all;
+     транспорт — contract-mock, переключение на боевой = apiOrigin; данные in-memory.
+   - Фильтр статуса — реальный query-параметр ручки (не клиентская подмена).
+   - Создание/переименование/пауза/возобновление/переоткрытие — реальные мутации
+     (POST /projects, PATCH /projects/:id, POST /projects/:id/{reopen,pause,resume}).
+     Каждая мутация — с подтверждением/формой; ошибка — честный тост с кодом.
 
    Состояния — только через <SurfaceState> (loading/error/empty).
    ============================================================ */
 
-export const PROJECTS_LIST_AVAILABLE_FILTERS = [{ value: "active", label: "Активные" }] as const;
+// Доступные фильтры статуса (значения — боевой query-параметр ?status=).
+export const PROJECTS_LIST_AVAILABLE_FILTERS = [
+  { value: "active", label: "Активные" },
+  { value: "paused", label: "Приостановленные" },
+  { value: "closed", label: "Закрытые" },
+  { value: "all", label: "Все" }
+] as const satisfies readonly { value: ProjectStatusFilter; label: string }[];
 
+// Сервер уже фильтрует по статусу; локально возвращаем как есть (защита от undefined).
 export function getVisibleProjects(projects: ProjectRecord[]): ProjectRecord[] {
-  return projects.filter((p) => p.status === "active");
+  return projects ?? [];
 }
 
 // Аватары/инициалы/цвет — по образцу deals-surface (детерминированно по справочнику).
@@ -57,19 +80,35 @@ const fmtDate = (iso: string) => {
 const ERR_RU: Record<string, string> = {
   load_failed: "Не удалось загрузить проекты",
   request_failed: "Запрос не выполнен",
-  invalid_json_response: "Некорректный ответ сервера"
+  invalid_json_response: "Некорректный ответ сервера",
+  invalid_project_title: "Некорректное название проекта",
+  invalid_planned_dates: "Некорректные плановые даты",
+  project_status_transition_not_allowed: "Переход статуса недоступен",
+  project_not_found: "Проект не найден",
+  project_id_taken: "Проект с таким идентификатором уже существует"
 };
-export const projectsErrorMessage = (code?: string) => (code && ERR_RU[code]) || (code ? "Запрос не выполнен" : "Не удалось загрузить");
+export const projectsErrorMessage = (code?: string) =>
+  (code && ERR_RU[code]) || (code ? "Запрос не выполнен" : "Не удалось загрузить");
+
+const mutationError = (code?: string) => ERR_RU[code ?? ""] ?? "Действие не выполнено" + (code ? ` (${code})` : "");
 
 // Человекочитаемый статус проекта (боевой status — свободная строка; известные — переводим).
 const STATUS_LABEL: Record<string, string> = {
   active: "Активен",
   draft: "Черновик",
+  paused: "На паузе",
   closed: "Закрыт",
+  cancelled: "Отменён",
   archived: "Архив"
 };
 const statusVariant = (status: string) =>
-  status === "active" ? "success" : status === "closed" || status === "archived" ? "danger" : "info";
+  status === "active"
+    ? "success"
+    : status === "paused"
+      ? "warning"
+      : status === "closed" || status === "cancelled" || status === "archived"
+        ? "danger"
+        : "info";
 
 export function ProjectsListSurface() {
   const usersDir = useWorkspaceUsers();
@@ -77,15 +116,12 @@ export function ProjectsListSurface() {
     const i = usersDir.indexOf(id);
     return i < 0 ? "c5" : AV[i % AV.length]!;
   };
-  const { data, status, error, reload } = useProjects();
+  const [filter, setFilter] = useState<ProjectStatusFilter>("active");
+  const { data, status, error, reload, createProject, updateProject, setProjectStatus } =
+    useProjects(filter);
 
-  // Контракт отдаёт только активные; локальная защита не даёт не-active строкам попасть в UI.
-  const projects = useMemo<ProjectRecord[]>(() => {
-    return getVisibleProjects(data?.projects ?? []);
-  }, [data]);
+  const projects = useMemo<ProjectRecord[]>(() => getVisibleProjects(data?.projects ?? []), [data]);
 
-  // Статус поверхности: есть данные → ready; ошибка → error; иначе loading.
-  // Пустой список активных проектов → empty.
   const surfaceStatus =
     status === "forbidden"
       ? "forbidden"
@@ -105,13 +141,23 @@ export function ProjectsListSurface() {
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h1 className="text-[length:var(--text-lg)] font-bold text-[var(--text-strong)]">Проекты</h1>
-            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Активные проекты рабочей области</p>
+            <p className="text-[length:var(--text-sm)] text-[var(--muted)]">Проекты рабочей области и их жизненный цикл</p>
           </div>
-          <Button asChild variant="default" size="sm">
-            <Link href="/crm/deals">Создать проект</Link>
-          </Button>
+          <CreateProjectDialog onCreate={createProject} />
         </div>
 
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {PROJECTS_LIST_AVAILABLE_FILTERS.map((f) => (
+            <Button
+              key={f.value}
+              variant={filter === f.value ? "default" : "secondary"}
+              size="sm"
+              onClick={() => setFilter(f.value)}
+            >
+              {f.label}
+            </Button>
+          ))}
+        </div>
 
         <SurfaceState
           status={surfaceStatus}
@@ -120,16 +166,25 @@ export function ProjectsListSurface() {
           errorFormat={projectsErrorMessage}
           loadingLabel="Загрузка проектов…"
           empty={{
-            title: "Нет проектов",
-            description: "Проекты появляются активацией сделки из CRM: выиграйте сделку — и она станет проектом.",
-            action: (
-              <Button asChild variant="default">
-                <Link href="/crm/deals">К сделкам</Link>
-              </Button>
-            )
+            title: filter === "active" ? "Нет активных проектов" : "Нет проектов",
+            description:
+              filter === "active"
+                ? "Создайте внутренний проект вручную или активируйте выигранную сделку из CRM."
+                : "В этой выборке проектов нет. Смените фильтр статуса.",
+            action:
+              filter === "active" ? (
+                <CreateProjectDialog onCreate={createProject} />
+              ) : (
+                <Button variant="secondary" onClick={() => setFilter("all")}>Показать все</Button>
+              )
           }}
         >
-          <ProjectsTable projects={projects} userColor={userColor} />
+          <ProjectsTable
+            projects={projects}
+            userColor={userColor}
+            onRename={updateProject}
+            onSetStatus={setProjectStatus}
+          />
         </SurfaceState>
       </main>
     </WorkspaceShell>
@@ -145,15 +200,221 @@ function ProtoBanner() {
         Прототип
       </span>
       <span>
-        Боевой контракт: GET /api/workspace/projects (только активные проекты рабочей области). Транспорт — contract-mock;
-        переключение на боевой = apiOrigin. Данные in-memory.
+        Боевые контракты: GET /api/workspace/projects?status=…, POST /projects, PATCH /projects/:id,
+        POST /projects/:id/&#123;reopen,pause,resume&#125;. Транспорт — contract-mock; переключение на боевой = apiOrigin. Данные in-memory.
       </span>
     </div>
   );
 }
 
-// Таблица проектов: Проект · Клиент · Статус · Срок · Сумма · План.часы · Спрос.
-function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; userColor: (id: string) => BemAvatarColor }) {
+// Диалог ручного создания внутреннего проекта (POST /api/workspace/projects).
+type MutationRun = () => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+function runMutation(run: MutationRun, okMsg: string, onOk?: () => void) {
+  return async () => {
+    const res = await run();
+    if (res.ok) {
+      toast.success(okMsg);
+      onOk?.();
+    } else {
+      toast.error(mutationError(res.code));
+    }
+  };
+}
+
+function CreateProjectDialog({
+  onCreate
+}: {
+  onCreate: (input: {
+    title: string;
+    plannedStart: string;
+    plannedFinish: string;
+  }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState("");
+  const [start, setStart] = useState("");
+  const [finish, setFinish] = useState("");
+
+  const valid =
+    title.trim().length > 0 &&
+    start !== "" &&
+    finish !== "" &&
+    finish >= start;
+
+  const submit = async () => {
+    if (!valid) return;
+    setBusy(true);
+    await runMutation(
+      () => onCreate({ title: title.trim(), plannedStart: start, plannedFinish: finish }),
+      "Проект создан",
+      () => {
+        setOpen(false);
+        setTitle("");
+        setStart("");
+        setFinish("");
+      }
+    )();
+    setBusy(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="default" size="sm">Новый проект</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle>Новый проект</DialogTitle>
+          <DialogDescription>Внутренний проект без сделки CRM. Тип, шаблон и календарь можно задать позже.</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+            Название проекта
+            <Input value={title} disabled={busy} maxLength={160} placeholder="напр. Внутренний R&D" onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <div className="flex flex-wrap gap-3">
+            <label className="flex flex-col gap-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+              Плановый старт
+              <Input type="date" value={start} disabled={busy} onChange={(e) => setStart(e.target.value)} className="w-[170px]" />
+            </label>
+            <label className="flex flex-col gap-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+              Плановый финиш
+              <Input type="date" value={finish} disabled={busy} onChange={(e) => setFinish(e.target.value)} className="w-[170px]" />
+            </label>
+          </div>
+          {finish !== "" && start !== "" && finish < start ? (
+            <span className="text-[length:var(--text-xs)] text-[var(--danger)]">Финиш не может быть раньше старта.</span>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost" disabled={busy}>Отмена</Button>
+          </DialogClose>
+          <Button variant="default" disabled={busy || !valid} onClick={() => void submit()}>Создать проект</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Диалог переименования проекта (PATCH /api/workspace/projects/:id, поле title).
+function RenameProjectDialog({
+  project,
+  onRename
+}: {
+  project: ProjectRecord;
+  onRename: (
+    projectId: string,
+    input: { title: string }
+  ) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState(project.title);
+
+  const valid = title.trim().length > 0 && title.trim() !== project.title;
+
+  const submit = async () => {
+    if (!valid) return;
+    setBusy(true);
+    await runMutation(() => onRename(project.id, { title: title.trim() }), "Название обновлено", () => setOpen(false))();
+    setBusy(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) setTitle(project.title); }}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm">Изменить</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle>Изменить проект</DialogTitle>
+          <DialogDescription>Название проекта. Тип, шаблон и календарь редактируются в настройках проекта.</DialogDescription>
+        </DialogHeader>
+        <label className="flex flex-col gap-1 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+          Название проекта
+          <Input value={title} disabled={busy} maxLength={160} onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost" disabled={busy}>Отмена</Button>
+          </DialogClose>
+          <Button variant="default" disabled={busy || !valid} onClick={() => void submit()}>Сохранить</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Действие статусного перехода с подтверждением (переоткрыть/пауза/возобновить).
+function StatusAction({
+  project,
+  action,
+  label,
+  onSetStatus
+}: {
+  project: ProjectRecord;
+  action: ProjectStatusAction;
+  label: string;
+  onSetStatus: (
+    projectId: string,
+    action: ProjectStatusAction
+  ) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+}) {
+  const okMsg =
+    action === "reopen" ? "Проект переоткрыт" : action === "pause" ? "Проект приостановлен" : "Проект возобновлён";
+  return (
+    <ConfirmDialog
+      title={`${label}: «${project.title}»?`}
+      description="Действие изменит статус проекта и пересчитает загрузку ресурсов."
+      confirmLabel={label}
+      cancelLabel="Отмена"
+      destructive={action === "pause"}
+      onConfirm={runMutation(() => onSetStatus(project.id, action), okMsg)}
+    >
+      <Button variant="ghost" size="sm">{label}</Button>
+    </ConfirmDialog>
+  );
+}
+
+function RowActions({
+  project,
+  onRename,
+  onSetStatus
+}: {
+  project: ProjectRecord;
+  onRename: (projectId: string, input: { title: string }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+  onSetStatus: (projectId: string, action: ProjectStatusAction) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+}) {
+  return (
+    <span className="flex flex-wrap items-center justify-end gap-1">
+      <RenameProjectDialog project={project} onRename={onRename} />
+      {project.status === "active" ? (
+        <StatusAction project={project} action="pause" label="Пауза" onSetStatus={onSetStatus} />
+      ) : null}
+      {project.status === "paused" ? (
+        <StatusAction project={project} action="resume" label="Возобновить" onSetStatus={onSetStatus} />
+      ) : null}
+      {project.status === "closed" || project.status === "cancelled" ? (
+        <StatusAction project={project} action="reopen" label="Переоткрыть" onSetStatus={onSetStatus} />
+      ) : null}
+    </span>
+  );
+}
+
+// Таблица проектов: Проект · Клиент · Статус · Срок · Сумма · План.часы · Действия.
+function ProjectsTable({
+  projects,
+  userColor,
+  onRename,
+  onSetStatus
+}: {
+  projects: ProjectRecord[];
+  userColor: (id: string) => BemAvatarColor;
+  onRename: (projectId: string, input: { title: string }) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+  onSetStatus: (projectId: string, action: ProjectStatusAction) => Promise<{ ok: true } | { ok: false; code?: string; message?: string }>;
+}) {
   return (
     <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
       <table className="w-full border-collapse text-[length:var(--text-sm)]">
@@ -165,7 +426,7 @@ function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; use
             <th className="px-3 py-2 font-semibold">Срок</th>
             <th className="px-3 py-2 text-right font-semibold">Сумма</th>
             <th className="px-3 py-2 text-right font-semibold">План.часы</th>
-            <th className="px-3 py-2 font-semibold">Спрос</th>
+            <th className="px-3 py-2 text-right font-semibold">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -203,18 +464,8 @@ function ProjectsTable({ projects, userColor }: { projects: ProjectRecord[]; use
               <td className="px-3 py-2 text-right">
                 <span className="v4-num text-[var(--muted-strong)]">{p.plannedHours.toLocaleString("ru-RU")} ч</span>
               </td>
-              <td className="px-3 py-2">
-                {p.demand.length === 0 ? (
-                  <span className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">—</span>
-                ) : (
-                  <span className="flex flex-wrap gap-1">
-                    {p.demand.map((d) => (
-                      <Chip key={d.positionId} variant="info">
-                        {d.positionId} · {d.requiredHours} ч
-                      </Chip>
-                    ))}
-                  </span>
-                )}
+              <td className="px-3 py-2 text-right">
+                <RowActions project={p} onRename={onRename} onSetStatus={onSetStatus} />
               </td>
             </tr>
           ))}

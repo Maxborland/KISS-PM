@@ -28,8 +28,13 @@ const project = (overrides: Partial<ProjectRecord>): ProjectRecord => {
 };
 
 describe("projects list honest scope", () => {
-  it("only exposes filters backed by the active-projects API contract", () => {
-    expect(PROJECTS_LIST_AVAILABLE_FILTERS).toEqual([{ value: "active", label: "Активные" }]);
+  it("exposes exactly the status filters backed by the API ?status contract", () => {
+    expect(PROJECTS_LIST_AVAILABLE_FILTERS).toEqual([
+      { value: "active", label: "Активные" },
+      { value: "paused", label: "Приостановленные" },
+      { value: "closed", label: "Закрытые" },
+      { value: "all", label: "Все" }
+    ]);
   });
 
   it("does not expose raw network errors", () => {
@@ -38,12 +43,12 @@ describe("projects list honest scope", () => {
     expect(projectsErrorMessage("Failed to fetch internal.example")).toBe("Запрос не выполнен");
   });
 
-  it("shows active projects only", () => {
+  it("passes projects through unchanged (server applies the status filter)", () => {
     const visible = getVisibleProjects([
       project({ id: "active-project", status: "active" }),
       project({ id: "closed-project", status: "closed" })
     ]);
 
-    expect(visible.map((p) => p.id)).toEqual(["active-project"]);
+    expect(visible.map((p) => p.id)).toEqual(["active-project", "closed-project"]);
   });
 });

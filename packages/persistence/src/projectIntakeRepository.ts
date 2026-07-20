@@ -118,6 +118,45 @@ export type ProjectDraftActivationInput = {
   projectId: string;
 };
 
+// Ручное создание внутреннего проекта (без сделки CRM): source_type = "manual",
+// source_opportunity_id = null (см. projects_source_opportunity_chk). Проект создаётся
+// сразу активным — доменного драфта/активации для manual-пути нет (они завязаны на сделку).
+export type ManualProjectInput = {
+  id: string;
+  tenantId: TenantId;
+  title: string;
+  clientName: string;
+  projectTypeId: string | null;
+  templateId: string | null;
+  calendarId: string | null;
+  plannedStart: Date;
+  plannedFinish: Date;
+  contractValue: number;
+  plannedHours: number;
+  demand: PositionDemandRecord[];
+};
+
+// Редактирование параметров проекта (жизненный цикл): меняем только переданные поля.
+// undefined → колонку не трогаем (частичный PATCH). null для projectTypeId/templateId
+// допустим (снятие типа/шаблона).
+export type ProjectSettingsUpdateInput = {
+  tenantId: TenantId;
+  projectId: string;
+  title?: string;
+  projectTypeId?: string | null;
+  templateId?: string | null;
+  calendarId?: string | null;
+};
+
+// Смена статуса проекта (reopen/pause/resume). expectedStatuses — защита от гонок:
+// апдейт применяется только если проект в одном из ожидаемых статусов (иначе undefined).
+export type ProjectStatusTransitionInput = {
+  tenantId: TenantId;
+  projectId: string;
+  status: ProjectStatus;
+  expectedStatuses: readonly ProjectStatus[];
+};
+
 export type WorkspaceInboxProjectInput = {
   tenantId: TenantId;
   plannedStart: Date;
@@ -155,9 +194,20 @@ export type ProjectIntakeRepository = {
     status: OpportunityFinalStatus;
   }): Promise<OpportunityRecord | undefined>;
   listProjects(tenantId: TenantId): Promise<ProjectRecord[]>;
+  findProjectById(
+    tenantId: TenantId,
+    projectId: string
+  ): Promise<ProjectRecord | undefined>;
   ensureWorkspaceInboxProject(input: WorkspaceInboxProjectInput): Promise<ProjectRecord>;
   createProjectDraftFromOpportunity(input: ProjectInput): Promise<ProjectRecord>;
   activateProjectDraft(input: ProjectDraftActivationInput): Promise<ProjectRecord>;
+  createManualProject(input: ManualProjectInput): Promise<ProjectRecord>;
+  updateProjectSettings(
+    input: ProjectSettingsUpdateInput
+  ): Promise<ProjectRecord | undefined>;
+  updateProjectStatus(
+    input: ProjectStatusTransitionInput
+  ): Promise<ProjectRecord | undefined>;
 };
 
 export function createProjectIntakeRepository(
@@ -692,6 +742,101 @@ export function createProjectIntakeRepository(
         const demandByProject = await listProjectDemand(input.tenantId, [input.projectId]);
         return mapProjectRecord(row, demandByProject.get(row.id) ?? []);
       });
+    },
+    async findProjectById(tenantId, projectId) {
+      const [row] = await db
+        .select()
+        .from(projects)
+        .where(and(eq(projects.tenantId, tenantId), eq(projects.id, projectId)))
+        .limit(1);
+      if (!row) return undefined;
+      const demandByProject = await listProjectDemand(tenantId, [projectId]);
+      return mapProjectRecord(row, demandByProject.get(row.id) ?? []);
+    },
+    async createManualProject(input) {
+      return db.transaction(async (transaction) => {
+        const now = new Date();
+        const [row] = await transaction
+          .insert(projects)
+          .values({
+            id: input.id,
+            tenantId: input.tenantId,
+            sourceType: "manual",
+            sourceOpportunityId: null,
+            clientId: null,
+            projectTypeId: input.projectTypeId,
+            title: input.title,
+            clientName: input.clientName,
+            status: "active",
+            plannedStart: input.plannedStart,
+            plannedFinish: input.plannedFinish,
+            calendarId: input.calendarId,
+            contractValue: input.contractValue,
+            plannedHours: input.plannedHours,
+            templateId: input.templateId,
+            createdAt: now,
+            activatedAt: now
+          })
+          .returning();
+
+        if (!row) throw new Error("Manual project insert returned no row");
+
+        if (input.demand.length > 0) {
+          await transaction.insert(projectPositionDemands).values(
+            input.demand.map((line) => ({
+              tenantId: input.tenantId,
+              projectId: input.id,
+              positionId: line.positionId,
+              requiredHours: line.requiredHours
+            }))
+          );
+        }
+
+        return mapProjectRecord(row, input.demand);
+      });
+    },
+    async updateProjectSettings(input) {
+      const patch: Partial<typeof projects.$inferInsert> = {};
+      if (input.title !== undefined) patch.title = input.title;
+      if (input.projectTypeId !== undefined) patch.projectTypeId = input.projectTypeId;
+      if (input.templateId !== undefined) patch.templateId = input.templateId;
+      if (input.calendarId !== undefined) patch.calendarId = input.calendarId;
+      // Пустой патч не должен молча «терять» ответ: возвращаем текущую запись.
+      if (Object.keys(patch).length === 0) {
+        return this.findProjectById(input.tenantId, input.projectId);
+      }
+
+      const [row] = await db
+        .update(projects)
+        .set(patch)
+        .where(
+          and(eq(projects.tenantId, input.tenantId), eq(projects.id, input.projectId))
+        )
+        .returning();
+      if (!row) return undefined;
+      const demandByProject = await listProjectDemand(input.tenantId, [input.projectId]);
+      return mapProjectRecord(row, demandByProject.get(row.id) ?? []);
+    },
+    async updateProjectStatus(input) {
+      const now = new Date();
+      const [row] = await db
+        .update(projects)
+        .set({
+          status: input.status,
+          // closed → фиксируем момент закрытия; любой не-closed статус снимает метку.
+          closedAt: input.status === "closed" ? now : null
+        })
+        .where(
+          and(
+            eq(projects.tenantId, input.tenantId),
+            eq(projects.id, input.projectId),
+            inArray(projects.status, input.expectedStatuses as ProjectStatus[])
+          )
+        )
+        .returning();
+      if (!row) return undefined;
+      const demandByProject = await listProjectDemand(input.tenantId, [input.projectId]);
+      return mapProjectRecord(row, demandByProject.get(row.id) ?? []);
     }
   };
 }

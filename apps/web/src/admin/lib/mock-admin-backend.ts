@@ -109,6 +109,7 @@ type Store = {
   positions: Position[];
   securityPolicy: SecurityPolicy;
   absences: ResourceAbsence[];
+  calendarBaseMode: { workingWeekdays: number[]; workingMinutesPerDay: number };
   calendarExceptions: ProductionCalendarException[];
   jobRuns: BackgroundJobRun[];
   jobEvents: BackgroundJobEvent[];
@@ -193,6 +194,9 @@ function seed(): Store {
     absence("0b8f6c2a-1111-4aaa-8aaa-000000000002", "user-sergey", "sick_leave", isoDay(-2), isoDay(1), null)
   ];
 
+  // Базовый режим недели тенанта (Пн–Пт, 8 ч) — правится PATCH-ручкой.
+  const calendarBaseMode = { workingWeekdays: [1, 2, 3, 4, 5], workingMinutesPerDay: 480 };
+
   // Исключения производственного календаря (tenant-wide: resourceId = null).
   const year = new Date().getUTCFullYear();
   const calendarExceptions: ProductionCalendarException[] = [
@@ -240,7 +244,7 @@ function seed(): Store {
     jobEvent("7", "purge-1", "enqueued", "Job enqueued", "2026-01-13T03:00:00.000Z")
   ];
 
-  return { accessRoles, users, positions, securityPolicy, absences, calendarExceptions, jobRuns, jobEvents };
+  return { accessRoles, users, positions, securityPolicy, absences, calendarBaseMode, calendarExceptions, jobRuns, jobEvents };
 }
 
 /* ---- Транспорт: fetchImpl, совместимый с createAdminClient ---- */
@@ -618,8 +622,46 @@ export function createMockAdminFetch(): typeof fetch {
         if (existing >= 0) db.calendarExceptions[existing] = item;
         else db.calendarExceptions.push(item);
       }
-      // Боевой ответ: календарь ТЕКУЩЕГО года (не года правки).
+      // Боевой ответ: календарь года отредактированных исключений (не текущего).
+      const bulkYear = items[0]
+        ? Number.parseInt(items[0].date.slice(0, 4), 10)
+        : new Date().getUTCFullYear();
+      return json(productionCalendarView(db, bulkYear));
+    }
+    if (path === "/api/tenant/current/production-calendar" && method === "PATCH") {
+      // Зеркало parseBaseModeBody: workingWeekdays ISO 1..7 (уникальные, 1..7 шт.),
+      // workingMinutesPerDay 1..1440 (оба поля обязательны).
+      const rawWeekdays = body.workingWeekdays;
+      if (!Array.isArray(rawWeekdays) || rawWeekdays.length < 1 || rawWeekdays.length > 7) {
+        return err("production_calendar_invalid", 400);
+      }
+      const seenDays = new Set<number>();
+      for (const day of rawWeekdays) {
+        if (typeof day !== "number" || !Number.isInteger(day) || day < 1 || day > 7 || seenDays.has(day)) {
+          return err("production_calendar_invalid", 400);
+        }
+        seenDays.add(day);
+      }
+      const minutes = body.workingMinutesPerDay;
+      if (typeof minutes !== "number" || !Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+        return err("production_calendar_invalid", 400);
+      }
+      db.calendarBaseMode = {
+        workingWeekdays: [...seenDays].sort((a, b) => a - b),
+        workingMinutesPerDay: minutes
+      };
       return json(productionCalendarView(db, new Date().getUTCFullYear()));
+    }
+    const calendarExceptionDeleteMatch = method === "DELETE"
+      ? path.match(/^\/api\/tenant\/current\/production-calendar\/exceptions\/([^/]+)$/)
+      : null;
+    if (calendarExceptionDeleteMatch) {
+      const id = decodeURIComponent(calendarExceptionDeleteMatch[1]!).trim();
+      if (!/^[a-z0-9][a-z0-9_-]{2,119}$/.test(id)) return err("production_calendar_invalid", 400);
+      const index = db.calendarExceptions.findIndex((e) => e.id === id);
+      if (index < 0) return err("production_calendar_exception_not_found", 404);
+      db.calendarExceptions.splice(index, 1);
+      return json({ ok: true });
     }
 
     /* ---- background jobs (фоновые задачи) — зеркало backgroundJobRoutes, read-only ---- */
@@ -692,8 +734,8 @@ function productionCalendarView(db: Store, year: number) {
   return {
     calendarId: "tenant-default",
     year,
-    workingWeekdays: [1, 2, 3, 4, 5],
-    workingMinutesPerDay: 480,
+    workingWeekdays: [...db.calendarBaseMode.workingWeekdays],
+    workingMinutesPerDay: db.calendarBaseMode.workingMinutesPerDay,
     exceptions: db.calendarExceptions
       .filter((e) => e.date.startsWith(`${year}-`))
       .sort((a, b) => (a.date === b.date ? (a.id < b.id ? -1 : 1) : a.date < b.date ? -1 : 1))

@@ -94,6 +94,25 @@ function createMockClient(): ClosureClient {
       },
       auditEventId: "audit-2"
     })),
+    applyTemplateImprovement: vi.fn(async () => ({
+      action: {
+        id: "improvement-1",
+        tenantId: "tenant",
+        projectId: "project-1",
+        snapshotId: "closure-1",
+        templateId: "template-1",
+        status: "applied" as const,
+        title: "Улучшение",
+        description: "Описание",
+        impact: { plannedWorkDeltaMinutes: 0, plannedDurationDeltaDays: 0, confidence: "medium" as const, sourceMetric: "estimation" },
+        createdByUserId: "user-1",
+        appliedByUserId: "user-1",
+        createdAt: "2026-07-19T10:05:00.000Z",
+        appliedAt: "2026-07-19T10:06:00.000Z",
+        auditEventId: "audit-3"
+      },
+      auditEventId: "audit-3"
+    })),
     getTemplateInsights: vi.fn(async () => ({
       templateId: "template-1",
       appliedImprovements: [],

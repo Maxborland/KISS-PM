@@ -47,6 +47,9 @@ export type SolverRunResult =
 export type SolverApplyResult =
   | { ok: true; planVersion: number; auditEventId: string }
   | { ok: false; conflict: boolean; code?: string; message: string };
+export type SolverRejectResult =
+  | { ok: true; runId: string; rejectedAt: string }
+  | { ok: false; code?: string; message: string };
 /**
  * Работает через настоящий @kiss-pm/planning-client. Транспорт —
  * contract-mock (createMockPlanningFetch), отдельный на каждый монтаж
@@ -318,11 +321,12 @@ export function usePlanning(projectId: string) {
   // Авто-солвер: preview-расчёт «schedule» с персистентным run на сервере. Read-only —
   // план не мутирует, применение идёт отдельным applySolverProposal по кнопке.
   const runAutoSolver = useCallback(
-    async (mode: "schedule" | "repair" = "schedule", targetDeadline?: string | null): Promise<SolverRunResult> => {
+    async (_mode: "schedule" = "schedule", targetDeadline?: string | null): Promise<SolverRunResult> => {
       if (!readModel) return { ok: false, conflict: false, message: "no_read_model" };
       try {
+        // Контракт солвера принимает только «schedule» (фантомный «repair» убран из envelope).
         const res = await client.createAutoSolverRun(projectId, {
-          mode,
+          mode: "schedule",
           clientPlanVersion: readModel.planVersion,
           targetDeadline: targetDeadline ?? null
         });
@@ -365,13 +369,28 @@ export function usePlanning(projectId: string) {
     [client, projectId, readModel, load]
   );
 
+  // Явное отклонение run авто-солвера: план не мутирует, run помечается rejectedAt и
+  // становится неприменимым (apply → 409). Симметрично rejectScenario. Причину в v1 не собираем.
+  const rejectSolverRun = useCallback(
+    async (runId: string): Promise<SolverRejectResult> => {
+      try {
+        const res = await client.rejectAutoSolverRun(projectId, runId);
+        return { ok: true, runId: res.runId, rejectedAt: res.rejectedAt };
+      } catch (e) {
+        const mappedError = mapPlanningError(e, "reject_solver_failed");
+        return { ok: false, code: mappedError.code, message: mappedError.message };
+      }
+    },
+    [client, projectId]
+  );
+
   // журнал коммитов сессии — через единый шов клиента (mock /planning/commits vs live audit-events).
   // lastApplyRef.current даёт live-адаптеру данные отката последнего применённого этой сессией коммита.
   const loadCommits = useCallback((): Promise<CommitsView> => {
     return client.getCommits(projectId, lastApplyRef.current);
   }, [client, projectId]);
 
-  return { client, readModel, setReadModel, status, error, reload: load, preview, previewBatch, apply, applyBatch, revertLast, previewScenarios, applyScenario, rejectScenario, runAutoSolver, applySolverProposal, loadCommits };
+  return { client, readModel, setReadModel, status, error, reload: load, preview, previewBatch, apply, applyBatch, revertLast, previewScenarios, applyScenario, rejectScenario, runAutoSolver, applySolverProposal, rejectSolverRun, loadCommits };
 }
 function planningWriteSignature(planVersion: number, commands: readonly PlanningCommand[]): string {
   return JSON.stringify({ planVersion, commands });

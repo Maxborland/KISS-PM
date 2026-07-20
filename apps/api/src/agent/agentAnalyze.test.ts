@@ -77,3 +77,40 @@ describe("agent analyze: detect_resource_overloads", () => {
     expect(result.overloadCount).toBeGreaterThan(0);
   });
 });
+
+describe("agent analyze: list_task_statuses", () => {
+  function statusRecord(over: { id: string; name: string; category: "new" | "waiting" | "in_progress" | "review" | "done"; status: "active" | "archived" }) {
+    return { tenantId: "tenant-1", sortOrder: 0, isSystem: false, createdAt: new Date(), updatedAt: new Date(), ...over };
+  }
+
+  function statusDeps(records: ReturnType<typeof statusRecord>[]): ApiRouteDeps {
+    const dataSource: Partial<ApiTenantDataSource> = {
+      async listTaskStatuses() { return records as Awaited<ReturnType<NonNullable<ApiTenantDataSource["listTaskStatuses"]>>>; }
+    };
+    return { dataSource: dataSource as ApiTenantDataSource } as ApiRouteDeps;
+  }
+
+  it("returns only active statuses as {id,name,category} so the LLM picks a valid statusId", async () => {
+    const exec = buildAnalyzeExecutor(statusDeps([
+      statusRecord({ id: "todo", name: "К выполнению", category: "new", status: "active" }),
+      statusRecord({ id: "review", name: "На проверке", category: "review", status: "active" }),
+      statusRecord({ id: "legacy", name: "Старый", category: "done", status: "archived" })
+    ]), fakeApp, null, "tenant-1", "user-1");
+
+    const result = (await exec(findAgentTool("list_task_statuses")!, {})) as {
+      statuses: Array<{ id: string; name: string; category: string }>;
+    };
+
+    expect(result.statuses).toEqual([
+      { id: "todo", name: "К выполнению", category: "new" },
+      { id: "review", name: "На проверке", category: "review" }
+    ]);
+  });
+
+  it("degrades honestly without persistence", async () => {
+    const exec = buildAnalyzeExecutor({ dataSource: {} as ApiTenantDataSource } as ApiRouteDeps, fakeApp, null, "tenant-1", "user-1");
+    const result = (await exec(findAgentTool("list_task_statuses")!, {})) as { statuses: unknown[]; note?: string };
+    expect(result.statuses).toEqual([]);
+    expect(result.note).toBe("persistence_not_configured");
+  });
+});
