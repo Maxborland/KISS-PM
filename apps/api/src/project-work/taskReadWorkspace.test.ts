@@ -82,6 +82,31 @@ function createWorkspace(overrides: DataSourceOverrides = {}) {
   return createTaskReadWorkspace({ dataSource });
 }
 
+describe("taskReadWorkspace.getProjectDetail — читаемость не-active проектов (ревью #265)", () => {
+  it("отдаёт закрытый/приостановленный проект через findProjectById, а не 404", async () => {
+    const closed = { ...project, status: "closed" } as ProjectRecord;
+    const workspace = createWorkspace({
+      // listProjects не возвращает closed (фильтр [draft,active,paused]) — деталь берёт findProjectById.
+      listProjects: async () => [],
+      listProjectTasks: async () => [],
+      findProjectById: async (tenantId: string, projectId: string) =>
+        tenantId === TENANT_ID && projectId === closed.id ? closed : undefined
+    });
+    const result = await workspace.getProjectDetail({ actor, profile, projectId: closed.id });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.project.status).toBe("closed");
+  });
+
+  it("404 когда проект не найден ни findProjectById, ни в списке", async () => {
+    const workspace = createWorkspace({ listProjects: async () => [], listProjectTasks: async () => [], findProjectById: async () => undefined });
+    const result = await workspace.getProjectDetail({ actor, profile, projectId: "ghost" });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.status).toBe(404);
+  });
+});
+
 describe("taskReadWorkspace.getTaskDetail", () => {
   it("returns projectId and projectName resolved through listProjects", async () => {
     const workspace = createWorkspace();

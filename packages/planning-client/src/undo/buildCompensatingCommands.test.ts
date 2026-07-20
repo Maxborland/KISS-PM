@@ -136,6 +136,29 @@ describe("client planning undo — task.delete_or_archive reversal", () => {
     expect(createIds).toEqual(["parent", "task-b", "task-a"]);
   });
 
+  it("восстанавливает исходную WBS-позицию задачи (ревью #265): move_wbs с sortOrder из wbsCode", () => {
+    // task-a = wbsCode «1.1» (1-я среди сиблингов под «parent») → sortOrder 0.
+    const inverse = buildCompensatingCommands(deleteA, deletableReadModel());
+    expect(inverse).toContainEqual({
+      type: "task.move_wbs",
+      payload: { taskId: "task-a", parentTaskId: "parent", sortOrder: 0 }
+    });
+    // move_wbs идёт ПОСЛЕ task.create (позиционировать можно только существующую задачу).
+    const createIdx = inverse.findIndex((c) => c.type === "task.create");
+    const moveIdx = inverse.findIndex((c) => c.type === "task.move_wbs");
+    expect(createIdx).toBeGreaterThanOrEqual(0);
+    expect(moveIdx).toBeGreaterThan(createIdx);
+  });
+
+  it("средний ребёнок «1.2» восстанавливается на позицию sortOrder 1", () => {
+    const deleteB: PlanningCommand = { type: "task.delete_or_archive", payload: { taskId: "task-b", mode: "delete" } };
+    const inverse = buildCompensatingCommands(deleteB, deletableReadModel());
+    expect(inverse).toContainEqual({
+      type: "task.move_wbs",
+      payload: { taskId: "task-b", parentTaskId: "parent", sortOrder: 1 }
+    });
+  });
+
   it("не оставляет пустой компенсации: удаление задачи откатывается (canUndo включён)", () => {
     expect(buildCompensatingCommandBatch([deleteA], deletableReadModel()).length).toBeGreaterThan(0);
   });

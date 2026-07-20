@@ -237,6 +237,17 @@ export function buildCompensatingCommands(
             }))
           }
         },
+        // create добавляет задачу В КОНЕЦ ветки — возвращаем её на исходную позицию среди
+        // сиблингов (ревью #265). Последний сегмент wbsCode «1.2» = 1-based позиция (2),
+        // sortOrder move_wbs — 0-based индекс вставки, поэтому позиция минус 1.
+        {
+          type: "task.move_wbs" as const,
+          payload: {
+            taskId,
+            parentTaskId: source.parentTaskId ?? null,
+            sortOrder: Math.max(0, (Number.parseInt(String(source.wbsCode).split(".").at(-1) ?? "1", 10) || 1) - 1)
+          }
+        },
         // create фиксирует taskType=fixed_units/effortDriven=false и progress=0 — возвращаем прежние
         {
           type: "task.update_work_model",
