@@ -11,23 +11,23 @@ import { useAgent } from "@/workspace/agent/use-agent";
 import { AGENT_HISTORY_PAGE_LIMIT, decodeAgentThreadTurn, type AgentActionInput, type AgentThreadTurn, type ProposedAction } from "@/workspace/agent/agent-client";
 import { useWorkspaceRealtime } from "@/communications/lib/use-realtime";
 import type { AgentChange, AgentMessage, AgentPhase } from "@/workspace/agent/agent-model";
-import { TERMINAL_STATUSES } from "@/workspace/agent/agent-model";
+import { composeAfter, TERMINAL_STATUSES } from "@/workspace/agent/agent-model";
 import { AgentComposer } from "@/workspace/agent/ui/agent-composer";
 import { AgentHeader } from "@/workspace/agent/ui/agent-header";
 import { ChatThread } from "@/workspace/agent/ui/agent-messages";
 import { ChangeReviewPanel } from "@/workspace/agent/ui/agent-review";
 
-// Какое поле action редактируется ручной правкой в панели сверки. Структурные действия
-// (статус/ресурсы/план) сюда НЕ входят — их значение нельзя безопасно вывести из текста, поэтому
-// inline-правка для них блокируется (иначе apply молча слал бы оригинал — дыра доверия).
-const EDITABLE_FIELD: Record<string, string> = { comment_task: "body", create_task: "title" };
-
+// Какое поле правится ручной правкой — объявляет СЕРВЕР (preview.editable), клиент его не
+// угадывает: у create_task отображаемое «Стало» — сводная фраза превью, и прежняя догадка
+// «create_task → title» писала в input.title всю фразу целиком (ревью F2). Структурные
+// действия (статус/ресурсы/план) редактируемого поля не объявляют — правка для них закрыта.
 function actionToChange(action: ProposedAction, index: number): AgentChange {
   const allowed = action.capability.allowed;
   // Честный diff обязателен до подтверждения: mutation с пустым «после» (сервер не смог
   // сериализовать изменения) НЕ преселектится — иначе пользователь подтвердил бы вслепую.
   // Карточка остаётся видимой (заголовок + before), но требует ручного выбора.
   const hasHonestDiff = action.preview.after.trim().length > 0;
+  const editable = action.preview.editable;
   return {
     id: `chg-${index}`,
     number: index + 1,
@@ -36,7 +36,8 @@ function actionToChange(action: ProposedAction, index: number): AgentChange {
     after: action.preview.after,
     status: allowed ? (hasHonestDiff ? "выбрано" : "отклонено") : "требует прав",
     selected: allowed && hasHonestDiff,
-    editable: Boolean(EDITABLE_FIELD[action.tool])
+    editable: Boolean(editable),
+    ...(editable ? { edit: editable } : {})
   };
 }
 
@@ -583,11 +584,14 @@ export function AgentSurface() {
             onUpdateChange: (id, value) => {
               if (applyInFlight.current) return;
               // Правка реально попадает в action (а не только в отображение) — закрывает дыру доверия.
-              const field = EDITABLE_FIELD[actionMap[id]?.tool ?? ""];
-              if (field) {
-                setActionMap((m) => (m[id] ? { ...m, [id]: { ...m[id]!, input: { ...m[id]!.input, [field]: value } } } : m));
-                setChanges((cs) => cs.map((c) => (c.id === id ? { ...c, after: value, status: "изменено", selected: true } : c)));
-              }
+              // В input пишем СЫРОЕ значение объявленного сервером поля, а отображаемое «Стало»
+              // пересобираем как prefix + value + suffix: превью остаётся тем, что применится.
+              const edit = changes.find((change) => change.id === id)?.edit;
+              if (!edit) return;
+              setActionMap((m) => (m[id] ? { ...m, [id]: { ...m[id]!, input: { ...m[id]!.input, [edit.field]: value } } } : m));
+              setChanges((cs) => cs.map((c) => (c.id === id
+                ? { ...c, after: composeAfter(edit, value), edit: { ...edit, value }, status: "изменено", selected: true }
+                : c)));
             },
             onApply: () => void applySelected(),
             onReset: resetConversation

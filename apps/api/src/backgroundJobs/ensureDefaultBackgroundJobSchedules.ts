@@ -7,9 +7,11 @@ import type { BackgroundJobScheduleSeedDataPort } from "../apiDataPorts";
 // boundary-джобы (connector.sync, search.projection_rebuild,
 // calls.recording_compose) намеренно НЕ засеваются — их выполнение ничего не
 // делает и лишь шумит в background_job_runs.
-// notification.dispatch реализован: каждые 15 минут собирает непрочитанные
-// уведомления и шлёт email-дайджест. Интервал совпадает с окном по умолчанию в
-// хендлере (lookbackMinutes=15), чтобы окна не пересекались и не зияли.
+// notification.dispatch реализован: каждые 15 минут разбирает очередь
+// непрочитанных уведомлений и шлёт email-дайджест. Интервал больше не обязан
+// совпадать с каким-либо окном в хендлере: очередь определяется маркером
+// delivered_at, поэтому интервал влияет только на задержку письма, а не на
+// пропуски/дубликаты.
 export const defaultBackgroundJobScheduleSeeds: ReadonlyArray<{
   kind: BackgroundJobKind;
   intervalSeconds: number;
@@ -19,6 +21,10 @@ export const defaultBackgroundJobScheduleSeeds: ReadonlyArray<{
   { kind: "planning.expired_runs_purge", intervalSeconds: 86_400 },
   { kind: "notification.dispatch", intervalSeconds: 900 }
 ];
+
+// Ширина пачки параллельных вставок сида. Держим заметно ниже размера пула
+// соединений, чтобы сид не выедал пул у остального старта API.
+const SEED_INSERT_CONCURRENCY = 25;
 
 export function defaultBackgroundJobScheduleKey(kind: BackgroundJobKind): string {
   return `default:${kind}`;
@@ -53,20 +59,32 @@ export async function ensureDefaultBackgroundJobSchedules(input: {
   const now = input.now ?? new Date();
   const tenantIds =
     input.tenantIds ?? (await listTenants!.call(input.dataSource)).map((tenant) => tenant.id);
+  const rows = tenantIds.flatMap((tenantId) =>
+    defaultBackgroundJobScheduleSeeds.map((seed) => ({
+      id: `sched-${tenantId}-${seed.kind}`,
+      tenantId,
+      kind: seed.kind,
+      scheduleKey: defaultBackgroundJobScheduleKey(seed.kind),
+      payload: {},
+      intervalSeconds: seed.intervalSeconds,
+      enabled: true,
+      nextRunAt: now
+    }))
+  );
+
+  // Сид ждут перед первым poll воркера (server.ts), поэтому строго
+  // последовательные вставки упирали время старта в число тенантов
+  // (400 тенантов x 4 сида = 1600 round-trip'ов подряд). Пачки по
+  // SEED_INSERT_CONCURRENCY режут это на порядок при том же
+  // ON CONFLICT DO NOTHING и том же порядке строк в пределах пачки.
   let created = 0;
   let existing = 0;
-  for (const tenantId of tenantIds) {
-    for (const seed of defaultBackgroundJobScheduleSeeds) {
-      const inserted = await insertBackgroundJobScheduleIfMissing.call(input.dataSource, {
-        id: `sched-${tenantId}-${seed.kind}`,
-        tenantId,
-        kind: seed.kind,
-        scheduleKey: defaultBackgroundJobScheduleKey(seed.kind),
-        payload: {},
-        intervalSeconds: seed.intervalSeconds,
-        enabled: true,
-        nextRunAt: now
-      });
+  for (let offset = 0; offset < rows.length; offset += SEED_INSERT_CONCURRENCY) {
+    const chunk = rows.slice(offset, offset + SEED_INSERT_CONCURRENCY);
+    const results = await Promise.all(
+      chunk.map((row) => insertBackgroundJobScheduleIfMissing.call(input.dataSource, row))
+    );
+    for (const inserted of results) {
       if (inserted) created += 1;
       else existing += 1;
     }

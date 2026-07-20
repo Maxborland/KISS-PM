@@ -15,13 +15,14 @@ import { useAuditEvents } from "@/admin/lib/use-audit-events";
 import type { AuditEvent } from "@/admin/lib/admin-client";
 import { useUrlPeekParamCleaner } from "@/workspace/lib/url-peek";
 import { prototypeNotesEnabled } from "@/views/lib/prototype-gate";
+// Рендер отметки времени и границы дат фильтра живут в ОДНОЙ зоне (UTC) — см. audit-date.
+import {
+  auditDayInputValue,
+  auditFromDateBound,
+  auditToDateBound,
+  formatAuditTimestamp as fmt
+} from "./audit-date";
 
-// Дата+время события (ru-RU, как боевой формат журнала).
-const fmt = (iso: string): string => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(d);
-};
 
 const selCls = "h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
 const dateCls = `${selCls} [color-scheme:light] dark:[color-scheme:dark]`;
@@ -107,10 +108,11 @@ export function AdminAuditSurface() {
     : events.length === 0 ? (hasServerFilter ? "ready" : "empty")
     : "ready";
 
-  // Дата-инпуты хранят YYYY-MM-DD; на сервер уходит ISO-инстант (начало / конец дня, UTC).
-  const dayValue = (iso?: string | null): string => (iso ? iso.slice(0, 10) : "");
-  const onFromDate = (day: string) => applyFilter({ fromDate: day ? `${day}T00:00:00.000Z` : null });
-  const onToDate = (day: string) => applyFilter({ toDate: day ? `${day}T23:59:59.999Z` : null });
+  // Дата-инпуты хранят YYYY-MM-DD; на сервер уходит ISO-инстант (начало / конец дня, UTC —
+  // ровно та зона, в которой колонка «Когда» рендерит строки, см. audit-date).
+  const dayValue = auditDayInputValue;
+  const onFromDate = (day: string) => applyFilter({ fromDate: auditFromDateBound(day) });
+  const onToDate = (day: string) => applyFilter({ toDate: auditToDateBound(day) });
 
   return (
     <AdminFrame activeTab="Аудит" subtitle="Журнал управленческих действий и системных событий">

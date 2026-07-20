@@ -134,8 +134,37 @@ const HANDWIRED_TOOLS: AgentTool[] = [
   }
 ];
 
+/**
+ * Инвариант реестра: имена инструментов уникальны.
+ *
+ * Имя инструмента — это `function.name` в запросе к LLM. Два определения с одним именем в
+ * одном запросе отвергаются и Anthropic, и OpenAI/OpenRouter кодом 400, поэтому дубль ломает
+ * агента целиком у любого актора, которому доступны обе копии. Плюс `findAgentTool` разрешает
+ * имя первым совпадением — вторая копия (её binding и её, возможно, более строгий гейт) молча
+ * мертва. Обе беды не ловились фильтрами (allowedToolsForActor/offered — это filter, не dedupe),
+ * поэтому инвариант проверяется на инициализации модуля: сборка падает громко и сразу.
+ */
+export function assertUniqueToolNames(tools: AgentTool[]): AgentTool[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const tool of tools) {
+    if (seen.has(tool.name)) duplicates.add(tool.name);
+    seen.add(tool.name);
+  }
+  if (duplicates.size > 0) {
+    throw new Error(`agent_tool_name_collision: ${[...duplicates].sort().join(", ")}`);
+  }
+  return tools;
+}
+
 // Полный набор: ручные (кастомное исполнение) + доменные декларативные (generic-редиспатч).
-export const AGENT_TOOLS: AgentTool[] = [...HANDWIRED_TOOLS, ...CRM_TOOLS, ...COMMS_TOOLS, ...ADMIN_TOOLS, ...PROJECT_TOOLS];
+export const AGENT_TOOLS: AgentTool[] = assertUniqueToolNames([
+  ...HANDWIRED_TOOLS,
+  ...CRM_TOOLS,
+  ...COMMS_TOOLS,
+  ...ADMIN_TOOLS,
+  ...PROJECT_TOOLS
+]);
 
 export type AgentToolAvailability = {
   name: string;

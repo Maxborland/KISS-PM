@@ -135,9 +135,10 @@ export function getPaletteCommands({
   return { navigation, actions };
 }
 
+// Маршрутизация сущностей принадлежит ОДНОМУ слою — API (apps/api/src/search/searchRouting.ts).
+// Раньше палитра переписывала route для задач и сделок здесь, поэтому остальные
+// потребители того же поля (вложения, почтовый дайджест уведомлений — он шлёт
+// item.route дословно) получали непропатченное значение и расходились с палитрой.
 export function paletteRouteForSearchResult(result: PaletteSearchResultLocation): string {
-  const entityId = result.entityId ?? result.id.slice(result.id.indexOf(":") + 1);
-  if (result.type === "task" && entityId) return `/my-work?task=${encodeURIComponent(entityId)}`;
-  if (result.type === "opportunity" && entityId) return `/crm/deals?deal=${encodeURIComponent(entityId)}`;
   return result.route;
 }

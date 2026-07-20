@@ -41,6 +41,11 @@ export const ADMIN_TOOLS: AgentTool[] = [
   reTool({ name: "read_org_structure", title: "Оргструктура", description: "Прочитать организационную структуру (функциональную и проектную).", kind: "analyze", canX: canReadOrgStructure, method: "GET", path: () => "/api/tenant/current/org-structure" }),
 
   // ---- Статусы задач ----
-  reTool({ name: "list_task_statuses", title: "Статусы задач", description: "Список статусов задач тенанта (только чтение).", kind: "analyze", canX: canManageTaskStatuses, method: "GET", path: () => "/api/workspace/task-statuses" }),
+  // Чтения статусов здесь НЕТ сознательно: справочник читает ручной инструмент
+  // list_task_statuses из toolRegistry (гейт canReadProjects, кастомный исполнитель).
+  // Вторая декларация с тем же именем давала бы ДВА tool-определения с одинаковым
+  // function.name в одном запросе к LLM — и Anthropic, и OpenAI отвечают на это 400,
+  // то есть агент падал бы у каждого, кому выданы оба права (ревью F1).
+  // Уникальность имён теперь держит assertUniqueToolNames в toolRegistry.
   reTool({ name: "create_task_status", title: "Создать статус задачи", description: "Создать статус задачи. fields: id, name, category и др.", kind: "mutation", canX: canManageTaskStatuses, method: "POST", path: () => "/api/workspace/task-statuses", properties: fields("поля статуса задачи"), required: ["fields"], body: passFields })
 ];

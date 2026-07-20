@@ -10,13 +10,22 @@
  * иначе mock. setAgentLlmProviderOverride — инъекция в тестах.
  */
 
+import { parseReasoningEffort, resolveGenerationBudget, type ReasoningEffort } from "./generationBudget";
 import { createOpenRouterLlmProvider } from "./openRouterProvider";
 
 export type LlmToolSchema = { name: string; description: string; input_schema: Record<string, unknown> };
 
 export type LlmTextBlock = { type: "text"; text: string };
 export type LlmToolUseBlock = { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
-export type LlmContentBlock = LlmTextBlock | LlmToolUseBlock;
+/**
+ * Блоки размышления Anthropic (extended thinking). Мы их НЕ читаем и не показываем —
+ * они непрозрачны и возвращаются провайдеру как есть: при включённом thinking Anthropic
+ * требует вернуть блок размышления (вместе с его signature) неизменным в следующем ходе
+ * с tool_result, иначе отвергает запрос. Цикл агента просто прокидывает их дальше.
+ */
+export type LlmThinkingBlock = { type: "thinking"; thinking: string; signature: string };
+export type LlmRedactedThinkingBlock = { type: "redacted_thinking"; data: string };
+export type LlmContentBlock = LlmTextBlock | LlmToolUseBlock | LlmThinkingBlock | LlmRedactedThinkingBlock;
 
 export type LlmToolResultBlock = { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
 export type LlmMessage = { role: "user" | "assistant"; content: string | Array<LlmContentBlock | LlmToolResultBlock> };
@@ -33,9 +42,18 @@ const DEFAULT_MODEL = "claude-sonnet-4-6";
 const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.6"; // переопределяется KISS_PM_AGENT_MODEL
 
 // ---- боевой провайдер (Anthropic SDK) ----
-export function createAnthropicLlmProvider(opts: { apiKey: string; model?: string; maxTokens?: number }): LlmProvider {
+export function createAnthropicLlmProvider(opts: { apiKey: string; model?: string; maxTokens?: number; reasoningEffort?: ReasoningEffort }): LlmProvider {
   const model = opts.model ?? DEFAULT_MODEL;
-  const maxTokens = opts.maxTokens ?? 1024;
+  // Бюджет считает общий резолвер (ревью F4): reasoning больше не теряется на этом пути,
+  // а пол max_tokens не дублируется отдельной константой в каждом провайдере.
+  const budget = resolveGenerationBudget({
+    ...(opts.maxTokens !== undefined ? { maxTokens: opts.maxTokens } : {}),
+    ...(opts.reasoningEffort ? { reasoningEffort: opts.reasoningEffort } : {})
+  });
+  // Extended thinking Anthropic: бюджет в токенах, а не абстрактный «effort».
+  const thinking = budget.thinkingBudgetTokens
+    ? { thinking: { type: "enabled" as const, budget_tokens: budget.thinkingBudgetTokens } }
+    : {};
   // SDK импортируется лениво, чтобы окружения без ключа/без сети не платили за загрузку.
   return {
     model,
@@ -44,14 +62,19 @@ export function createAnthropicLlmProvider(opts: { apiKey: string; model?: strin
       const client = new Anthropic({ apiKey: opts.apiKey });
       const response = await client.messages.create({
         model,
-        max_tokens: maxTokens,
+        max_tokens: budget.maxTokens,
         system: input.system,
         messages: input.messages as Parameters<typeof client.messages.create>[0]["messages"],
-        tools: input.tools.map((tool) => ({ name: tool.name, description: tool.description, input_schema: tool.input_schema as { type: "object" } }))
+        tools: input.tools.map((tool) => ({ name: tool.name, description: tool.description, input_schema: tool.input_schema as { type: "object" } })),
+        ...thinking
       });
       const content = (response.content as unknown as Array<{ type: string; [k: string]: unknown }>).flatMap((block): LlmContentBlock[] => {
         if (block.type === "text") return [{ type: "text", text: String(block.text ?? "") }];
         if (block.type === "tool_use") return [{ type: "tool_use", id: String(block.id), name: String(block.name), input: (block.input as Record<string, unknown>) ?? {} }];
+        // Блоки размышления сохраняем дословно: следующий ход с tool_result обязан вернуть
+        // их вместе с signature, иначе Anthropic отвергает запрос при включённом thinking.
+        if (block.type === "thinking") return [{ type: "thinking", thinking: String(block.thinking ?? ""), signature: String(block.signature ?? "") }];
+        if (block.type === "redacted_thinking") return [{ type: "redacted_thinking", data: String(block.data ?? "") }];
         return [];
       });
       const usage = response.usage as { input_tokens?: number; output_tokens?: number } | undefined;
@@ -266,14 +289,17 @@ export function createAgentLlmProviderFromEnv(): LlmProvider {
   const maxTokensRaw = Number.parseInt(process.env.KISS_PM_AGENT_MAX_TOKENS ?? "", 10);
   const maxTokens = Number.isFinite(maxTokensRaw) && maxTokensRaw > 0 ? maxTokensRaw : undefined;
   const maxTokensOpt = maxTokens ? { maxTokens } : {};
-  const reasoningEffort = (process.env.KISS_PM_AGENT_REASONING_EFFORT ?? "").trim();
+  // Непонятное значение ручки — громкая ошибка, а не тихий дефолт (ревью F4).
+  const reasoningEffort = parseReasoningEffort(process.env.KISS_PM_AGENT_REASONING_EFFORT);
   const reasoningOpt = reasoningEffort ? { reasoningEffort } : {};
 
   if (openRouterKey && openRouterKey.length > 0 && (explicit === "openrouter" || explicit === "")) {
     return createOpenRouterLlmProvider({ apiKey: openRouterKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_OPENROUTER_MODEL, ...maxTokensOpt, ...reasoningOpt });
   }
   if (anthropicKey && (explicit === "anthropic" || explicit === "")) {
-    return createAnthropicLlmProvider({ apiKey: anthropicKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_MODEL, ...maxTokensOpt });
+    // reasoningOpt теперь доезжает и сюда: раньше ручка молча терялась на Anthropic-пути,
+    // а max_tokens оставался на дефолте 1024 — оператор получал обрезанные ответы.
+    return createAnthropicLlmProvider({ apiKey: anthropicKey, model: process.env.KISS_PM_AGENT_MODEL || DEFAULT_MODEL, ...maxTokensOpt, ...reasoningOpt });
   }
   if (testHooks && (explicit === "demo" || process.env.KISS_PM_AGENT_DEMO === "true")) return createDemoLlmProvider();
   return createMockLlmProvider();

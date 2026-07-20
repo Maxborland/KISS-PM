@@ -118,6 +118,34 @@ describe("ensureDefaultBackgroundJobSchedules", () => {
     ]);
   });
 
+  // F4(b): сид ждут перед первым poll воркера, поэтому строго последовательные
+  // вставки упирали время старта в число тенантов (400 x 4 = 1600 round-trip'ов).
+  it("F4: вставки сида идут пачками параллельно, а не строго по одной", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const dataSource: BackgroundJobScheduleSeedDataPort = {
+      async listTenants() {
+        return Array.from({ length: 10 }, (_, index) => ({
+          id: `tenant-${index}`,
+          name: `Tenant ${index}`
+        }));
+      },
+      async insertBackgroundJobScheduleIfMissing(input) {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        inFlight -= 1;
+        return toSchedule(input);
+      }
+    };
+
+    const result = await ensureDefaultBackgroundJobSchedules({ dataSource });
+
+    expect(result).toEqual({ status: "seeded", tenants: 10, created: 40, existing: 0 });
+    // Последовательный цикл дал бы ровно 1.
+    expect(maxInFlight).toBeGreaterThan(1);
+  });
+
   it("fail-soft: warns and performs zero inserts when listTenants is unavailable", async () => {
     const insertBackgroundJobScheduleIfMissing = vi.fn();
     const warn = vi.fn();

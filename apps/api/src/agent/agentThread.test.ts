@@ -354,3 +354,91 @@ describe("execute → персистентность исхода", () => {
     expect(execute.body.results).toMatchObject([{ tool: "comment_task", status: "failed" }]);
   });
 });
+
+// ── Ревью F5: HISTORY_MAX_TURNS считает реплики, а не строки треда ──
+// Константа документирована как «последние N реплик», но передавалась как лимит СТРОК в
+// listDiscussionMessages, а historyFromThreadMessages выбрасывает трейсы и error-квитанции
+// уже ПОСЛЕ отсечения. Один цикл propose+apply пишет 4 строки на 3 пригодные реплики, так что
+// модель получала ~9 реплик вместо 12 — контекст молча ужимался на четверть относительно
+// клиентского пути (parseHistory режет ровно HISTORY_MAX_TURNS реплик).
+describe("propose → окно истории треда меряется репликами", () => {
+  const HISTORY_MAX_TURNS = 12;
+
+  function captureHistoryProvider(seen: { messages: Array<{ role: string; content: unknown }> }): LlmProvider {
+    return {
+      model: "test-live",
+      createMessage(input) {
+        seen.messages = input.messages.map((message) => ({ role: message.role, content: message.content }));
+        return Promise.resolve({ stopReason: "end_turn", content: [{ type: "text", text: "Готово." }] });
+      }
+    };
+  }
+
+  it("отдаёт модели HISTORY_MAX_TURNS пригодных реплик, несмотря на трейсы и квитанции", async () => {
+    stubUnconfiguredProviderEnv();
+    const harness = createHarness();
+    // 20 циклов «цель → трейс → ответ агента → квитанция исполнения» = 80 строк,
+    // из которых пригодны только user/agent-реплики (по 3 на цикл: цель, ответ, квитанция).
+    for (let cycle = 0; cycle < 20; cycle += 1) {
+      harness.messages.push(
+        { id: `m-${cycle}-user`, conversationId: "agent-thread-user-agent", authorUserId: "user-agent", body: `цель ${cycle}`, metadata: { agent: { role: "user" } } },
+        { id: `m-${cycle}-trace`, conversationId: "agent-thread-user-agent", authorUserId: "user-agent", body: `Ход агента: шагов 3.`, metadata: { agent: { role: "trace", steps: ["a"] } } },
+        { id: `m-${cycle}-agent`, conversationId: "agent-thread-user-agent", authorUserId: "user-agent", body: `ответ ${cycle}`, metadata: { agent: { role: "agent" } } },
+        { id: `m-${cycle}-result`, conversationId: "agent-thread-user-agent", authorUserId: "user-agent", body: `Результат ${cycle}`, metadata: { agent: { role: "agent", kind: "result" } } }
+      );
+    }
+    const seen = { messages: [] as Array<{ role: string; content: unknown }> };
+    setAgentLlmProviderOverride(captureHistoryProvider(seen));
+
+    const propose = await post(harness.app, "/api/workspace/agent/propose", {
+      goal: "Новая цель",
+      threadId: "agent-thread-user-agent"
+    });
+
+    expect(propose.status).toBe(200);
+    // Последнее сообщение — текущая цель; всё до него — история из треда.
+    const history = seen.messages.slice(0, -1);
+    // Окно по-прежнему меряется РЕПЛИКАМИ (HISTORY_MAX_TURNS = 12 = 4 полных цикла), но на
+    // провод уходит меньше сообщений: agentLoop склеивает соседей одной роли, а каждый цикл
+    // даёт два assistant-хода подряд (ответ агента + квитанция исполнения). Такое чередование
+    // прямой Anthropic-путь отвергает, поэтому склейка обязательна — считаем реплики по тексту.
+    const historyText = history.map((message) => String(message.content)).join("\n");
+    const firstCycleInWindow = 20 - HISTORY_MAX_TURNS / 3; // 3 пригодные реплики на цикл
+    for (let cycle = firstCycleInWindow; cycle < 20; cycle += 1) {
+      expect(historyText).toContain(`цель ${cycle}`);
+      expect(historyText).toContain(`ответ ${cycle}`);
+      expect(historyText).toContain(`Результат ${cycle}`);
+    }
+    // Ровно 4 цикла: пятый с конца в окно уже не попадает.
+    expect(historyText).not.toContain(`цель ${firstCycleInWindow - 1}`);
+    // Роли строго чередуются — ни одной пары одинаковых подряд.
+    expect(history.every((message, index) => index === 0 || message.role !== history[index - 1]!.role)).toBe(true);
+    // Ни одного трейса: они выбрасываются, но больше НЕ съедают окно истории.
+    expect(historyText).not.toContain("Ход агента");
+    // Окно — самый свежий хвост треда, а не середина.
+    expect(String(history.at(-1)!.content)).toContain("Результат 19");
+    expect(seen.messages.at(-1)!.content).toBe("Новая цель");
+  });
+
+  it("короткая история отдаётся целиком (лимит не выдумывает реплик)", async () => {
+    stubUnconfiguredProviderEnv();
+    const harness = createHarness();
+    harness.messages.push(
+      { id: "m-1", conversationId: "agent-thread-user-agent", authorUserId: "user-agent", body: "цель 1", metadata: { agent: { role: "user" } } },
+      { id: "m-2", conversationId: "agent-thread-user-agent", authorUserId: "user-agent", body: "Ход агента: шагов 2.", metadata: { agent: { role: "trace", steps: ["a"] } } },
+      { id: "m-3", conversationId: "agent-thread-user-agent", authorUserId: "user-agent", body: "ответ 1", metadata: { agent: { role: "agent" } } },
+      // error-квитанции в контекст модели не попадают (существующий контракт).
+      { id: "m-4", conversationId: "agent-thread-user-agent", authorUserId: "user-agent", body: "сбой", metadata: { agent: { role: "agent", kind: "error" } } }
+    );
+    const seen = { messages: [] as Array<{ role: string; content: unknown }> };
+    setAgentLlmProviderOverride(captureHistoryProvider(seen));
+
+    const propose = await post(harness.app, "/api/workspace/agent/propose", {
+      goal: "Новая цель",
+      threadId: "agent-thread-user-agent"
+    });
+
+    expect(propose.status).toBe(200);
+    expect(seen.messages.slice(0, -1).map((message) => message.content)).toEqual(["цель 1", "ответ 1"]);
+  });
+});

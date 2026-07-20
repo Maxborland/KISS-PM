@@ -94,7 +94,9 @@ describe("unified search routes", () => {
       results: [
         expect.objectContaining({
           id: "task:task-target",
-          route: "/projects/project-second",
+          // Канонический маршрут задачи; раньше вели в карточку проекта, а палитра
+          // подменяла её на `/my-work?task=` — второй владелец маршрутизации.
+          route: "/tasks/task-target",
           subtitle: "Второй проект"
         })
       ]

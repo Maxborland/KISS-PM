@@ -49,6 +49,35 @@ function normalizeReasoning(reasoning: string, proposedActions: ProposedAction[]
   return "Я не сформировал применимых действий для подтверждения. Переформулируйте запрос или укажите конкретное действие, чтобы я подготовил структурированное предложение.";
 }
 
+/**
+ * Нормализация стартовой последовательности ролей (история + текущая цель).
+ *
+ * Провайдеры (прямой Anthropic-путь) отвергают диалог, где два хода одной роли идут
+ * подряд или который начинается с assistant. Такое окно собирается не только из битой
+ * истории: усечение slice(-N) легко отрезает начало на assistant-ходе, а недописанный
+ * ход (сбой персистенции уже ПОСЛЕ записи цели) оставляет висящий user-ход в треде.
+ * Склеиваем соседей одной роли и срезаем ведущие assistant-ходы, чтобы транзиентный
+ * сбой не ломал тред необратимо. Ничего не теряем: тексты соседей объединяются.
+ */
+function normalizeConversationStart(messages: LlmMessage[]): LlmMessage[] {
+  const normalized: LlmMessage[] = [];
+  for (const message of messages) {
+    // Диалог обязан начинаться с user-хода.
+    if (normalized.length === 0 && message.role !== "user") continue;
+    const previous = normalized.at(-1);
+    if (
+      previous?.role === message.role &&
+      typeof previous.content === "string" &&
+      typeof message.content === "string"
+    ) {
+      normalized[normalized.length - 1] = { role: message.role, content: `${previous.content}\n\n${message.content}` };
+      continue;
+    }
+    normalized.push(message);
+  }
+  return normalized;
+}
+
 // Гонка промиса с реальным дедлайном: если время вышло — возвращаем сентинел, не дожидаясь
 // зависшего вызова (SDK без AbortSignal не отменить, но ждать дальше не будем).
 const DEADLINE_HIT = Symbol("deadline");
@@ -103,7 +132,10 @@ export async function runAgentLoop(input: {
   // Память чата: прежние реплики треда идут перед текущей целью, чтобы агент понимал контекст
   // («теперь то же для проекта Б», «почему?»). Tool-вызовы прошлых ходов НЕ восстанавливаем —
   // только текстовые реплики, этого достаточно для преемственности.
-  const messages: LlmMessage[] = [...(input.history ?? []), { role: "user", content: input.goal + attachmentsBlock }];
+  const messages: LlmMessage[] = normalizeConversationStart([
+    ...(input.history ?? []),
+    { role: "user", content: input.goal + attachmentsBlock }
+  ]);
   const proposedActions: ProposedAction[] = [];
   const analyzeResults: AnalyzeResult[] = [];
   const reasoningParts: string[] = [];

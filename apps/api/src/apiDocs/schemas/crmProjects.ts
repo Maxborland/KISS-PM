@@ -260,6 +260,16 @@ export const crmProjectSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  // Полный новый порядок стадий воронки. Частичный список запрещён: сервер
+  // перенумеровывает стадии в 1..N одной транзакцией.
+  DealStageOrderRequest: {
+    type: "object",
+    required: ["stageIds"],
+    properties: {
+      stageIds: { type: "array", minItems: 1, items: stringIdSchema }
+    },
+    additionalProperties: false
+  },
   DealStageResponse: {
     type: "object",
     required: ["dealStage"],

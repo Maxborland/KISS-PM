@@ -217,8 +217,9 @@ async function findProjectName(
   tenantId: string,
   projectId: string
 ): Promise<string | null> {
-  const projects = await dataSource.listProjects?.(tenantId);
-  return projects?.find((project) => project.id === projectId)?.title ?? null;
+  // Дешёвый tenant-scoped точечный поиск (как в findReadableProject): listProjects
+  // тянул весь список проектов тенанта вместе с position-demand ради одного title.
+  return (await findReadableProject(dataSource, tenantId, projectId))?.title ?? null;
 }
 
 async function findActiveProject(

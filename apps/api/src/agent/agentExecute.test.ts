@@ -548,7 +548,10 @@ describe("agent apply truth contract", () => {
     )).resolves.toEqual({
       preview: {
         before: "Количество комментариев недоступно",
-        after: "Готово"
+        after: "Готово",
+        // Сервер объявляет редактируемое поле явно: редактор правит input.body, а не
+        // отрисованную сводку превью (ревью F2).
+        editable: { field: "body", label: "Текст комментария", value: "Готово", prefix: "", suffix: "" }
       },
       preconditionVersions: {},
       capability: { allowed: false, reason: "task_participant_required" }
@@ -564,7 +567,8 @@ describe("agent apply truth contract", () => {
       title: "Прокомментировать задачу: «Подготовить смету» · проект project-1, задача task-1",
       preview: {
         before: "Комментариев: 1",
-        after: "Готово"
+        after: "Готово",
+        editable: { field: "body", label: "Текст комментария", value: "Готово", prefix: "", suffix: "" }
       },
       preconditionVersions: {}
     });

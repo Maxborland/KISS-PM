@@ -446,6 +446,8 @@ export function createMockCrmFetch(): typeof fetch {
         if (!def) { def = { id: genId("pipeline"), tenantId: TENANT, name: "Основная воронка", description: null, isDefault: true, sortOrder: 1, status: "active", createdAt: nowIso(), updatedAt: nowIso() }; db.pipelines.push(def); }
         pipelineId = def.id;
       }
+      // Зеркало immediate-unique (tenant_id, pipeline_id, sort_order): занятый слот → 409, не 500.
+      if (db.dealStages.some((x) => x.pipelineId === pipelineId && x.sortOrder === parsed.sortOrder)) return err("deal_stage_sort_order_taken", 409);
       const s: DealStage = { id: genId("stage"), tenantId: TENANT, pipelineId, name: parsed.name, sortOrder: parsed.sortOrder, status: parsed.status, createdAt: nowIso(), updatedAt: nowIso() };
       db.dealStages.push(s);
       return json({ dealStage: s }, 201);
@@ -460,8 +462,35 @@ export function createMockCrmFetch(): typeof fetch {
       if (!s) return err("deal_stage_not_found", 404);
       const parsed = parseDealStageInput({ ...body, pipelineId: s.pipelineId, status: body.status ?? s.status });
       if (!parsed.ok) return err(parsed.error, 400);
+      // Зеркало immediate-unique (tenant_id, pipeline_id, sort_order). Именно поэтому
+      // переупорядочивание НЕЛЬЗЯ собрать из двух таких PATCH — только PATCH .../stage-order.
+      if (db.dealStages.some((x) => x.id !== s.id && x.pipelineId === s.pipelineId && x.sortOrder === parsed.sortOrder)) return err("deal_stage_sort_order_taken", 409);
       s.name = parsed.name; s.sortOrder = parsed.sortOrder; s.status = parsed.status; s.updatedAt = nowIso();
       return json({ dealStage: s });
+    }
+    // Конструктор CRM: атомарное переупорядочивание стадий воронки (PATCH /pipelines/:id/stage-order).
+    // Тело — ПОЛНЫЙ новый порядок { stageIds }; сервер перенумеровывает 1..N за одну операцию.
+    const stageOrderPatch = method === "PATCH" ? path.match(/^\/api\/workspace\/pipelines\/([^/]+)\/stage-order$/) : null;
+    if (stageOrderPatch) {
+      const pipelineId = decodeURIComponent(stageOrderPatch[1]!);
+      if (!ID_RE.test(pipelineId)) return err("invalid_pipeline_id", 400);
+      if (!db.pipelines.some((p) => p.id === pipelineId)) return err("pipeline_not_found", 404);
+      const raw = body.stageIds;
+      if (!Array.isArray(raw) || raw.length === 0) return err("invalid_stage_order", 400);
+      const stageIds: string[] = [];
+      for (const item of raw) {
+        if (typeof item !== "string" || !ID_RE.test(item)) return err("invalid_deal_stage_id", 400);
+        if (stageIds.includes(item)) return err("invalid_stage_order", 400);
+        stageIds.push(item);
+      }
+      const current = db.dealStages.filter((x) => x.pipelineId === pipelineId);
+      if (stageIds.length !== current.length || stageIds.some((id) => !current.some((x) => x.id === id))) return err("invalid_stage_order", 400);
+      stageIds.forEach((id, index) => {
+        const stage = db.dealStages.find((x) => x.id === id)!;
+        stage.sortOrder = index + 1;
+        stage.updatedAt = nowIso();
+      });
+      return json({ dealStages: stageIds.map((id) => db.dealStages.find((x) => x.id === id)!) });
     }
     if (method === "GET" && path === "/api/workspace/project-types") return json({ projectTypes: db.projectTypes });
     // Конструктор CRM: создание типа проекта (POST /project-types).

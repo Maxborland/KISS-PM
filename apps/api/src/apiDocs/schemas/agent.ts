@@ -148,7 +148,21 @@ export const agentSchemas = openApiSchemaFragment({
     required: ["before", "after"],
     properties: {
       before: { type: "string" },
-      after: { type: "string" }
+      after: { type: "string" },
+      editable: {
+        type: "object",
+        description:
+          "Present when exactly one input field may be hand-edited on the review card. `after` is composed as prefix + value + suffix, so the client edits `value` (written back to action.input[field]) and recomposes the display, never assigning the rendered summary to the field.",
+        required: ["field", "label", "value", "prefix", "suffix"],
+        properties: {
+          field: stringIdSchema,
+          label: { type: "string", minLength: 1 },
+          value: { type: "string" },
+          prefix: { type: "string" },
+          suffix: { type: "string" }
+        },
+        additionalProperties: false
+      }
     },
     additionalProperties: false
   },

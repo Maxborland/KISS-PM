@@ -207,7 +207,44 @@ const TEXT_MIME_RE = /^(text\/|application\/(json|ld\+json|xml|csv|x-yaml|yaml|m
 const MAYBE_TEXT_MIME_RE = /^(application\/octet-stream|$)/i;
 
 type PreviewableAction = { tool: string; input: Record<string, unknown> };
-export type AgentActionPreview = { before: string; after: string };
+
+/**
+ * Контракт ручной правки карточки сверки (ревью F2).
+ *
+ * `after` у части действий — СВОДНАЯ фраза превью («Название» · проект «X» · даты · часы …),
+ * а не значение поля. Клиент, посадив редактор на `after`, писал всю фразу в `input.title` —
+ * задача создавалась с именем-предложением, и валидация 160 символов это пропускала.
+ * Поэтому сервер сам объявляет, какое поле редактируемо и чему оно сейчас равно, а превью
+ * раскладывает на `prefix + value + suffix`, чтобы клиент честно пересобрал отображение
+ * после правки. Инвариант: `after === prefix + value + suffix`.
+ */
+export type AgentActionPreviewEditable = {
+  /** Имя поля в `action.input`, которое реально уйдёт в execute. */
+  field: string;
+  /** Подпись поля для редактора (ru). */
+  label: string;
+  /** Текущее сырое значение поля — им и засевается редактор. */
+  value: string;
+  /** Неизменяемая часть превью до значения. */
+  prefix: string;
+  /** Неизменяемая часть превью после значения. */
+  suffix: string;
+};
+export type AgentActionPreview = { before: string; after: string; editable?: AgentActionPreviewEditable };
+
+/** Сборка превью с редактируемым полем — единственный источник инварианта after = prefix+value+suffix. */
+function editablePreview(
+  before: string,
+  editable: { field: string; label: string; value: string; prefix?: string; suffix?: string }
+): AgentActionPreview {
+  const prefix = editable.prefix ?? "";
+  const suffix = editable.suffix ?? "";
+  return {
+    before,
+    after: `${prefix}${editable.value}${suffix}`,
+    editable: { field: editable.field, label: editable.label, value: editable.value, prefix, suffix }
+  };
+}
 export type AgentActionPreconditionVersions = { taskUpdatedAt?: string; planVersion?: number };
 
 export async function buildProposalActionMetadata(
@@ -232,12 +269,16 @@ export async function buildProposalActionMetadata(
       ...(canReadTaskMetadata && task
         ? { title: `Прокомментировать задачу: «${task.title}» · проект ${task.projectId}, задача ${task.id}` }
         : {}),
+      // Деградированная ветка (нет права видеть счётчик комментариев) тоже объявляет
+      // редактируемое поле: текст комментария принадлежит автору, и правка обязана
+      // оставаться доступной — но править нужно input.body, а не отрисованное превью.
       preview: canReadTaskMetadata
         ? await buildActionPreview(dataSource, actor.tenantId, action)
-        : {
-            before: "Количество комментариев недоступно",
-            after: typeof action.input.body === "string" ? action.input.body : ""
-          },
+        : editablePreview("Количество комментариев недоступно", {
+            field: "body",
+            label: "Текст комментария",
+            value: typeof action.input.body === "string" ? action.input.body : ""
+          }),
       preconditionVersions: {},
       ...(!canReadTaskMetadata
         ? { capability: { allowed: false, reason: "task_participant_required" } }
@@ -522,10 +563,16 @@ export async function buildProposalActionMetadata(
         : "входящая задача (без проекта)";
     return {
       title: `Создать задачу: «${title}»${project ? ` · проект «${project.title}»` : ""}`,
-      preview: {
-        before: "Задачи не существует",
-        after: `«${title}» · ${projectLabel} · ${plannedStart} → ${plannedFinish} · ${plannedWork} ч · приоритет: ${priority} · ${participants}${descriptionPart}`
-      },
+      // Редактируется ИМЕННО title, а не сводная фраза: раньше клиент писал всю фразу
+      // целиком в input.title (ревью F2) — она укладывалась в лимит 160 символов и задача
+      // создавалась с именем «„X“ · проект … · 8 ч · приоритет: normal · исполнитель: вы».
+      preview: editablePreview("Задачи не существует", {
+        field: "title",
+        label: "Название задачи",
+        value: title,
+        prefix: "«",
+        suffix: `» · ${projectLabel} · ${plannedStart} → ${plannedFinish} · ${plannedWork} ч · приоритет: ${priority} · ${participants}${descriptionPart}`
+      }),
       preconditionVersions: {}
     };
   }
@@ -585,16 +632,19 @@ export async function buildActionPreview(
       ? await dataSource.listTaskActivities?.(tenantId, taskId)
       : undefined;
     const comments = activities?.filter((activity) => activity.type === "comment").length;
-    return {
-      before: comments === undefined ? "Количество комментариев недоступно" : `Комментариев: ${comments}`,
-      after: typeof input.body === "string" ? input.body : ""
-    };
+    // Тело комментария — само по себе значение поля: prefix/suffix пусты, но поле
+    // объявлено явно, чтобы редактор писал в input.body, а не угадывал его по превью.
+    return editablePreview(
+      comments === undefined ? "Количество комментариев недоступно" : `Комментариев: ${comments}`,
+      { field: "body", label: "Текст комментария", value: typeof input.body === "string" ? input.body : "" }
+    );
   }
   if (action.tool === "create_task") {
-    return {
-      before: "Задача отсутствует",
-      after: typeof input.title === "string" ? input.title : ""
-    };
+    return editablePreview("Задача отсутствует", {
+      field: "title",
+      label: "Название задачи",
+      value: typeof input.title === "string" ? input.title : ""
+    });
   }
   if (action.tool === "apply_plan_commands" || action.tool === "apply_resource_resolution") {
     const projectId = typeof input.projectId === "string" ? input.projectId : "";
@@ -776,6 +826,18 @@ function agentSourceEntity(input: Record<string, unknown>): { type: string; id: 
 }
 
 const HISTORY_MAX_TURNS = 12; // память чата: последние N реплик (защита от раздувания контекста)
+
+/**
+ * Во сколько раз больше СТРОК треда читать, чтобы набрать HISTORY_MAX_TURNS пригодных реплик
+ * (ревью F5).
+ *
+ * Строка треда ≠ реплика для модели: один цикл propose+apply пишет 4 строки (цель, трейс,
+ * ответ агента, квитанция исполнения), а historyFromThreadMessages выбрасывает трейсы и
+ * error-квитанции. Раньше HISTORY_MAX_TURNS передавался как лимит СТРОК, и фильтрация шла
+ * ПОСЛЕ отсечения — модель получала ~9 реплик вместо 12 (контекст молча ужимался на четверть
+ * относительно клиентского пути). Читаем с запасом и режем уже пригодные реплики.
+ */
+const HISTORY_ROW_FETCH_MULTIPLIER = 4;
 type AgentProviderStatus = { model: string; live: boolean; configured: boolean };
 
 function agentProviderStatus(provider: { model: string }): AgentProviderStatus {
@@ -1027,9 +1089,11 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const threadMessages = await deps.dataSource.listDiscussionMessages({
         tenantId: actor.tenantId,
         conversationId: request.threadId,
-        limit: HISTORY_MAX_TURNS
+        // Лимит СТРОК с запасом: трейсы и error-квитанции отфильтруются, поэтому пригодных
+        // реплик из этого окна выйдет меньше — режем их после фильтра, а не до (ревью F5).
+        limit: HISTORY_MAX_TURNS * HISTORY_ROW_FETCH_MULTIPLIER
       });
-      history = historyFromThreadMessages(threadMessages);
+      history = historyFromThreadMessages(threadMessages).slice(-HISTORY_MAX_TURNS);
     }
     const allowed = allowedToolsForActor(actor, profile);
     // LLM получает read-only binding-и и только mutation с честным preview + реальным execute.
@@ -1075,7 +1139,15 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
   // (messageIds в ответе нет), fake persistence с клиента запрещена.
   type ProposePersistOutcome =
     | { kind: "provider_unavailable"; providerModel: string }
+    // Апстрим агента упал (сеть/таймаут/5xx/квота). Ход тоже персистится: иначе
+    // транзиентный сбой ТЕРЯЛ набранную пользователем цель при reload, тогда как всего лишь
+    // ненастроенный провайдер её сохранял (ревью F3). Текст квитанции — стабильный,
+    // без сырого тела апстрима.
+    | { kind: "upstream_failed" }
     | { kind: "success"; result: Awaited<ReturnType<typeof runProposeLoop>>; traceSteps?: string[] };
+  // Идемпотентность записи цели в пределах одного запроса (ключ — объект ProposeRequest,
+  // он создаётся заново на каждый HTTP-вход, так что между запросами ничего не течёт).
+  const persistedGoalByRequest = new WeakMap<ProposeRequest, string>();
   async function persistProposeTurns(
     request: ProposeRequest,
     outcome: ProposePersistOutcome
@@ -1091,10 +1163,21 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
     };
     const messageIds: string[] = [];
     let traceMessageId: string | undefined;
-    messageIds.push(await persistTurn(request.goal, { role: "user" }, request.attachmentIds));
+    // Цель пишется РОВНО один раз на запрос: повторный вход в персистенцию (частичный
+    // сбой записи, любой будущий retry) переиспользует уже записанный user-ход, а не
+    // дублирует реплику пользователя в треде.
+    const goalMessageId = persistedGoalByRequest.get(request)
+      ?? await persistTurn(request.goal, { role: "user" }, request.attachmentIds);
+    persistedGoalByRequest.set(request, goalMessageId);
+    messageIds.push(goalMessageId);
     if (outcome.kind === "provider_unavailable") {
       messageIds.push(await persistTurn(
         `LLM-провайдер не настроен (провайдер ${outcome.providerModel}) — задайте OPENROUTER_API_KEY или ANTHROPIC_API_KEY на сервере.`,
+        { role: "agent", kind: "error" }
+      ));
+    } else if (outcome.kind === "upstream_failed") {
+      messageIds.push(await persistTurn(
+        "Не удалось получить ответ от LLM — попробуйте повторить запрос. Детали сбоя записаны в серверный лог.",
         { role: "agent", kind: "error" }
       ));
     } else {
@@ -1115,6 +1198,48 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       messageIds.push(await persistTurn(bodyText, { role: "agent", proposal: proposalSnapshot(result) }));
     }
     return { threadId: conversation.id, messageIds, ...(traceMessageId ? { traceMessageId } : {}) };
+  }
+
+  /**
+   * Общий хвост обоих провальных путей propose (JSON и SSE): деталь сбоя — только в
+   * серверный лог, в тред — стабильная квитанция, наружу — стабильный код (ревью F3).
+   * Сама персистенция не должна маскировать исходный сбой: её ошибку логируем и
+   * возвращаем null (ответ клиенту всё равно уйдёт как 502/error-эвент).
+   */
+  /**
+   * Персистенция УСПЕШНОГО хода. Её сбой означает «не смогли записать результат», а НЕ
+   * «LLM не ответил», и наружу как сбой LLM не всплывает.
+   *
+   * Раньше исключение отсюда ловил общий catch роута и повторно звал persistProposeTurns
+   * уже как upstream_failed: цель писалась второй раз, а реальный ответ модели подменялся
+   * квитанцией «Не удалось получить ответ от LLM» — пользователь видел своё сообщение
+   * дважды, а полученный ответ терялся. Теперь ответ уходит клиенту как есть, с честным
+   * признаком persistFailed (id-шников для дедупликации в этом случае просто нет).
+   */
+  async function persistProposeSuccess(
+    request: ProposeRequest,
+    result: Awaited<ReturnType<typeof runProposeLoop>>,
+    traceSteps: string[]
+  ): Promise<{ threadId: string; messageIds: string[]; traceMessageId?: string } | { persistFailed: true } | null> {
+    try {
+      return await persistProposeTurns(request, { kind: "success", result, traceSteps });
+    } catch (error) {
+      console.error("agent_propose_success_persist_failed", error);
+      return { persistFailed: true };
+    }
+  }
+
+  async function persistProposeFailure(
+    request: ProposeRequest,
+    error: unknown
+  ): Promise<{ threadId: string; messageIds: string[] } | null> {
+    console.error("agent_propose_upstream_failed", error);
+    try {
+      return await persistProposeTurns(request, { kind: "upstream_failed" });
+    } catch (persistError) {
+      console.error("agent_propose_failure_persist_failed", persistError);
+      return null;
+    }
   }
 
   // Серверная сборка меток трейса — тем же форматом, что live-лейблы клиента:
@@ -1157,13 +1282,15 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
       const result = await runProposeLoop(parsed.value, runtime.provider, (event) => {
         traceSteps.push(traceLabelFromEvent(event));
       });
-      const persisted = await persistProposeTurns(parsed.value, { kind: "success", result, traceSteps });
+      const persisted = await persistProposeSuccess(parsed.value, result, traceSteps);
       return context.json({ ...result, ...(persisted ?? {}) });
     } catch (error) {
-      // Сбой LLM/аплинка (сеть, таймаут, 5xx апстрима) — честный 502 Bad Gateway с
-      // кодом, а не generic 500: клиент отличает «апстрим агента упал» от внутренней
-      // ошибки. SSE-вариант эмитит такой же error-эвент — симметрия контракта.
-      return context.json({ error: error instanceof Error ? error.message : "agent_failed" }, 502);
+      // Сбой LLM/аплинка (сеть, таймаут, 5xx апстрима) — честный 502 Bad Gateway со
+      // СТАБИЛЬНЫМ кодом, а не generic 500 и не сырой текст апстрима: error.message
+      // собирается из 300 байт ответа OpenRouter и утёк бы в браузер вместе с
+      // идентификацией провайдера, статусом квоты и состоянием ключа (ревью F3).
+      const persisted = await persistProposeFailure(parsed.value, error);
+      return context.json({ error: "agent_upstream_failed", ...(persisted ?? {}) }, 502);
     } finally {
       slot.release();
     }
@@ -1189,10 +1316,12 @@ export function registerAgentRoutes(app: ApiApp, deps: ApiRouteDeps) {
           traceSteps.push(traceLabelFromEvent(event));
           await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
         });
-        const persisted = await persistProposeTurns(parsed.value, { kind: "success", result, traceSteps });
+        const persisted = await persistProposeSuccess(parsed.value, result, traceSteps);
         await stream.writeSSE({ event: "done", data: JSON.stringify({ ...result, ...(persisted ?? {}) }) });
       } catch (error) {
-        await stream.writeSSE({ event: "error", data: JSON.stringify({ error: error instanceof Error ? error.message : "agent_failed" }) });
+        // Симметрия с JSON-вариантом: ход переживает reload, наружу — стабильный код.
+        const persisted = await persistProposeFailure(parsed.value, error);
+        await stream.writeSSE({ event: "error", data: JSON.stringify({ error: "agent_upstream_failed", ...(persisted ?? {}) }) });
       } finally {
         slot.release();
       }

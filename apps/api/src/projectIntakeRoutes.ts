@@ -274,23 +274,34 @@ export function registerProjectIntakeRoutes(
     if (!auth.ok) return auth.response;
     const { actor, dataSource } = auth.value;
 
-    // Блок 5: фильтр статуса. Значения — active (по умолчанию) | closed | paused | all.
-    // Неизвестное/отсутствующее значение → active (обратная совместимость: раньше
-    // ручка отдавала только активные проекты).
+    // Блок 5: фильтр статуса. Значения — draft | active | paused | closed | all.
+    // ОТСУТСТВУЮЩИЙ параметр → active (обратная совместимость: раньше ручка отдавала
+    // только активные проекты). НЕВАЛИДНОЕ значение → 400: молчаливое приведение к
+    // active скрывало опечатки (`?status=Active`) и выдавало не тот список.
     const statusFilter = parseProjectStatusFilter(context.req.query("status"));
+    if (!statusFilter.ok) return context.json({ error: statusFilter.error }, 400);
     const all = await dataSource.listProjects(actor.tenantId);
     const projects =
-      statusFilter === "all"
+      statusFilter.value === "all"
         ? all
-        : all.filter((project) => project.status === statusFilter);
+        : all.filter((project) => project.status === statusFilter.value);
 
     return context.json({ projects });
   });
 }
 
-type ProjectStatusFilter = "active" | "closed" | "paused" | "all";
+// `cancelled` намеренно НЕ включён: в union ProjectStatus он есть, но ни один
+// код-путь его не пишет — фильтр по нему был бы fake affordance.
+const PROJECT_STATUS_FILTERS = ["draft", "active", "paused", "closed", "all"] as const;
 
-function parseProjectStatusFilter(value: string | undefined): ProjectStatusFilter {
-  if (value === "closed" || value === "paused" || value === "all") return value;
-  return "active";
+type ProjectStatusFilter = (typeof PROJECT_STATUS_FILTERS)[number];
+
+function parseProjectStatusFilter(
+  value: string | undefined
+): { ok: true; value: ProjectStatusFilter } | { ok: false; error: string } {
+  if (value === undefined) return { ok: true, value: "active" };
+  if ((PROJECT_STATUS_FILTERS as readonly string[]).includes(value)) {
+    return { ok: true, value: value as ProjectStatusFilter };
+  }
+  return { ok: false, error: "invalid_project_status_filter" };
 }
