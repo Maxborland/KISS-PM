@@ -72,6 +72,27 @@ describe("openRouterProvider translation", () => {
     expect(body.reasoning).toEqual({ effort: "medium" });
   });
 
+  it("createOpenRouterLlmProvider: reasoningEffort поднимает max_tokens выше reasoning-бюджета", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "ок" } }] }), { status: 200 })
+    );
+    // Дефолтный max_tokens=1024 сломал бы Anthropic-reasoning (budget>=1024, нужен max>budget).
+    const provider = createOpenRouterLlmProvider({ apiKey: "key", model: "anthropic/claude-sonnet-4.6", reasoningEffort: "medium", fetchImpl: fetchImpl as unknown as typeof fetch });
+    await provider.createMessage({ system: "s", messages: [{ role: "user", content: "hi" }], tools: [] });
+    const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.max_tokens).toBeGreaterThanOrEqual(8192);
+  });
+
+  it("createOpenRouterLlmProvider: явный больший max_tokens сохраняется при reasoning", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "ок" } }] }), { status: 200 })
+    );
+    const provider = createOpenRouterLlmProvider({ apiKey: "key", model: "m", reasoningEffort: "high", maxTokens: 32_000, fetchImpl: fetchImpl as unknown as typeof fetch });
+    await provider.createMessage({ system: "s", messages: [], tools: [] });
+    const body = JSON.parse((fetchImpl.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.max_tokens).toBe(32_000);
+  });
+
   it("createOpenRouterLlmProvider: без reasoningEffort ключ reasoning отсутствует", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ choices: [{ finish_reason: "stop", message: { content: "ок" } }] }), { status: 200 })
