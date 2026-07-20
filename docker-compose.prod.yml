@@ -168,6 +168,66 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # ── Media plane (self-hosted A/V: LiveKit + egress + coturn) ────────────────
+  # OPT-IN: only started with the `media` profile —
+  #   docker compose -f docker-compose.prod.yml --profile media up -d
+  # Enables real video calls (KISS_PM_VIDEO_PROVIDER=livekit) and per-track
+  # recording. Configs live in infra/ and are mounted read-only. For a REAL deploy
+  # you MUST edit infra/livekit/livekit.yaml (rotate keys:, set use_external_ip:
+  # true, remove node_ip), edit infra/coturn/turnserver.conf (realm/secret/certs),
+  # and open the RTC-UDP + TURN ports in the host firewall.
+  # See docs/runbooks/self-hosted-deployment.md and the video block of
+  # .env.prod.example. Recording COMPOSITING (склейка треков) is out of scope here.
+  livekit:
+    image: livekit/livekit-server:v1.8.4
+    profiles: ["media"]
+    command: ["--config", "/etc/livekit/livekit.yaml"]
+    volumes:
+      - ./infra/livekit/livekit.yaml:/etc/livekit/livekit.yaml:ro
+    ports:
+      - "7880:7880" # signaling + twirp API + health (proxy via Caddy in prod)
+      - "7881:7881" # ICE/TCP fallback
+      - "50000-50019:50000-50019/udp" # RTC media — widen this range under real load
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  egress:
+    image: livekit/egress:v1.8.4
+    profiles: ["media"]
+    # Per-track server recording to S3-compatible storage. Only useful when
+    # KISS_PM_STORAGE_PROVIDER=s3 and KISS_PM_VIDEO_EGRESS_ENABLED=true.
+    # infra/egress/egress.yaml substitutes ${KISS_PM_LIVEKIT_*} + ${KISS_PM_STORAGE_S3_*}.
+    env_file:
+      - .env
+    environment:
+      EGRESS_CONFIG_FILE: /etc/egress/egress.yaml
+      # egress.yaml uses the un-prefixed names; mirror the API's _VIDEO_ values.
+      KISS_PM_LIVEKIT_API_KEY: ${KISS_PM_VIDEO_LIVEKIT_API_KEY:-}
+      KISS_PM_LIVEKIT_API_SECRET: ${KISS_PM_VIDEO_LIVEKIT_API_SECRET:-}
+    volumes:
+      - ./infra/egress/egress.yaml:/etc/egress/egress.yaml:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:4.6
+    profiles: ["media"]
+    # TURN/STUN relay for clients behind symmetric NAT (~10-15% of networks).
+    # Host networking: coturn must see real client IPs and own its relay UDP range.
+    # Edit infra/coturn/turnserver.conf (realm, static-auth-secret = the API's
+    # KISS_PM_TURN_SHARED_SECRET, TLS certs) before enabling in production.
+    network_mode: host
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    volumes:
+      - ./infra/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    restart: unless-stopped
+
 volumes:
   kiss_pm_prod_postgres_data:
   kiss_pm_prod_storage:

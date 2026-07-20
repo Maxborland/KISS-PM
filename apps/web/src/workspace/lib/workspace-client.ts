@@ -91,13 +91,51 @@ export type TaskActivityRecord = {
   updatedAt: string;
 };
 
+/* ---- Вложения задачи (сериализованное зеркало attachmentSerialization.serializeAttachment) ----
+   Ответ GET /api/workspace/attachments и POST …/files / DELETE …/:id несёт эту форму под
+   ключом attachment(s); в карточке задачи те же записи приходят в TaskDetailResponse.attachmentItems
+   (сервер собирает их listAttachmentActivityItems по entityType="task", entityId=taskId). */
+export type TaskAttachmentFileAsset = {
+  id: string;
+  originalName: string;
+  safeDisplayName: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksumSha256: string;
+  status: string;
+  createdAt: string;
+};
+export type TaskAttachmentExternalReference = {
+  id: string;
+  connectorType: string;
+  externalId: string | null;
+  url: string;
+  title: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+export type TaskAttachment = {
+  id: string;
+  entityType: string;
+  entityId: string;
+  relationType: string;
+  kind: "file" | "external_reference";
+  fileAsset: TaskAttachmentFileAsset | null;
+  externalReference: TaskAttachmentExternalReference | null;
+  sourceActivityType: string | null;
+  sourceActivityId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  archivedAt: string | null;
+};
+
 export type TaskDetailResponse = {
   task: TaskRecord;
   projectId: string;
   // Fail-soft: null, если проект недоступен (карточка задачи остаётся читаемой).
   projectName: string | null;
   activities: TaskActivityRecord[];
-  attachmentItems: unknown[];
+  attachmentItems: TaskAttachment[];
 };
 
 export type UpdateTaskInput = {
@@ -166,6 +204,10 @@ export type UpdateProjectInput = {
 
 export function createWorkspaceClient(options: WorkspaceApiClientOptions) {
   const requestJson = createRequestJson(options);
+  // Прямой транспорт нужен для вложений: multipart-загрузка (без content-type json) и
+  // бинарное скачивание (blob) не проходят через requestJson — как в agent-client.
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const credentials = options.credentials ?? "include";
 
   const enc = encodeURIComponent;
   return {
@@ -215,6 +257,64 @@ export function createWorkspaceClient(options: WorkspaceApiClientOptions) {
         body: JSON.stringify({ body })
       });
     },
+    // Вложения задачи (GET /api/workspace/attachments?entityType=task&entityId=…). Сервер связывает
+    // вложение с задачей по (entityType="task", entityId=taskId) — тот же контракт, что в attachmentRoutes.
+    listTaskAttachments(taskId: string) {
+      return requestJson<{ attachments: TaskAttachment[] }>(
+        `/api/workspace/attachments?entityType=task&entityId=${enc(taskId)}`
+      );
+    },
+    // Загрузка файла (POST /api/workspace/attachments/files, multipart). content-type НЕ ставим —
+    // браузер выставит multipart-boundary сам. relationType по умолчанию "attachment" (сервер).
+    async uploadTaskAttachment(taskId: string, file: File): Promise<{ attachment: TaskAttachment }> {
+      const form = new FormData();
+      form.append("entityType", "task");
+      form.append("entityId", taskId);
+      form.append("file", file);
+      const response = await fetchImpl(`${options.apiOrigin}/api/workspace/attachments/files`, {
+        method: "POST",
+        credentials,
+        headers: { "x-kiss-pm-action": "same-origin" },
+        body: form
+      });
+      const raw = await response.text();
+      let parsed: Record<string, unknown> = {};
+      try {
+        const value: unknown = JSON.parse(raw);
+        if (value && typeof value === "object") parsed = value as Record<string, unknown>;
+      } catch { /* keep */ }
+      if (!response.ok) {
+        throw new DomainApiError(response.status, typeof parsed.error === "string" ? parsed.error : "upload_failed", parsed);
+      }
+      return { attachment: parsed.attachment as TaskAttachment };
+    },
+    // Скачивание файла (GET /api/workspace/attachments/:id/download → бинарь). Возвращаем blob и
+    // имя из Content-Disposition — вызывающий слой сам инициирует браузерную загрузку.
+    async downloadTaskAttachment(attachmentId: string): Promise<{ blob: Blob; filename: string | null }> {
+      const response = await fetchImpl(`${options.apiOrigin}/api/workspace/attachments/${enc(attachmentId)}/download`, {
+        method: "GET",
+        credentials,
+        headers: { "x-kiss-pm-action": "same-origin" }
+      });
+      if (!response.ok) {
+        let code = "download_failed";
+        try {
+          const value: unknown = JSON.parse(await response.text());
+          if (value && typeof value === "object" && typeof (value as Record<string, unknown>).error === "string") {
+            code = (value as Record<string, unknown>).error as string;
+          }
+        } catch { /* keep */ }
+        throw new DomainApiError(response.status, code, {});
+      }
+      const blob = await response.blob();
+      return { blob, filename: parseContentDispositionFilename(response.headers.get("content-disposition")) };
+    },
+    // Удаление вложения (DELETE /api/workspace/attachments/:id → архив, {attachment}).
+    deleteTaskAttachment(attachmentId: string) {
+      return requestJson<{ attachment: TaskAttachment }>(`/api/workspace/attachments/${enc(attachmentId)}`, {
+        method: "DELETE"
+      });
+    },
     // Смена статуса задачи (PATCH /api/workspace/projects/:projectId/tasks/:taskId/status, тело {statusId}).
     updateTaskStatus(projectId: string, taskId: string, statusId: string) {
       return requestJson<{ task: TaskRecord }>(`/api/workspace/projects/${enc(projectId)}/tasks/${enc(taskId)}/status`, { method: "PATCH", body: JSON.stringify({ statusId }) });
@@ -247,3 +347,10 @@ export function createWorkspaceClient(options: WorkspaceApiClientOptions) {
 }
 
 export type WorkspaceClient = ReturnType<typeof createWorkspaceClient>;
+
+// Имя файла из заголовка Content-Disposition (attachment; filename="…"); null, если заголовка нет.
+function parseContentDispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  const match = /filename="?([^"]+?)"?(?:;|$)/i.exec(header);
+  return match ? match[1] ?? null : null;
+}

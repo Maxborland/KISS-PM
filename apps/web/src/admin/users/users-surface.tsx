@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, KeyRound, Pencil, Plus, UserCheck, UserMinus } from "lucide-react";
+import { Copy, KeyRound, MailPlus, Pencil, Plus, UserCheck, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ const labelCls = "flex flex-col gap-1 text-[length:var(--text-xs)] font-medium t
 export function AdminUsersSurface() {
   const { live } = useAdminRuntime();
   const admin = useAdmin("users");
-  const { data, status, error, reload, createUser, updateUser, deactivateUser, issueUserResetToken } = admin;
+  const { data, status, error, reload, createUser, inviteUser, updateUser, deactivateUser, issueUserResetToken } = admin;
   const [busy, setBusy] = useState(false);
   const sessionUser = useSessionUser();
 
@@ -74,7 +74,12 @@ export function AdminUsersSurface() {
     <AdminFrame
       activeTab="Пользователи"
       subtitle="Пользователи рабочей области"
-      actions={data ? <CreateUserDialog roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} create={createUser} disabledReason={createDisabledReason} /> : undefined}
+      actions={data ? (
+        <div className="flex items-center gap-2">
+          <InviteUserDialog roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} invite={inviteUser} disabledReason={createDisabledReason} />
+          <CreateUserDialog roles={data.roles} positions={data.positions} busy={busy} setBusy={setBusy} create={createUser} disabledReason={createDisabledReason} />
+        </div>
+      ) : undefined}
     >
       {!live ? (
         <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
@@ -189,6 +194,103 @@ export function IssueResetTokenAction({ user, busy, setBusy, issue, disabledReas
           </DialogHeader>
           <div data-testid="reset-token-value" className="v4-mono break-all rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--text-strong)]">
             {issued?.resetToken}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => void copy()}><Copy className="size-3.5" aria-hidden />Скопировать</Button>
+            <DialogClose asChild><Button variant="default">Готово</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// Приглашение сотрудника по email БЕЗ пароля (POST /api/workspace/invitations).
+// Сотрудник задаёт пароль сам по ссылке /invite/accept. ЧЕСТНАЯ ДЕГРАДАЦИЯ:
+// если канал почты не настроен (delivery:"none"), сервер возвращает
+// invitationToken — показываем его один раз для ручной передачи (как reset-token).
+export function InviteUserDialog({ roles, positions, busy, setBusy, invite, disabledReason }: {
+  roles: AccessProfile[]; positions: Position[];
+  busy: boolean; setBusy: (v: boolean) => void;
+  invite: ReturnType<typeof useAdmin>["inviteUser"];
+  disabledReason?: string | undefined;
+}) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [accessProfileId, setAccessProfileId] = useState(roles[0]?.id ?? "");
+  const [positionId, setPositionId] = useState("");
+  // Токен приглашения из ответа delivery:"none" — показывается один раз.
+  const [issued, setIssued] = useState<{ token: string; expiresAt?: string } | null>(null);
+
+  const valid = email.trim().length > 0 && name.trim().length > 0 && accessProfileId.length > 0;
+
+  const copy = async () => {
+    if (!issued) return;
+    try {
+      await navigator.clipboard.writeText(issued.token);
+      toast.success("Токен приглашения скопирован в буфер обмена");
+    } catch {
+      toast.error("Не удалось скопировать — выделите токен и скопируйте вручную");
+    }
+  };
+
+  return (
+    <>
+      <FormDialog
+        title="Пригласить сотрудника"
+        trigger={<Button variant="ghost" size="sm" disabled={busy || Boolean(disabledReason)} title={disabledReason ?? "Пригласить по email"}><MailPlus className="size-3.5" aria-hidden />Пригласить</Button>}
+        submitLabel={<><MailPlus className="size-3.5" aria-hidden />Отправить приглашение</>}
+        submitDisabled={!valid || busy || Boolean(disabledReason)}
+        contentClassName="max-w-[480px]"
+        onSubmit={async () => {
+          if (disabledReason) return disabledReason;
+          if (!valid) return null;
+          setBusy(true);
+          // Пароль НЕ передаём — сотрудник задаёт его сам по ссылке из письма.
+          const res = await invite({ email: email.trim(), name: name.trim(), accessProfileId, positionId: positionId || null });
+          setBusy(false);
+          if (!res.ok) return adminErr(res.code, res.message);
+          if (res.data.delivery === "email") {
+            toast.success(`Приглашение отправлено на ${email.trim()}`);
+          } else if (res.data.invitationToken) {
+            // Письмо не уйдёт — показываем токен для ручной передачи.
+            setIssued({ token: res.data.invitationToken, ...(res.data.expiresAt ? { expiresAt: res.data.expiresAt } : {}) });
+          }
+          return null;
+        }}
+        onSuccess={() => { setEmail(""); setName(""); setPositionId(""); }}
+      >
+        <div className="flex flex-col gap-3">
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--panel-subtle)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
+            Сотрудник получит письмо со ссылкой и задаст пароль сам. Пароль здесь не нужен.
+          </div>
+          <label className={labelCls}>Email<Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@kiss-pm.dev" /></label>
+          <label className={labelCls}>Имя<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя Фамилия" /></label>
+          <label className={labelCls}>Роль доступа
+            <select value={accessProfileId} onChange={(e) => setAccessProfileId(e.target.value)} className={selCls} disabled={roles.length === 0}>
+              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </label>
+          <label className={labelCls}>Позиция
+            <select value={positionId} onChange={(e) => setPositionId(e.target.value)} className={selCls} disabled={positions.length === 0}>
+              <option value="">— без позиции —</option>
+              {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+        </div>
+      </FormDialog>
+      <Dialog open={issued !== null} onOpenChange={(open) => { if (!open) setIssued(null); }}>
+        <DialogContent className="max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Токен приглашения</DialogTitle>
+            <DialogDescription>
+              Почтовый канал не настроен — письмо не отправлено. Передайте токен сотруднику по безопасному каналу:
+              он вводит его на странице /invite/accept и задаёт пароль.
+              {issued?.expiresAt ? ` Действует до ${new Date(issued.expiresAt).toLocaleString("ru-RU")}.` : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div data-testid="invitation-token-value" className="v4-mono break-all rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-2 text-[length:var(--text-sm)] text-[var(--text-strong)]">
+            {issued?.token}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => void copy()}><Copy className="size-3.5" aria-hidden />Скопировать</Button>

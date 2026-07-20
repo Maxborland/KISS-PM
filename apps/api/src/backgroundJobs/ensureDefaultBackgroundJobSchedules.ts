@@ -4,16 +4,20 @@ import type { BackgroundJobScheduleSeedDataPort } from "../apiDataPorts";
 
 // Дефолтные maintenance-расписания, которые воркер фоновых джоб засевает при
 // старте. Только джобы с реальными хендлерами (см. jobHandlers.ts): no-op
-// boundary-джобы (notification.dispatch, connector.sync,
-// search.projection_rebuild, calls.recording_compose) намеренно НЕ засеваются —
-// их выполнение ничего не делает и лишь шумит в background_job_runs.
+// boundary-джобы (connector.sync, search.projection_rebuild,
+// calls.recording_compose) намеренно НЕ засеваются — их выполнение ничего не
+// делает и лишь шумит в background_job_runs.
+// notification.dispatch реализован: каждые 15 минут собирает непрочитанные
+// уведомления и шлёт email-дайджест. Интервал совпадает с окном по умолчанию в
+// хендлере (lookbackMinutes=15), чтобы окна не пересекались и не зияли.
 export const defaultBackgroundJobScheduleSeeds: ReadonlyArray<{
   kind: BackgroundJobKind;
   intervalSeconds: number;
 }> = [
   { kind: "storage.asset_cleanup", intervalSeconds: 86_400 },
   { kind: "calls.recording_janitor", intervalSeconds: 3_600 },
-  { kind: "planning.expired_runs_purge", intervalSeconds: 86_400 }
+  { kind: "planning.expired_runs_purge", intervalSeconds: 86_400 },
+  { kind: "notification.dispatch", intervalSeconds: 900 }
 ];
 
 export function defaultBackgroundJobScheduleKey(kind: BackgroundJobKind): string {

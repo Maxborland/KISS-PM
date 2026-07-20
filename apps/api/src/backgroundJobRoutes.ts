@@ -28,7 +28,6 @@ type BackgroundJobRouteDeps = Pick<
 // вместо фиктивного успеха и вечно висящей queued-строки. Дефолтный сид
 // расписаний (ensureDefaultBackgroundJobSchedules) эти kinds не засевает.
 export const NOT_IMPLEMENTED_BACKGROUND_JOB_KINDS: ReadonlySet<BackgroundJobKind> = new Set([
-  "notification.dispatch",
   "connector.sync",
   "search.projection_rebuild",
   "calls.recording_compose"

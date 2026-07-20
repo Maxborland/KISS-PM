@@ -126,19 +126,96 @@ const planningExpiredRunsPurge: BackgroundJobHandler = async (job, context) => {
   };
 };
 
+// Окно дайджеста по умолчанию: письмо собирает непрочитанные уведомления,
+// созданные за последние N минут. Оно должно совпадать с интервалом расписания
+// dispatch (ensureDefaultBackgroundJobSchedules) — иначе окна пересекаются
+// (дубликаты письма) или зияют (пропуск). Оператор может переопределить в payload
+// (lookbackMinutes). Точное однократное вручение без окна потребует колонки
+// delivered_at в user_notifications — вынесено как follow-up (за рамками блока).
+const NOTIFICATION_DISPATCH_LOOKBACK_MINUTES = 15;
+// Максимум уведомлений на одного получателя за прогон (защита от гигантских писем).
+const NOTIFICATION_DISPATCH_USER_LIMIT = 50;
+
+// Оффлайн-доставка: собирает непрочитанные уведомления пользователей тенанта за
+// окно lookbackMinutes и шлёт письмо-дайджест через emailProvider тем, кто включил
+// канал email или digest (freq != none) для соответствующего типа уведомления.
+// In-app остаётся источником истины; email — дополнительный канал вручения.
+const notificationDispatch: BackgroundJobHandler = async (job, context) => {
+  const { dataSource, emailProvider } = context;
+  if (
+    !emailProvider ||
+    !dataSource.listWorkspaceUsers ||
+    !dataSource.listUserNotifications ||
+    !dataSource.listNotificationPreferences
+  ) {
+    throw new Error("notification_dispatch_not_configured");
+  }
+  const lookbackMinutes = readPositiveInteger(
+    job.payload.lookbackMinutes,
+    NOTIFICATION_DISPATCH_LOOKBACK_MINUTES
+  );
+  const createdAfter = new Date(context.now.getTime() - lookbackMinutes * 60_000);
+  const users = await dataSource.listWorkspaceUsers(job.tenantId);
+  let emailedUsers = 0;
+  let deliveredNotifications = 0;
+  for (const user of users) {
+    if (user.status !== "active" || !user.email) continue;
+    const preferences = await dataSource.listNotificationPreferences(job.tenantId, user.id);
+    // Типы, для которых пользователь включил доставку по email или дайджесту.
+    const emailTypes = new Set<string>();
+    for (const preference of preferences) {
+      if (!preference.enabled) continue;
+      if (preference.channel === "email") emailTypes.add(preference.notificationType);
+      else if (preference.channel === "digest" && preference.digestFrequency !== "none") {
+        emailTypes.add(preference.notificationType);
+      }
+    }
+    if (emailTypes.size === 0) continue;
+    const unread = await dataSource.listUserNotifications({
+      tenantId: job.tenantId,
+      userId: user.id,
+      status: "unread",
+      limit: NOTIFICATION_DISPATCH_USER_LIMIT
+    });
+    const items = unread
+      .filter(
+        (notification) =>
+          notification.createdAt >= createdAfter && emailTypes.has(notification.notificationType)
+      )
+      .map((notification) => ({
+        title: notification.title,
+        body: notification.body,
+        route: notification.route
+      }));
+    if (items.length === 0) continue;
+    await emailProvider.sendNotificationDigest({
+      email: user.email,
+      recipientName: user.name,
+      items
+    });
+    emailedUsers += 1;
+    deliveredNotifications += items.length;
+  }
+  return {
+    message: "Notification digest dispatched",
+    metadata: { emailedUsers, deliveredNotifications, lookbackMinutes }
+  };
+};
+
 // Реестр содержит ТОЛЬКО реально реализованные kinds. Boundary-kinds без
-// реализации (notification.dispatch, connector.sync, search.projection_rebuild,
-// calls.recording_compose) намеренно отсутствуют: раньше их хендлеры возвращали
-// фиктивный успех («dispatched: 0») — теперь воркер такие джобы не claim'ит,
-// а постановка в очередь честно отклоняется 501 (см. backgroundJobRoutes.ts,
-// NOT_IMPLEMENTED_BACKGROUND_JOB_KINDS). Дефолтный сид расписаний
-// (ensureDefaultBackgroundJobSchedules) эти kinds и раньше не засевал.
+// реализации (connector.sync, search.projection_rebuild, calls.recording_compose)
+// намеренно отсутствуют: раньше их хендлеры возвращали фиктивный успех — теперь
+// воркер такие джобы не claim'ит, а постановка в очередь честно отклоняется 501
+// (см. backgroundJobRoutes.ts, NOT_IMPLEMENTED_BACKGROUND_JOB_KINDS).
+// notification.dispatch реализован (шлёт email-дайджест) и засевается в
+// ensureDefaultBackgroundJobSchedules.
 export function createDefaultBackgroundJobRegistry(): BackgroundJobRegistry {
   return {
     "storage.asset_cleanup": storageAssetCleanup,
     "capacity.cache_warmup": capacityCacheWarmup,
     "calls.recording_janitor": callRecordingJanitor,
-    "planning.expired_runs_purge": planningExpiredRunsPurge
+    "planning.expired_runs_purge": planningExpiredRunsPurge,
+    "notification.dispatch": notificationDispatch
   };
 }
 
@@ -146,7 +223,8 @@ export const defaultBackgroundJobKinds: BackgroundJobKind[] = [
   "storage.asset_cleanup",
   "capacity.cache_warmup",
   "calls.recording_janitor",
-  "planning.expired_runs_purge"
+  "planning.expired_runs_purge",
+  "notification.dispatch"
 ];
 
 function readPositiveInteger(value: unknown, fallback: number): number {

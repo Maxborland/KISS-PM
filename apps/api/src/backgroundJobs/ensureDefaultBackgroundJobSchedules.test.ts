@@ -42,21 +42,23 @@ function toSchedule(input: BackgroundJobScheduleInput): BackgroundJobSchedule {
 }
 
 describe("ensureDefaultBackgroundJobSchedules", () => {
-  it("seeds three maintenance schedules per tenant with default: keys and nextRunAt=now", async () => {
+  it("seeds four maintenance schedules per tenant with default: keys and nextRunAt=now", async () => {
     const { dataSource, upsertCalls } = createFakeSeedDataSource(["tenant-a", "tenant-b"]);
     const now = new Date("2026-07-19T10:00:00.000Z");
 
     const result = await ensureDefaultBackgroundJobSchedules({ dataSource, now });
 
-    expect(result).toEqual({ status: "seeded", tenants: 2, created: 6, existing: 0 });
-    expect(upsertCalls).toHaveLength(6);
+    expect(result).toEqual({ status: "seeded", tenants: 2, created: 8, existing: 0 });
+    expect(upsertCalls).toHaveLength(8);
     expect(upsertCalls.map((call) => [call.tenantId, call.scheduleKey])).toEqual([
       ["tenant-a", "default:storage.asset_cleanup"],
       ["tenant-a", "default:calls.recording_janitor"],
       ["tenant-a", "default:planning.expired_runs_purge"],
+      ["tenant-a", "default:notification.dispatch"],
       ["tenant-b", "default:storage.asset_cleanup"],
       ["tenant-b", "default:calls.recording_janitor"],
-      ["tenant-b", "default:planning.expired_runs_purge"]
+      ["tenant-b", "default:planning.expired_runs_purge"],
+      ["tenant-b", "default:notification.dispatch"]
     ]);
     for (const call of upsertCalls) {
       expect(call.id).toBe(`sched-${call.tenantId}-${call.kind}`);
@@ -70,12 +72,14 @@ describe("ensureDefaultBackgroundJobSchedules", () => {
     expect(intervalByKind.get("storage.asset_cleanup")).toBe(86_400);
     expect(intervalByKind.get("calls.recording_janitor")).toBe(3_600);
     expect(intervalByKind.get("planning.expired_runs_purge")).toBe(86_400);
+    expect(intervalByKind.get("notification.dispatch")).toBe(900);
   });
 
-  it("does not seed no-op boundary jobs", () => {
+  it("seeds implemented notification.dispatch but not no-op boundary jobs", () => {
     const seededKinds = defaultBackgroundJobScheduleSeeds.map((seed) => seed.kind);
+    // notification.dispatch реализован (Блок 8) — засеваем.
+    expect(seededKinds).toContain("notification.dispatch");
     for (const noOpKind of [
-      "notification.dispatch",
       "connector.sync",
       "search.projection_rebuild",
       "calls.recording_compose"
@@ -88,13 +92,13 @@ describe("ensureDefaultBackgroundJobSchedules", () => {
     const { dataSource, upsertCalls } = createFakeSeedDataSource(["tenant-a", "tenant-b"]);
 
     const first = await ensureDefaultBackgroundJobSchedules({ dataSource });
-    expect(first).toEqual({ status: "seeded", tenants: 2, created: 6, existing: 0 });
+    expect(first).toEqual({ status: "seeded", tenants: 2, created: 8, existing: 0 });
     upsertCalls.length = 0;
 
     // Второй старт (после рестарта API): все строки уже существуют — DO NOTHING,
     // enabled/nextRunAt оператора не перезатираются (ревью #258).
     const second = await ensureDefaultBackgroundJobSchedules({ dataSource });
-    expect(second).toEqual({ status: "seeded", tenants: 2, created: 0, existing: 6 });
+    expect(second).toEqual({ status: "seeded", tenants: 2, created: 0, existing: 8 });
     const keys = upsertCalls.map((call) => [call.tenantId, call.scheduleKey, call.id].join("|"));
     expect(new Set(keys).size).toBe(keys.length);
   });
@@ -107,10 +111,10 @@ describe("ensureDefaultBackgroundJobSchedules", () => {
       tenantIds: ["tenant-new"]
     });
 
-    expect(result).toEqual({ status: "seeded", tenants: 1, created: 3, existing: 0 });
-    expect(insertBackgroundJobScheduleIfMissing).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({ status: "seeded", tenants: 1, created: 4, existing: 0 });
+    expect(insertBackgroundJobScheduleIfMissing).toHaveBeenCalledTimes(4);
     expect(insertBackgroundJobScheduleIfMissing.mock.calls.map(([input]) => input.tenantId)).toEqual([
-      "tenant-new", "tenant-new", "tenant-new"
+      "tenant-new", "tenant-new", "tenant-new", "tenant-new"
     ]);
   });
 

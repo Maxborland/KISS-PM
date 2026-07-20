@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import type { AccessProfile } from "@kiss-pm/access-control";
 import type { Tenant, TenantId, TenantUser, UserId } from "@kiss-pm/domain";
@@ -69,6 +69,19 @@ export type AccessProfileRecord = AccessProfile & {
   name: string;
 };
 export type AuditEventListItem = AuditEventRecord;
+/** Keyset-курсор ленты аудита: сортировка (createdAt desc, id desc) стабильна и уникальна. */
+export type AuditEventCursor = { createdAt: Date; id: string };
+/** Серверные фильтры + keyset-пагинация журнала аудита (см. auditRoutes). */
+export type AuditEventQueryOptions = {
+  limit?: number;
+  projectId?: string | null;
+  actorUserId?: string | null;
+  actionType?: string | null;
+  executionResult?: string | null;
+  fromDate?: Date | null;
+  toDate?: Date | null;
+  cursor?: AuditEventCursor | null;
+};
 export type WorkspaceUserRecord = TenantUser & {
   email: string;
   positionId: string | null;
@@ -254,10 +267,7 @@ export type PostgresTenantDataSource = CrmRepository &
   appendAuditEvent(input: AuditEventRecordInput): Promise<void>;
   listAuditEventsByTenantId(
     tenantId: TenantId,
-    options?: {
-      limit?: number;
-      projectId?: string | null;
-    }
+    options?: AuditEventQueryOptions
   ): Promise<AuditEventListItem[]>;
   /** Точечная выборка audit-события (tenant-scoped): адресуемые квитанции агента
       не должны зависеть от окна limit ленты. */
@@ -855,6 +865,32 @@ export function createPostgresTenantDataSource(
           sql`${auditEvents.sourceEntity} ->> 'type' = 'Project'`,
           sql`${auditEvents.sourceEntity} ->> 'id' = ${options.projectId}`
         );
+      }
+      if (options?.actorUserId) {
+        filters.push(eq(auditEvents.actorUserId, options.actorUserId));
+      }
+      if (options?.actionType) {
+        filters.push(eq(auditEvents.actionType, options.actionType));
+      }
+      if (options?.executionResult) {
+        filters.push(sql`${auditEvents.executionResult} ->> 'status' = ${options.executionResult}`);
+      }
+      if (options?.fromDate) {
+        filters.push(gte(auditEvents.createdAt, options.fromDate));
+      }
+      if (options?.toDate) {
+        filters.push(lte(auditEvents.createdAt, options.toDate));
+      }
+      // Keyset: строго «после» курсора в порядке (createdAt desc, id desc).
+      if (options?.cursor) {
+        const keyset = or(
+          lt(auditEvents.createdAt, options.cursor.createdAt),
+          and(
+            eq(auditEvents.createdAt, options.cursor.createdAt),
+            lt(auditEvents.id, options.cursor.id)
+          )
+        );
+        if (keyset) filters.push(keyset);
       }
       const buildQuery = () =>
         db

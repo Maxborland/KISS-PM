@@ -155,6 +155,14 @@ export function useAuth() {
     [client]
   );
 
+  // Приём приглашения по invite-токену (POST /api/auth/invitation/accept) —
+  // сотрудник задаёт пароль и активируется; далее входит через login.
+  const acceptInvitation = useCallback(
+    (token: string, password: string): Promise<AuthDataResult<{ status: "ok" }>> =>
+      guardData(() => client.acceptInvitation(token, password)),
+    [client]
+  );
+
   // Правка профиля в ТОЙ ЖЕ сессии (PATCH /api/profile, ТОЛЬКО name/phone/telegram + рефетч me).
   // Нужна, чтобы ЛК работал на ОДНОМ useAuth (иначе useProfile создаёт отдельную мок-сессию → 401).
   const updateProfile = useCallback(
@@ -184,7 +192,7 @@ export function useAuth() {
   );
 
 
-  return { client, state, status, error, user, permissions, sessions, loadSessions, revokeSession, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, updateProfile, updateTheme, requestDeactivation };
+  return { client, state, status, error, user, permissions, sessions, loadSessions, revokeSession, reload: refresh, login, logout, register, requestPasswordReset, confirmPasswordReset, acceptInvitation, updateProfile, updateTheme, requestDeactivation };
 }
 
 /* ============================================================

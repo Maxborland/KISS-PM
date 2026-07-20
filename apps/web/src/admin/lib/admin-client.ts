@@ -79,6 +79,19 @@ export type AuditEvent = {
   sourceEntity?: { type?: string; id?: string } | null;
 };
 
+// Серверные фильтры журнала (боевой auditRoutes): актор/тип/результат/диапазон дат + keyset-курсор.
+export type AuditEventFilter = {
+  actorUserId?: string | null;
+  actionType?: string | null;
+  executionResult?: string | null;
+  fromDate?: string | null;
+  toDate?: string | null;
+  cursor?: string | null;
+  limit?: number;
+};
+// Ответ ленты аудита: окно событий + курсор следующей страницы (null — страниц больше нет).
+export type AuditEventsResponse = { auditEvents: AuditEvent[]; nextCursor: string | null };
+
 // Отсутствие ресурса (боевой ResourceAbsenceRecord из absencesRoutes; даты — YYYY-MM-DD).
 export const ABSENCE_TYPES = ["vacation", "admin_leave", "sick_leave", "maternity_leave", "truancy"] as const;
 export type AbsenceType = (typeof ABSENCE_TYPES)[number];
@@ -140,6 +153,22 @@ export type UserCreateInput = {
 // Ответ POST /api/workspace/users/:userId/password-reset-token: raw-токен приходит
 // РОВНО ОДИН РАЗ (сервер хранит только хэш), expiresAt — ISO-срок действия (60 минут).
 export type UserResetTokenResponse = { resetToken: string; expiresAt: string };
+// Тело приглашения сотрудника (POST /api/workspace/invitations): БЕЗ пароля —
+// сотрудник задаёт его сам по ссылке из письма. id опционален.
+export type UserInviteInput = {
+  email: string; name: string; accessProfileId: string;
+  id?: string; positionId?: string | null;
+};
+// Ответ POST /api/workspace/invitations: созданный (inactive) пользователь + канал
+// доставки. При delivery:"none" (почта не настроена) сервер возвращает invitationToken
+// для ручной передачи (ЧЕСТНОСТЬ, как admin reset-token); при delivery:"email" токен
+// уходит письмом и в ответе отсутствует.
+export type UserInviteResponse = {
+  user: WorkspaceUser;
+  delivery: "email" | "none";
+  invitationToken?: string;
+  expiresAt?: string;
+};
 // Тело PATCH /api/workspace/users/:userId — частичное (parseWorkspaceUserPatchBody мёржит с текущим).
 export type UserUpdateInput = Partial<{
   email: string; name: string; accessProfileId: string;
@@ -161,6 +190,9 @@ export function createAdminClient(options: AdminApiClientOptions) {
     // пользователи
     listUsers() { return requestJson<WorkspaceUserListResponse>("/api/workspace/users"); },
     createUser(input: UserCreateInput) { return requestJson<{ user: WorkspaceUser }>("/api/workspace/users", { method: "POST", body: JSON.stringify(input) }); },
+    // Приглашение сотрудника (POST /api/workspace/invitations) — без пароля; ответ несёт
+    // delivery-канал и (при delivery:"none") invitationToken для ручной передачи.
+    inviteUser(input: UserInviteInput) { return requestJson<UserInviteResponse>("/api/workspace/invitations", { method: "POST", body: JSON.stringify(input) }); },
     updateUser(userId: string, input: UserUpdateInput) { return requestJson<{ user: WorkspaceUser }>(`/api/workspace/users/${enc(userId)}`, { method: "PATCH", body: JSON.stringify(input) }); },
     // Деактивация = PATCH status:"inactive" (отдельной ручки нет; self_access_change_forbidden 400 для себя).
     deactivateUser(userId: string) { return requestJson<{ user: WorkspaceUser }>(`/api/workspace/users/${enc(userId)}`, { method: "PATCH", body: JSON.stringify({ status: "inactive" }) }); },
@@ -175,8 +207,18 @@ export function createAdminClient(options: AdminApiClientOptions) {
     // Удаление: 409 position_assigned, если должность назначена пользователям (боевой positionRoutes).
     deletePosition(positionId: string) { return requestJson<{ status: "deleted" }>(`/api/workspace/positions/${enc(positionId)}`, { method: "DELETE" }); },
 
-    // журнал аудита тенанта (GET /api/tenant/current/audit-events?limit=N) — последние события.
-    listAuditEvents(limit = 50) { return requestJson<{ auditEvents: AuditEvent[] }>(`/api/tenant/current/audit-events?limit=${limit}`); },
+    // журнал аудита тенанта (GET /api/tenant/current/audit-events) — серверные фильтры + keyset-курсор.
+    listAuditEvents(filter: AuditEventFilter = {}) {
+      const params = new URLSearchParams();
+      params.set("limit", String(filter.limit ?? 50));
+      if (filter.actorUserId) params.set("actorUserId", filter.actorUserId);
+      if (filter.actionType) params.set("actionType", filter.actionType);
+      if (filter.executionResult) params.set("executionResult", filter.executionResult);
+      if (filter.fromDate) params.set("fromDate", filter.fromDate);
+      if (filter.toDate) params.set("toDate", filter.toDate);
+      if (filter.cursor) params.set("cursor", filter.cursor);
+      return requestJson<AuditEventsResponse>(`/api/tenant/current/audit-events?${params.toString()}`);
+    },
     // точечная выборка события (deep-link ?event= из квитанций агента): запись может быть
     // старше окна ленты, поэтому читаем по id, а не поиском в списке.
     getAuditEvent(auditEventId: string) { return requestJson<{ auditEvent: AuditEvent }>(`/api/tenant/current/audit-events/${enc(auditEventId)}`); },

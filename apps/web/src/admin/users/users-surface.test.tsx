@@ -12,8 +12,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EditUserDialog, IssueResetTokenAction } from "./users-surface";
-import type { WorkspaceUser } from "@/admin/lib/admin-client";
+import { EditUserDialog, InviteUserDialog, IssueResetTokenAction } from "./users-surface";
+import type { AccessProfile, Position, WorkspaceUser } from "@/admin/lib/admin-client";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -41,6 +41,20 @@ vi.mock("@/components/ui/confirm-dialog", () => ({
       {children}
       <span data-testid="confirm-description">{description}</span>
       <button type="button" data-testid="confirm-issue" aria-label={title} onClick={() => void onConfirm()} />
+    </div>
+  )
+}));
+// FormDialog: рендерим триггер + поля + явную кнопку submit (портал-оверлей вне
+// скоупа). submit зовёт onSubmit; при null-возврате (успех) — onSuccess.
+vi.mock("@/components/domain/form-dialog", () => ({
+  FormDialog: ({ children, trigger, onSubmit, onSuccess }: {
+    children?: React.ReactNode; trigger?: React.ReactNode;
+    onSubmit: () => Promise<string | null>; onSuccess?: () => void;
+  }) => (
+    <div>
+      {trigger}
+      {children}
+      <button type="button" data-testid="form-submit" onClick={async () => { const e = await onSubmit(); if (e == null) onSuccess?.(); }} />
     </div>
   )
 }));
@@ -149,6 +163,79 @@ describe("IssueResetTokenAction", () => {
 
     expect(host.querySelector('[data-testid="token-dialog"]')).toBeNull();
     expect(toastError).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("InviteUserDialog", () => {
+  let host: HTMLDivElement;
+  let root: Root;
+  const roles: AccessProfile[] = [{ id: "role-observer", tenantId: "tenant-alpha", name: "Наблюдатель", permissions: [] }];
+  const positions: Position[] = [];
+
+  function setInput(el: HTMLInputElement, value: string) {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+    setter.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  async function fill() {
+    const inputs = [...host.querySelectorAll<HTMLInputElement>("input")];
+    const email = inputs.find((i) => i.type === "email")!;
+    const name = inputs.find((i) => i.type !== "email")!;
+    await act(async () => { setInput(email, "invitee@kiss-pm.dev"); });
+    await act(async () => { setInput(name, "Приглашённый"); });
+  }
+
+  beforeEach(() => {
+    toastError.mockReset();
+    toastSuccess.mockReset();
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+  });
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    document.body.replaceChildren();
+  });
+
+  it("при delivery:none показывает токен приглашения из ответа API один раз", async () => {
+    const invite = vi.fn(async () => ({ ok: true as const, data: {
+      user: { ...user, status: "inactive" as const }, delivery: "none" as const, invitationToken: TOKEN, expiresAt: EXPIRES_AT
+    } }));
+    await act(async () => {
+      root.render(<InviteUserDialog roles={roles} positions={positions} busy={false} setBusy={vi.fn()} invite={invite} />);
+    });
+    await fill();
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-testid="form-submit"]')!.click());
+
+    expect(invite).toHaveBeenCalledWith({ email: "invitee@kiss-pm.dev", name: "Приглашённый", accessProfileId: "role-observer", positionId: null });
+    expect(host.querySelector('[data-testid="invitation-token-value"]')!.textContent).toBe(TOKEN);
+    expect(host.querySelector('[data-testid="token-dialog-description"]')!.textContent).toContain("/invite/accept");
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("при delivery:email показывает toast успеха и НЕ показывает токен", async () => {
+    const invite = vi.fn(async () => ({ ok: true as const, data: {
+      user: { ...user, status: "inactive" as const }, delivery: "email" as const
+    } }));
+    await act(async () => {
+      root.render(<InviteUserDialog roles={roles} positions={positions} busy={false} setBusy={vi.fn()} invite={invite} />);
+    });
+    await fill();
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-testid="form-submit"]')!.click());
+
+    expect(host.querySelector('[data-testid="invitation-token-value"]')).toBeNull();
+    expect(toastSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it("при ошибке API возвращает код ошибки и НЕ показывает токен", async () => {
+    const invite = vi.fn(async () => ({ ok: false as const, code: "user_email_taken", message: "user_email_taken" }));
+    await act(async () => {
+      root.render(<InviteUserDialog roles={roles} positions={positions} busy={false} setBusy={vi.fn()} invite={invite} />);
+    });
+    await fill();
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-testid="form-submit"]')!.click());
+
+    expect(host.querySelector('[data-testid="invitation-token-value"]')).toBeNull();
   });
 });
 

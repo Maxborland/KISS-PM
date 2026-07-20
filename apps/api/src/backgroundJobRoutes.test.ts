@@ -49,8 +49,27 @@ describe("background job routes", () => {
     });
   });
 
+  it("enqueues implemented notification.dispatch (kind executable, not 501)", async () => {
+    const fixture = createFixture();
+    const app = createApp(fixture);
+
+    const response = await app.request("/api/workspace/background-jobs/runs", {
+      method: "POST",
+      headers: {
+        cookie: "kiss_pm_session=test",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ kind: "notification.dispatch" })
+    });
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      run: { kind: "notification.dispatch", status: "queued" }
+    });
+    expect(fixture.jobs).toHaveLength(1);
+  });
+
   it.each([
-    "notification.dispatch",
     "connector.sync",
     "search.projection_rebuild",
     "calls.recording_compose"

@@ -143,6 +143,12 @@ export function createAuthClient(options: AuthApiClientOptions) {
     // POST /api/auth/password-reset/confirm — смена пароля по токену, 200 {status:"ok"}.
     confirmPasswordReset(token: string, password: string) {
       return requestJson<{ status: "ok" }>("/api/auth/password-reset/confirm", { method: "POST", body: JSON.stringify({ token, password } satisfies ResetConfirmInput) });
+    },
+    // POST /api/auth/invitation/accept — приём приглашения: сотрудник задаёт пароль
+    // по одноразовому invite-токену и активируется, 200 {status:"ok"}. Тело идентично
+    // reset/confirm (token + пароль ≥8).
+    acceptInvitation(token: string, password: string) {
+      return requestJson<{ status: "ok" }>("/api/auth/invitation/accept", { method: "POST", body: JSON.stringify({ token, password } satisfies ResetConfirmInput) });
     }
   };
 }

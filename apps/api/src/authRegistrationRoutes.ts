@@ -492,6 +492,141 @@ export function registerAuthRegistrationRoutes(app: ApiApp, deps: ApiRouteDeps) 
       throw error;
     }
   });
+
+  // POST /api/auth/invitation/accept — публичный приём приглашения: сотрудник по
+  // одноразовому invite-токену задаёт пароль и активируется. Токен — та же запись,
+  // что выдаёт POST /api/workspace/invitations (issuePasswordResetToken), поэтому
+  // читается тем же findPasswordResetTokenByHash. Внутри транзакции: атомарное
+  // погашение токена → создание credential (upsertCredential) → активация юзера
+  // (status:"active") → инвалидация прочих invite-токенов. Работает ТОЛЬКО для
+  // приглашённого (status:"inactive") пользователя без пароля — уже активный
+  // аккаунт должен идти через password-reset, не через приём приглашения.
+  app.post("/api/auth/invitation/accept", async (context) => {
+    if (
+      !dataSource.findPasswordResetTokenByHash ||
+      !dataSource.listWorkspaceUsers ||
+      !dataSource.upsertCredential ||
+      !dataSource.updateWorkspaceUser ||
+      !dataSource.markPasswordResetTokenConsumed ||
+      !dataSource.deleteOtherPasswordResetTokensByUserId ||
+      !dataSource.withTransaction ||
+      !dataSource.appendAuditEvent
+    ) {
+      return context.json({ error: "auth_not_configured" }, 501);
+    }
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    // Тот же контракт тела, что у password-reset/confirm: token + пароль ≥8.
+    const parsed = parseResetConfirmInput(body.value);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    const { token, password } = parsed.value;
+
+    const rateLimitInput = {
+      email: `invite-accept:${hashResetToken(token)}`,
+      ip: getClientIp(context.req.raw.headers, {
+        trustForwardedHeaders: trustForwardedAuthHeaders
+      })
+    };
+    const reservedAttempt = Boolean(deps.authRateLimiter.reserveAttempt);
+    const rateLimitDecision = deps.authRateLimiter.reserveAttempt
+      ? await deps.authRateLimiter.reserveAttempt(rateLimitInput)
+      : await deps.authRateLimiter.check(rateLimitInput);
+    if (!rateLimitDecision.allowed) {
+      context.header("Retry-After", String(rateLimitDecision.retryAfterSeconds));
+      return context.json({ error: "too_many_requests" }, 429);
+    }
+
+    try {
+      const record = await dataSource.findPasswordResetTokenByHash(hashResetToken(token));
+      const now = new Date();
+      if (!record) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "invalid_invitation_token" }, 400);
+      }
+      if (record.consumedAt !== null) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "invitation_token_used" }, 400);
+      }
+      if (record.expiresAt.getTime() <= now.getTime()) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "invitation_token_expired" }, 400);
+      }
+
+      const invitedUser =
+        (await dataSource.listWorkspaceUsers(record.tenantId)).find(
+          (user) => user.id === record.userId
+        ) ?? null;
+      // Приём приглашения — только для приглашённого (inactive) пользователя.
+      // Активный аккаунт с валидным reset-токеном должен идти через reset/confirm.
+      if (!invitedUser || invitedUser.status !== "inactive") {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "invitation_not_pending" }, 400);
+      }
+
+      const accepted = await dataSource.withTransaction(async (tx) => {
+        if (
+          !tx.markPasswordResetTokenConsumed ||
+          !tx.upsertCredential ||
+          !tx.updateWorkspaceUser ||
+          !tx.deleteOtherPasswordResetTokensByUserId
+        ) {
+          throw new Error("transactional_invitation_accept_not_configured");
+        }
+
+        const affected = await tx.markPasswordResetTokenConsumed(
+          record.tenantId,
+          record.id,
+          now
+        );
+        if (affected === 0) return false;
+
+        await tx.upsertCredential({
+          userId: invitedUser.id,
+          tenantId: invitedUser.tenantId,
+          email: invitedUser.email,
+          ...hashPassword(password)
+        });
+        const { positionName: _positionName, ...userWithoutPositionName } = invitedUser;
+        await tx.updateWorkspaceUser({ ...userWithoutPositionName, status: "active" });
+        await tx.deleteOtherPasswordResetTokensByUserId(
+          record.tenantId,
+          record.userId,
+          record.id
+        );
+
+        await appendManagementAuditEvent(
+          {
+            tenantId: record.tenantId,
+            actorUserId: record.userId,
+            actionType: "auth.invitation_accepted",
+            sourceWorkflow: "auth_invitation_accept",
+            sourceEntity: { type: "TenantUser", id: record.userId },
+            commandInput: { tokenId: record.id },
+            beforeState: { status: "inactive" },
+            afterState: { userId: record.userId, status: "active" },
+            permissionResult: { allowed: true }
+          },
+          tx
+        );
+
+        return true;
+      });
+
+      if (!accepted) {
+        await deps.authRateLimiter.recordFailure(rateLimitInput, { reserved: reservedAttempt });
+        return context.json({ error: "invitation_token_used" }, 400);
+      }
+
+      await deps.authRateLimiter.recordSuccess(rateLimitInput, { reserved: reservedAttempt });
+      return context.json({ status: "ok" });
+    } catch (error) {
+      if (reservedAttempt) {
+        await deps.authRateLimiter.releaseReservedAttempt?.(rateLimitInput);
+      }
+      throw error;
+    }
+  });
 }
 
 // Публичная форма пользователя — как в /api/auth/login.

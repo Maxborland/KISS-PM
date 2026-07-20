@@ -38,7 +38,12 @@ const ERR: Record<string, string> = {
   invalid_reset_confirm_payload: "Проверьте токен и пароль",
   invalid_reset_token: "Ссылка для сброса недействительна",
   token_expired: "Срок действия ссылки истёк",
-  reset_token_used: "Ссылка уже была использована"
+  reset_token_used: "Ссылка уже была использована",
+  // приглашение / приём приглашения (БОЕВОЙ, authRegistrationRoutes.ts)
+  invalid_invitation_token: "Приглашение недействительно",
+  invitation_token_expired: "Срок действия приглашения истёк",
+  invitation_token_used: "Приглашение уже было использовано",
+  invitation_not_pending: "Приглашение уже принято или недоступно"
   // общие транспортные (invalid_json / not_found / request_failed) — из COMMON_ERR
 };
 // RU-текст кода ошибки (как commsErr/crmErr): код → человекочитаемая строка.

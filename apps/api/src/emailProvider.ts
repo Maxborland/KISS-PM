@@ -11,14 +11,46 @@ export type PasswordResetEmailInput = {
   resetUrl: string;
 };
 
+// Одна позиция дайджеста — заголовок/тело/раздел непрочитанного уведомления.
+export type NotificationDigestItem = {
+  title: string;
+  body: string;
+  route: string;
+};
+
+// Пакетное письмо-дайджест непрочитанных уведомлений одному получателю.
+// Отправляется фоновой джобой notification.dispatch (см. jobHandlers.ts).
+export type NotificationDigestEmailInput = {
+  email: string;
+  recipientName: string;
+  items: NotificationDigestItem[];
+};
+
+// Письмо-приглашение сотрудника: одноразовый токен + ссылка на страницу
+// задания пароля (/invite/accept). workspaceName/invitedByName — опциональный
+// контекст для тела письма.
+export type InvitationEmailInput = {
+  email: string;
+  rawToken: string;
+  acceptUrl: string;
+  workspaceName?: string;
+  invitedByName?: string;
+};
+
 export type EmailProvider = {
   sendPasswordReset(input: PasswordResetEmailInput): Promise<void>;
+  sendNotificationDigest(input: NotificationDigestEmailInput): Promise<void>;
+  sendInvitation(input: InvitationEmailInput): Promise<void>;
 };
 
 export type InMemoryEmailProvider = EmailProvider & {
   readonly provider: "memory";
   // Последнее отправленное письмо сброса (для тестов/демо); null до первой отправки.
   lastPasswordReset: PasswordResetEmailInput | null;
+  // Отправленные дайджесты уведомлений (для тестов/демо), в порядке отправки.
+  notificationDigests: NotificationDigestEmailInput[];
+  // Последнее отправленное приглашение (для тестов/демо); null до первой отправки.
+  lastInvitation: InvitationEmailInput | null;
 };
 
 export type SmtpEmailProvider = EmailProvider & {
@@ -47,8 +79,19 @@ export function createInMemoryEmailProvider(): InMemoryEmailProvider {
   const provider: InMemoryEmailProvider = {
     provider: "memory",
     lastPasswordReset: null,
+    notificationDigests: [],
+    lastInvitation: null,
     async sendPasswordReset(input) {
       provider.lastPasswordReset = { ...input };
+    },
+    async sendNotificationDigest(input) {
+      provider.notificationDigests.push({
+        ...input,
+        items: input.items.map((item) => ({ ...item }))
+      });
+    },
+    async sendInvitation(input) {
+      provider.lastInvitation = { ...input };
     }
   };
   return provider;
@@ -127,8 +170,65 @@ export function createSmtpEmailProvider(
           "If you did not request this, ignore this message."
         ].join("\n")
       });
+    },
+    async sendNotificationDigest(input) {
+      if (input.items.length === 0) return;
+      await sendSmtpMessage(config, {
+        from: config.from,
+        envelopeFrom: config.envelopeFrom,
+        to: input.email,
+        subject: `KISS PM · новые уведомления (${input.items.length})`,
+        body: formatNotificationDigestBody(input)
+      });
+    },
+    async sendInvitation(input) {
+      await sendSmtpMessage(config, {
+        from: config.from,
+        envelopeFrom: config.envelopeFrom,
+        to: input.email,
+        subject: input.workspaceName
+          ? `Приглашение в рабочее пространство «${input.workspaceName}» — KISS PM`
+          : "Приглашение в рабочее пространство KISS PM",
+        body: formatInvitationBody(input)
+      });
     }
   };
+}
+
+// Тело письма-приглашения: ссылка на страницу задания пароля + сам токен
+// (на случай, если ссылка не откроется). Тексты русские (user-facing).
+function formatInvitationBody(input: InvitationEmailInput): string {
+  const workspace = input.workspaceName ? `«${input.workspaceName}»` : "KISS PM";
+  const inviter = input.invitedByName ? `${input.invitedByName} ` : "";
+  return [
+    "Здравствуйте!",
+    "",
+    `${inviter}приглашает вас в рабочее пространство ${workspace} в KISS PM.`,
+    "Чтобы принять приглашение, перейдите по ссылке и задайте пароль:",
+    "",
+    input.acceptUrl,
+    "",
+    `Код приглашения: ${input.rawToken}`,
+    "",
+    "Ссылка действует 60 минут. Если вы не ожидали это приглашение — просто проигнорируйте письмо."
+  ].join("\n");
+}
+
+function formatNotificationDigestBody(input: NotificationDigestEmailInput): string {
+  const lines = [
+    `Здравствуйте, ${input.recipientName}!`,
+    "",
+    "У вас есть новые уведомления в KISS PM:",
+    ""
+  ];
+  for (const item of input.items) {
+    lines.push(`• ${item.title}`);
+    if (item.body.trim()) lines.push(`  ${item.body}`);
+    if (item.route.trim()) lines.push(`  Раздел: ${item.route}`);
+    lines.push("");
+  }
+  lines.push("Откройте KISS PM, чтобы просмотреть и ответить.");
+  return lines.join("\n");
 }
 
 function parseEmailProviderKind(

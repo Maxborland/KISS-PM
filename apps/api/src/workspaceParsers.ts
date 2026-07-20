@@ -134,6 +134,19 @@ export function parseWorkspaceUserBody(
   };
 }
 
+// Тело приглашения сотрудника (POST /api/workspace/invitations): те же поля,
+// что и у создания пользователя, НО пароль не принимается, а статус жёстко
+// проставляется "inactive" (приглашён, ещё не активировал доступ). Пароль
+// сотрудник задаёт сам на /api/auth/invitation/accept.
+export function parseWorkspaceInvitationBody(
+  body: unknown,
+  tenantId: TenantId
+): WorkspaceUserParseResult {
+  const parsed = parseWorkspaceUserBody(body, tenantId);
+  if (!parsed.ok) return parsed;
+  return { ok: true, value: { ...parsed.value, status: "inactive" } };
+}
+
 export function parseWorkspaceUserPatchBody(
   body: unknown,
   tenantId: TenantId,
