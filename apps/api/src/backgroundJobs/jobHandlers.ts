@@ -244,7 +244,7 @@ const notificationDispatch: BackgroundJobHandler = async (job, context) => {
   async function canRead(user: TenantUser, notification: PendingNotificationDelivery) {
     const entityType = parseCollaborationEntityType(notification.sourceEntityType);
     if (!entityType.ok) return false;
-    const cacheKey = `${user.id} ${entityType.value} ${notification.sourceEntityId}`;
+    const cacheKey = `${user.id}\u0000${entityType.value}\u0000${notification.sourceEntityId}`;
     const cached = readableCache.get(cacheKey);
     if (cached !== undefined) return cached;
 

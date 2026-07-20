@@ -251,7 +251,7 @@ function schedule(a: Authored): Map<string, Calc> {
   const leaves = a.tasks.filter((t) => t.kind !== "summary");
   const summaries = a.tasks.filter((t) => t.kind === "summary").sort((x, y) => levelOf(y.wbs) - levelOf(x.wbs));
   const leafDesc = (id: string) => {
-    const w = byId.get(id)?.wbs ?? " ";
+    const w = byId.get(id)?.wbs ?? "\u0000";
     return leaves.filter((l) => l.wbs.startsWith(w + "."));
   };
 
