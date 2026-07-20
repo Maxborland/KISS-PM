@@ -27,7 +27,7 @@ describe("API route health budgets", () => {
     { path: "project-work/taskCreateCommands.ts", maxLines: 360 },
     { path: "project-work/taskLifecycleCommands.ts", maxLines: 290 },
     { path: "project-work/taskStatusWorkspace.ts", maxLines: 310 },
-    { path: "project-work/taskReadWorkspace.ts", maxLines: 240 },
+    { path: "project-work/taskReadWorkspace.ts", maxLines: 265 }, // 2026-07-20: +findReadableProject (ревью #265, чтение не-active проектов),
     { path: "project-work/taskCommandGuards.ts", maxLines: 190 },
     { path: "project-work/taskUpdateCommands.ts", maxLines: 200 },
     { path: "project-work/taskCreateSupport.ts", maxLines: 180 },
