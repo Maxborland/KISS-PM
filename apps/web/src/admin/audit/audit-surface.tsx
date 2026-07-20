@@ -24,43 +24,66 @@ const fmt = (iso: string): string => {
 };
 
 const selCls = "h-8 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel)] px-2 text-[length:var(--text-xs)] text-[var(--text)] outline-none focus:border-[var(--accent)]";
+const dateCls = `${selCls} [color-scheme:light] dark:[color-scheme:dark]`;
+
+// Известные статусы исполнения (боевой executionResult.status): для селекта результата.
+const RESULT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "succeeded", label: "Успешно" },
+  { value: "failed", label: "Ошибка" },
+  { value: "denied", label: "Отклонено правами" }
+];
 
 /**
  * Admin «Аудит» — журнал управленческих действий и системных событий на боевом
  * контракте GET /api/tenant/current/audit-events (createAdminClient + in-memory mock,
- * swap = apiOrigin). Заменяет v2-экран 09-admin/audit (монолит) реальной поверхностью.
+ * swap = apiOrigin). Серверные фильтры (актор/тип/результат/период) + keyset-пагинация
+ * («Показать ещё») — комплаенс фильтрует журнал за пределами последнего окна.
  */
 export function AdminAuditSurface() {
   const { live } = useAdminRuntime();
-  const { events, status, error, reload, getEvent } = useAuditEvents(50);
+  const {
+    events,
+    status,
+    error,
+    reload,
+    getEvent,
+    filter,
+    applyFilter,
+    resetFilter,
+    hasMore,
+    loadMore,
+    loadingMore
+  } = useAuditEvents(50);
   // Deep-link ?event=<auditEventId> из квитанций агента: запись может быть старше
   // окна ленты (limit 50) — резолвим точечной выборкой, а не поиском в списке.
   const [deepEvent, setDeepEvent] = useState<AuditEvent | null>(null);
   // Справочник людей для колонки «Кто» (G6-05): actorUserId → имя. Если список
   // пользователей роли недоступен (403) — фолбэк «Участник xxxx», не сырой id (R3).
   const admin = useAdmin();
+  const users = admin.data?.users ?? [];
   const userName = useMemo(() => {
     const m = new Map<string, string>();
-    for (const u of admin.data?.users ?? []) m.set(u.id, u.name);
+    for (const u of users) m.set(u.id, u.name);
     return m;
-  }, [admin.data]);
+  }, [users]);
   const who = (actorUserId?: string | null): string =>
     actorUserId ? (userName.get(actorUserId) ?? `Участник ${actorUserId.slice(-4)}`) : "—";
 
-  // Клиентский фильтр по типу события + поиск по подстроке (G6-07). Пагинации у API нет.
-  const [typeFilter, setTypeFilter] = useState("");
+  // Клиентский поиск по подстроке (уточнение уже загруженного окна; серверные фильтры — ниже).
   const [query, setQuery] = useState("");
-  const types = useMemo(() => {
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const e of events) if (!seen.has(e.actionType)) { seen.add(e.actionType); out.push(e.actionType); }
-    return out;
-  }, [events]);
+  // Накапливаем встреченные типы действий для селекта (серверная фильтрация по одному
+  // типу не даёт полный перечень из одной страницы — храним объединение всех виденных).
+  const seenTypesRef = useRef<Set<string>>(new Set());
+  const actionTypes = useMemo(() => {
+    for (const e of events) seenTypesRef.current.add(e.actionType);
+    if (filter.actionType) seenTypesRef.current.add(filter.actionType);
+    return [...seenTypesRef.current].sort((a, b) => auditActionLabel(a).localeCompare(auditActionLabel(b), "ru"));
+  }, [events, filter.actionType]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
+    if (!q) return events;
     return events.filter((e) => {
-      if (typeFilter && e.actionType !== typeFilter) return false;
-      if (!q) return true;
       const haystack = [
         e.actionType,
         auditActionLabel(e.actionType),
@@ -72,16 +95,29 @@ export function AdminAuditSurface() {
     });
     // who зависит от userName — включаем его в зависимости пересчёта.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, typeFilter, query, userName]);
+  }, [events, query, userName]);
 
-  const surfaceStatus = status === "forbidden" ? "forbidden" : status === "loading" ? "loading" : status === "error" ? "error" : events.length === 0 ? "empty" : "ready";
+  const hasServerFilter = Boolean(
+    filter.actorUserId || filter.actionType || filter.executionResult || filter.fromDate || filter.toDate
+  );
+  const surfaceStatus =
+    status === "forbidden" ? "forbidden"
+    : status === "loading" ? "loading"
+    : status === "error" ? "error"
+    : events.length === 0 ? (hasServerFilter ? "ready" : "empty")
+    : "ready";
+
+  // Дата-инпуты хранят YYYY-MM-DD; на сервер уходит ISO-инстант (начало / конец дня, UTC).
+  const dayValue = (iso?: string | null): string => (iso ? iso.slice(0, 10) : "");
+  const onFromDate = (day: string) => applyFilter({ fromDate: day ? `${day}T00:00:00.000Z` : null });
+  const onToDate = (day: string) => applyFilter({ toDate: day ? `${day}T23:59:59.999Z` : null });
 
   return (
     <AdminFrame activeTab="Аудит" subtitle="Журнал управленческих действий и системных событий">
       {!live ? (
         <div className="mb-3 flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--accent-muted)] bg-[var(--accent-soft)] px-3 py-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
           <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-white">Прототип</span>
-          <span>Реальный контракт: GET /api/tenant/current/audit-events (createAdminClient + in-memory mock, swap = apiOrigin). Требует право чтения журнала (canReadAuditEvents). Последние события по убыванию времени.</span>
+          <span>Реальный контракт: GET /api/tenant/current/audit-events (createAdminClient + in-memory mock, swap = apiOrigin). Серверные фильтры (актор/тип/результат/период) + keyset-пагинация. Требует право чтения журнала (canReadAuditEvents).</span>
         </div>
       ) : null}
 
@@ -110,25 +146,85 @@ export function AdminAuditSurface() {
             </div>
           </div>
         ) : null}
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-[length:var(--text-xs)] text-[var(--muted-strong)]">
-            Тип события
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={selCls}>
-              <option value="">Все типы</option>
-              {types.map((t) => <option key={t} value={t}>{auditActionLabel(t)}</option>)}
+
+        {/* Серверные фильтры журнала */}
+        <div className="mb-2 flex flex-wrap items-end gap-2" data-testid="audit-filters">
+          <label className="flex flex-col gap-1 text-[length:var(--text-2xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+            Кто
+            <select
+              aria-label="Фильтр по актору"
+              value={filter.actorUserId ?? ""}
+              onChange={(e) => applyFilter({ actorUserId: e.target.value || null })}
+              className={selCls}
+            >
+              <option value="">Все участники</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-2xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+            Тип события
+            <select
+              aria-label="Фильтр по типу события"
+              value={filter.actionType ?? ""}
+              onChange={(e) => applyFilter({ actionType: e.target.value || null })}
+              className={selCls}
+            >
+              <option value="">Все типы</option>
+              {actionTypes.map((t) => <option key={t} value={t}>{auditActionLabel(t)}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-2xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+            Результат
+            <select
+              aria-label="Фильтр по результату"
+              value={filter.executionResult ?? ""}
+              onChange={(e) => applyFilter({ executionResult: e.target.value || null })}
+              className={selCls}
+            >
+              <option value="">Любой</option>
+              {RESULT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-2xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+            С даты
+            <input
+              type="date"
+              aria-label="Фильтр: с даты"
+              value={dayValue(filter.fromDate)}
+              onChange={(e) => onFromDate(e.target.value)}
+              className={dateCls}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[length:var(--text-2xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
+            По дату
+            <input
+              type="date"
+              aria-label="Фильтр: по дату"
+              value={dayValue(filter.toDate)}
+              onChange={(e) => onToDate(e.target.value)}
+              className={dateCls}
+            />
+          </label>
+          {hasServerFilter ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => { setQuery(""); resetFilter(); }}>
+              Сбросить фильтры
+            </Button>
+          ) : null}
+        </div>
+
+        {/* Клиентское уточнение по подстроке (внутри загруженного окна) */}
+        <div className="mb-2">
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Поиск по событиям…"
-            aria-label="Поиск по событиям"
+            placeholder="Поиск в загруженных событиях…"
+            aria-label="Поиск в загруженных событиях"
             className="h-8 max-w-[260px] text-[length:var(--text-xs)]"
           />
         </div>
 
         <div className="overflow-auto rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-card)]">
-          <table className="w-full border-collapse text-[length:var(--text-sm)]">
+          <table className="w-full border-collapse text-[length:var(--text-sm)]" data-testid="audit-table">
             <thead>
               <tr className="border-b border-[var(--border)] bg-[var(--panel-subtle)] text-left text-[length:var(--text-xs)] uppercase tracking-[0.03em] text-[var(--muted-soft)]">
                 <th className="px-3 py-2 font-semibold">Действие</th>
@@ -183,12 +279,25 @@ export function AdminAuditSurface() {
           </table>
         </div>
 
-        {/* Пагинации у API нет — честная подпись об объёме журнала. */}
-        <p className="mt-2 text-[length:var(--text-xs)] text-[var(--muted-soft)]">
-          {filtered.length === events.length
-            ? `Показаны последние ${events.length} событий`
-            : `Отфильтровано ${filtered.length} из последних ${events.length} событий`}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[length:var(--text-xs)] text-[var(--muted-soft)]">
+            {query.trim() && filtered.length !== events.length
+              ? `Найдено ${filtered.length} из ${events.length} загруженных событий`
+              : `Загружено ${events.length} событий${hasMore ? " (есть ещё)" : ""}`}
+          </p>
+          {hasMore ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+              data-testid="audit-load-more"
+            >
+              {loadingMore ? "Загружаем…" : "Показать ещё"}
+            </Button>
+          ) : null}
+        </div>
       </SurfaceState>
     </AdminFrame>
   );

@@ -4,6 +4,7 @@ import {
   canReadTenantUsers,
   type PolicyDecision
 } from "@kiss-pm/access-control";
+import type { Context } from "hono";
 import type { TenantId, TenantUser, UserId } from "@kiss-pm/domain";
 import { hashPassword } from "@kiss-pm/persistence";
 import { getClientIp } from "./authRateLimit";
@@ -15,6 +16,7 @@ import { parseUserIdParam } from "./routeParamParsers";
 import type { WorkspaceUserRecord } from "./apiTypes";
 import type { ApiApp, ApiRouteDeps } from "./routeTypes";
 import {
+  parseWorkspaceInvitationBody,
   parseWorkspaceUserBody,
   parseWorkspaceUserPatchBody
 } from "./workspaceParsers";
@@ -58,6 +60,7 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
   const {
     appendManagementAuditEvent,
     dataSource,
+    emailProvider,
     getActorProfile,
     getSessionActorFromHeaders,
     runDataSourceTransaction
@@ -205,6 +208,149 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
 
     invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ user }, 201);
+  });
+
+  // POST /api/workspace/invitations — приглашение сотрудника по email БЕЗ пароля
+  // (под canManageTenantUsers). Создаётся пользователь status:"inactive" (войти
+  // не сможет: isWorkspaceUserActive → 403 user_inactive) + одноразовый invite-токен
+  // ТЕМ ЖЕ механизмом, что и сброс пароля (issuePasswordResetToken: hashResetToken +
+  // passwordResetTtlMs). Письмо-приглашение уходит через emailProvider со ссылкой на
+  // /invite/accept. Пароль сотрудник задаёт сам на POST /api/auth/invitation/accept.
+  // Честная деградация: если канал почты не настроен (delivery:"none", in-memory
+  // provider) — rawToken возвращается в ответе для ручной передачи (как admin
+  // reset-token). При delivery:"email" токен в ответе НЕ отдаётся.
+  app.post("/api/workspace/invitations", async (context) => {
+    const auth = await authorizeRoute(context, deps, {
+      permission: canManageTenantUsers,
+      capabilities: [
+        "createWorkspaceUser",
+        "createPasswordResetToken",
+        "listWorkspaceUsers",
+        "listAccessProfilesByTenantId",
+        "listPositions",
+        "withTransaction",
+        "appendAuditEvent"
+      ],
+      onDenied: ({ actor, decision }) =>
+        appendWorkspaceUserDeniedAudit(deps, actor, {
+          actionType: "workspace.user.invite_denied",
+          entityId: "new",
+          commandInput: { operation: "invite_user" },
+          decision
+        })
+    });
+    if (!auth.ok) return auth.response;
+    const { actor, decision, dataSource } = auth.value;
+
+    const body = await readLimitedJsonBody(context);
+    if (!body.ok) return context.json({ error: body.error }, body.status);
+    const parsed = parseWorkspaceInvitationBody(body.value, actor.tenantId);
+    if (!parsed.ok) return context.json({ error: parsed.error }, 400);
+    const existingUsers = await dataSource.listWorkspaceUsers(actor.tenantId);
+    if (existingUsers.some((user) => user.id === parsed.value.id)) {
+      return context.json({ error: "user_id_taken" }, 409);
+    }
+    if (existingUsers.some((user) => user.email === parsed.value.email)) {
+      return context.json({ error: "user_email_taken" }, 409);
+    }
+    if (!(await emailDomainAllowed(dataSource, actor.tenantId, parsed.value.email))) {
+      return context.json({ error: "email_domain_not_allowed" }, 400);
+    }
+    if (
+      !(await dataSource.listAccessProfilesByTenantId(actor.tenantId)).some(
+        (profile) => profile.id === parsed.value.accessProfileId
+      )
+    ) {
+      return context.json({ error: "invalid_access_role" }, 400);
+    }
+    if (parsed.value.positionId) {
+      const positionExists = (await dataSource.listPositions(actor.tenantId)).some(
+        (position) => position.id === parsed.value.positionId
+      );
+      if (!positionExists) {
+        return context.json({ error: "invalid_position" }, 400);
+      }
+    }
+
+    let outcome: { user: WorkspaceUserRecord; rawToken: string; expiresAt: Date };
+    try {
+      outcome = await runDataSourceTransaction(async (transactionDataSource) => {
+        if (
+          !transactionDataSource.createWorkspaceUser ||
+          !transactionDataSource.createPasswordResetToken
+        ) {
+          throw new Error("transactional_user_invite_not_configured");
+        }
+
+        const createdUser = await transactionDataSource.createWorkspaceUser(parsed.value);
+        const token = await issuePasswordResetToken(
+          transactionDataSource.createPasswordResetToken,
+          {
+            tenantId: actor.tenantId,
+            userId: createdUser.id,
+            requestedIp: getClientIp(context.req.raw.headers, {
+              trustForwardedHeaders: deps.trustForwardedAuthHeaders
+            })
+          }
+        );
+
+        await appendManagementAuditEvent(
+          {
+            tenantId: actor.tenantId,
+            actorUserId: actor.id,
+            actionType: "workspace.user.invited",
+            sourceWorkflow: "single_workspace_users",
+            sourceEntity: {
+              type: "TenantUser",
+              id: createdUser.id
+            },
+            // Честность аудита: фиксируем факт приглашения (юзер + tokenId + срок),
+            // rawToken в audit-payload отсутствует принципиально.
+            commandInput: { ...parsed.value },
+            beforeState: null,
+            afterState: {
+              user: createdUser,
+              tokenId: token.tokenId,
+              expiresAt: token.expiresAt.toISOString()
+            },
+            permissionResult: decision
+          },
+          transactionDataSource
+        );
+
+        return { user: createdUser, rawToken: token.rawToken, expiresAt: token.expiresAt };
+      });
+    } catch (error) {
+      const conflict = workspaceUserUniqueConflict(error);
+      if (conflict) return context.json({ error: conflict }, 409);
+      throw error;
+    }
+
+    // delivery — свойство ИНСТАЛЛЯЦИИ (настроен ли канал почты), не аккаунта.
+    const delivery =
+      "provider" in emailProvider && emailProvider.provider === "smtp" ? "email" : "none";
+    const workspace = await dataSource.findTenantById?.(actor.tenantId);
+    await emailProvider.sendInvitation({
+      email: outcome.user.email,
+      rawToken: outcome.rawToken,
+      acceptUrl: buildInvitationAcceptUrl(context, outcome.rawToken),
+      ...(workspace?.name ? { workspaceName: workspace.name } : {}),
+      ...(actor.name ? { invitedByName: actor.name } : {})
+    });
+
+    invalidateCapacityCacheForTenant(actor.tenantId);
+    return context.json(
+      {
+        user: outcome.user,
+        delivery,
+        // Токен возвращаем в открытом виде ТОЛЬКО когда письмо не уйдёт
+        // (delivery:"none") — иначе он существует лишь как хэш в БД.
+        ...(delivery === "none"
+          ? { invitationToken: outcome.rawToken, expiresAt: outcome.expiresAt.toISOString() }
+          : {})
+      },
+      201
+    );
   });
 
   app.patch("/api/workspace/users/:userId", async (context) => {
@@ -504,6 +650,18 @@ export function registerWorkspaceUserRoutes(app: ApiApp, deps: ApiRouteDeps) {
     invalidateCapacityCacheForTenant(actor.tenantId);
     return context.json({ status: "deleted" });
   });
+}
+
+// Ссылка на страницу принятия приглашения на фронте. Как и buildResetUrl:
+// при web→API rewrite request-URL содержит внутренний origin API, поэтому берём
+// browser Origin (уже проверен same-origin middleware); для server-to-server без
+// Origin — origin запроса.
+function buildInvitationAcceptUrl(context: Context, rawToken: string): string {
+  const originHeader = context.req.header("origin");
+  const origin = originHeader
+    ? new URL(originHeader).origin
+    : new URL(context.req.url).origin;
+  return `${origin}/invite/accept?token=${encodeURIComponent(rawToken)}`;
 }
 
 async function appendWorkspaceUserDeniedAudit(

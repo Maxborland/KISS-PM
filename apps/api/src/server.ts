@@ -105,6 +105,7 @@ if (dataSource && runtimeConfig.backgroundJobsEnabled) {
   const runBackgroundJobsPoll = createSerializedBackgroundJobPoller({
     dataSource,
     egressProvider: createLiveKitEgressProviderFromEnv(),
+    emailProvider,
     onError: (error) => {
       console.error("background_jobs_tick_failed", error);
     },

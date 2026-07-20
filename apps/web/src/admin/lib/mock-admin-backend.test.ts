@@ -158,6 +158,28 @@ describe("contract-mock admin backend", () => {
     await expect(c.createUser(newUser({ email: "not-an-email" }))).rejects.toMatchObject({ status: 400, code: "invalid_user_email" });
   });
 
+  /* ---- пользователи: приглашение ---- */
+  it("invites a user without a password → inactive user + delivery:none + invitationToken", async () => {
+    const c = client();
+    const res = await c.inviteUser({ email: "invitee@kiss-pm.dev", name: "Приглашённый", accessProfileId: "role-observer" });
+    expect(res.delivery).toBe("none");
+    expect(res.user.status).toBe("inactive");
+    expect(res.invitationToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(res.expiresAt).toEqual(expect.any(String));
+    const { users } = await c.listUsers();
+    expect(users.find((u) => u.email === "invitee@kiss-pm.dev")?.status).toBe("inactive");
+  });
+
+  it("rejects a duplicate email on invite (409 user_email_taken)", async () => {
+    const c = client();
+    await expect(c.inviteUser({ email: "ivan@kiss-pm.dev", name: "Дубль", accessProfileId: "role-observer" })).rejects.toMatchObject({ status: 409, code: "user_email_taken" });
+  });
+
+  it("rejects an unknown access role on invite (400 invalid_access_role)", async () => {
+    const c = client();
+    await expect(c.inviteUser({ email: "invitee2@kiss-pm.dev", name: "Гость", accessProfileId: "role-ghost" })).rejects.toMatchObject({ status: 400, code: "invalid_access_role" });
+  });
+
   it("updates a user (partial-merge keeps untouched fields)", async () => {
     const c = client();
     const { user } = await c.updateUser("user-maria", { name: "Мария Обновлённая" });

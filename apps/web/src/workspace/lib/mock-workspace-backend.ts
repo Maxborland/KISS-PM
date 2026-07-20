@@ -44,6 +44,7 @@ import {
 import type {
   ProjectRecord,
   TaskActivityRecord,
+  TaskAttachment,
   TaskParticipant,
   TaskPriority,
   TaskRecord,
@@ -126,6 +127,9 @@ type Store = {
   activities: TaskActivityRecord[];
   // Справочник статусов задач (копия сида на сессию мока): CRUD через /api/workspace/task-statuses.
   taskStatuses: WorkspaceTaskStatus[];
+  // Вложения (entityType="task"): контракт attachmentRoutes. blobs — байты для скачивания по id вложения.
+  attachments: TaskAttachment[];
+  blobs: Map<string, { bytes: Uint8Array; mimeType: string; name: string }>;
 };
 
 // Переход разрешён (зеркало isTaskStatusTransitionAllowed из taskCommandGuards).
@@ -243,7 +247,14 @@ function seed(): Store {
     task({ id: "task-bi-etl", projectId: "proj-bi-sales", title: "ETL-конвейер продаж", statusId: "status-new", ownerUserId: "u-sergeev", priority: "normal", plannedStart: "2026-05-11", plannedFinish: "2026-06-19", durationWorkingDays: 30, plannedWork: 200, actualWork: 0, progress: 0 })
   ];
 
-  return { projects, tasks, activities: [], taskStatuses: TASK_STATUSES.map((s) => ({ ...s })) };
+  return {
+    projects,
+    tasks,
+    activities: [],
+    taskStatuses: TASK_STATUSES.map((s) => ({ ...s })),
+    attachments: [],
+    blobs: new Map()
+  };
 }
 
 /* ---- Загрузка ресурсов (GET /api/workspace/capacity/tree) ----
@@ -412,8 +423,10 @@ export function createMockWorkspaceFetch(): typeof fetch {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.replace(/^https?:\/\/[^/]+/, "").split("?")[0]!;
+    // Загрузка вложения приходит multipart (FormData) — её не парсим как JSON.
+    const isForm = typeof FormData !== "undefined" && !!init?.body && init.body instanceof FormData;
     let body: Record<string, unknown> = {};
-    if (init?.body) { try { const p: unknown = JSON.parse(String(init.body)); if (p && typeof p === "object" && !Array.isArray(p)) body = p as Record<string, unknown>; } catch { return err("invalid_json", 400); } }
+    if (init?.body && !isForm) { try { const p: unknown = JSON.parse(String(init.body)); if (p && typeof p === "object" && !Array.isArray(p)) body = p as Record<string, unknown>; } catch { return err("invalid_json", 400); } }
 
     /* ---- GET /api/workspace/projects: фильтр статуса active|closed|paused|all
        (как боевой projectIntakeRoutes: неизвестное/пустое → active) ---- */
@@ -456,6 +469,90 @@ export function createMockWorkspaceFetch(): typeof fetch {
       return json({ project }, 201);
     }
 
+    /* ---- Вложения задачи (зеркало attachmentRoutes): список, загрузка, скачивание, удаление.
+       Мок связывает вложение с задачей по (entityType="task", entityId=taskId) — как боевой роут.
+       RBAC-веток нет (актор мока — с правами), как в остальных хендлерах. ---- */
+    if (method === "GET" && path === "/api/workspace/attachments") {
+      const query = new URLSearchParams(url.split("?")[1] ?? "");
+      const entityType = (query.get("entityType") ?? "").trim();
+      const entityId = (query.get("entityId") ?? "").trim();
+      if (entityType !== "task") return err("attachment_entity_type_invalid", 400);
+      if (!ROUTE_ID_RE.test(entityId)) return err("attachment_entity_id_invalid", 400);
+      const attachments = db.attachments.filter((a) => a.entityId === entityId && a.archivedAt === null);
+      return json({ attachments });
+    }
+    if (method === "POST" && path === "/api/workspace/attachments/files") {
+      if (!isForm) return err("multipart_form_invalid", 400);
+      const form = init!.body as FormData;
+      const entityType = str(form.get("entityType"));
+      const entityId = str(form.get("entityId"));
+      const file = form.get("file");
+      if (entityType !== "task") return err("attachment_entity_type_invalid", 400);
+      if (!ROUTE_ID_RE.test(entityId)) return err("attachment_entity_id_invalid", 400);
+      if (!(typeof File !== "undefined" && file instanceof File)) return err("file_required", 400);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const now = new Date().toISOString();
+      const id = genId("att");
+      const mimeType = file.type || "application/octet-stream";
+      const attachment: TaskAttachment = {
+        id,
+        entityType: "task",
+        entityId,
+        relationType: "attachment",
+        kind: "file",
+        fileAsset: {
+          id: genId("fa"),
+          originalName: file.name,
+          safeDisplayName: file.name,
+          mimeType,
+          sizeBytes: bytes.byteLength,
+          checksumSha256: "",
+          status: "ready",
+          createdAt: now
+        },
+        externalReference: null,
+        sourceActivityType: null,
+        sourceActivityId: null,
+        createdByUserId: CURRENT_USER_ID,
+        createdAt: now,
+        archivedAt: null
+      };
+      db.attachments.unshift(attachment);
+      db.blobs.set(id, { bytes, mimeType, name: file.name });
+      return json({ attachment }, 201);
+    }
+    const attachmentDownload = method === "GET" ? path.match(/^\/api\/workspace\/attachments\/([^/]+)\/download$/) : null;
+    if (attachmentDownload) {
+      const attachmentId = decodeURIComponent(attachmentDownload[1]!);
+      const attachment = db.attachments.find((a) => a.id === attachmentId && a.archivedAt === null);
+      const blob = db.blobs.get(attachmentId);
+      if (!attachment || !blob) return err("attachment_not_found", 404);
+      // Заголовок Content-Disposition — байтовая строка (Latin1): не-ASCII символы заменяем,
+      // как боевой роут санитизирует имя. Тесты со скачиванием используют ASCII-имена.
+      const headerName = blob.name.replace(/[^ -~]/g, "_").replace(/["\\\r\n]/g, "_");
+      const buffer = blob.bytes.buffer.slice(
+        blob.bytes.byteOffset,
+        blob.bytes.byteOffset + blob.bytes.byteLength
+      ) as ArrayBuffer;
+      return new Response(buffer, {
+        status: 200,
+        headers: {
+          "content-type": blob.mimeType,
+          "content-disposition": `attachment; filename="${headerName}"`,
+          "x-content-type-options": "nosniff"
+        }
+      });
+    }
+    const attachmentDelete = method === "DELETE" ? path.match(/^\/api\/workspace\/attachments\/([^/]+)$/) : null;
+    if (attachmentDelete) {
+      const attachmentId = decodeURIComponent(attachmentDelete[1]!);
+      const attachment = db.attachments.find((a) => a.id === attachmentId);
+      if (!attachment) return err("attachment_not_found", 404);
+      // DELETE = архив (боевой archiveAttachment): повторный вызов идемпотентен.
+      if (attachment.archivedAt === null) attachment.archivedAt = new Date().toISOString();
+      return json({ attachment });
+    }
+
     /* ---- GET /api/workspace/my-work: задачи текущего пользователя (исполнитель = CURRENT_USER_ID) ---- */
     if (method === "GET" && path === "/api/workspace/my-work") {
       const tasks = db.tasks.filter((t) => t.archivedAt === null && t.ownerUserId === CURRENT_USER_ID);
@@ -475,7 +572,7 @@ export function createMockWorkspaceFetch(): typeof fetch {
         // Зеркало боевого fail-soft: null, если проект недоступен.
         projectName: db.projects.find((p) => p.id === task.projectId)?.title ?? null,
         activities: db.activities.filter((activity) => activity.taskId === task.id),
-        attachmentItems: []
+        attachmentItems: db.attachments.filter((a) => a.entityId === task.id && a.archivedAt === null)
       });
     }
     const taskUpdate = method === "PATCH" ? path.match(/^\/api\/workspace\/tasks\/([^/]+)$/) : null;

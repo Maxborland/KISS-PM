@@ -15,6 +15,7 @@ const ADMIN_TAB_HREF: Record<string, string> = {
   "Роли": "/admin/roles",
   "Безопасность": "/admin/security",
   "Аудит": "/admin/audit",
+  "Контрол-поверхности": "/admin/control-surfaces",
   "Отсутствия": "/admin/absences",
   "Произв. календарь": "/admin/production-calendar",
   "Оргструктура": "/admin/org-structure",
@@ -27,7 +28,7 @@ const ADMIN_TAB_HREF: Record<string, string> = {
  * WorkspaceShell с активным пунктом «Администрирование».
  * Табы — реальные ссылки Next.js на /admin/<раздел> (ADMIN_TAB_HREF); переключение работает.
  */
-export const ADMIN_TABS = ["Пользователи", "Роли", "Безопасность", "Аудит", "Отсутствия", "Произв. календарь", "Оргструктура", "Фоновые задачи"] as const;
+export const ADMIN_TABS = ["Пользователи", "Роли", "Безопасность", "Аудит", "Контрол-поверхности", "Отсутствия", "Произв. календарь", "Оргструктура", "Фоновые задачи"] as const;
 export type AdminTab = (typeof ADMIN_TABS)[number];
 
 // Права, любое из которых открывает админку (зеркало гейта пункта навигации).
@@ -51,7 +52,12 @@ const ADMIN_PERMISSIONS = [
   "tenant.org_structure.read",
   "tenant.org_structure.manage",
   "tenant.background_jobs.read",
-  "tenant.background_jobs.manage"
+  "tenant.background_jobs.manage",
+  // Вкладка «Контрол-поверхности» — RBAC controlSurfaceRoutes (read/manage/publish):
+  // роль только с этими правами тоже должна попадать в админку.
+  "tenant.control_surfaces.read",
+  "tenant.control_surfaces.manage",
+  "tenant.control_surfaces.publish"
 ];
 
 export function AdminFrame({

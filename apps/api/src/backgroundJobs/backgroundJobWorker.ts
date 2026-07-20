@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import type { ApiTenantDataSource } from "../apiTypes";
 import type { LiveKitEgressProvider } from "../communications/recording/livekitEgressProvider";
+import type { EmailProvider } from "../emailProvider";
 import type { StorageProvider } from "../storageProvider";
 
 export type BackgroundJobHandlerResult = {
@@ -19,6 +20,7 @@ export type BackgroundJobHandlerContext = {
   dataSource: ApiTenantDataSource;
   storageProvider?: StorageProvider;
   egressProvider?: LiveKitEgressProvider | null;
+  emailProvider?: EmailProvider;
   now: Date;
 };
 
@@ -30,7 +32,8 @@ const SAFE_BACKGROUND_JOB_ERROR_CODES = new Set([
   "background_jobs_not_configured",
   "capacity_warmup_failed",
   "capacity_warmup_month_invalid",
-  "storage_cleanup_not_configured"
+  "storage_cleanup_not_configured",
+  "notification_dispatch_not_configured"
 ]);
 
 export async function runBackgroundJobWorkerTick(input: {
@@ -38,6 +41,7 @@ export async function runBackgroundJobWorkerTick(input: {
   registry: BackgroundJobRegistry;
   storageProvider?: StorageProvider;
   egressProvider?: LiveKitEgressProvider | null;
+  emailProvider?: EmailProvider;
   workerId: string;
   now?: Date;
   clock?: () => Date;
@@ -86,6 +90,7 @@ export async function runBackgroundJobWorkerTick(input: {
     };
     if (input.storageProvider) context.storageProvider = input.storageProvider;
     if (input.egressProvider) context.egressProvider = input.egressProvider;
+    if (input.emailProvider) context.emailProvider = input.emailProvider;
     const result = await handler(job, context);
     const completeInput: Parameters<NonNullable<ApiTenantDataSource["completeBackgroundJob"]>>[0] = {
       tenantId: job.tenantId,
@@ -115,6 +120,7 @@ export function createSerializedBackgroundJobPoller(input: {
   registry: BackgroundJobRegistry;
   storageProvider?: StorageProvider;
   egressProvider?: LiveKitEgressProvider | null;
+  emailProvider?: EmailProvider;
   workerId: string;
   onError?: (error: unknown) => void;
 }): () => Promise<"ran" | "skipped" | "failed"> {

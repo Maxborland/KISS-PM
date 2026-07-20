@@ -230,6 +230,36 @@ describe("contract-mock Auth backend", () => {
     expect(ok.user.id).toBe("u-admin");
   });
 
+  it("accepts an invitation with the seeded valid token → 200 ok, then the invitee can log in", async () => {
+    const c = client();
+    const res = await c.acceptInvitation("d".repeat(64), "brand-new-password");
+    expect(res.status).toBe("ok");
+    // Приглашённый активирован и получил пароль → вход проходит.
+    const login = await c.login("invited@kiss-pm.local", "brand-new-password");
+    expect(login.user.id).toBe("u-invited");
+  });
+
+  it("rejects invitation accept for invalid / expired / used tokens, weak password and non-pending → 400", async () => {
+    const c1 = client();
+    await expect(c1.acceptInvitation("9".repeat(64), "brand-new-password")).rejects.toMatchObject({ status: 400, code: "invalid_invitation_token" });
+    const c2 = client();
+    await expect(c2.acceptInvitation("e".repeat(64), "brand-new-password")).rejects.toMatchObject({ status: 400, code: "invitation_token_expired" });
+    const c3 = client();
+    await expect(c3.acceptInvitation("f".repeat(64), "brand-new-password")).rejects.toMatchObject({ status: 400, code: "invitation_token_used" });
+    const c4 = client();
+    await expect(c4.acceptInvitation("d".repeat(64), "short")).rejects.toMatchObject({ status: 400, code: "weak_password" });
+    // Повторный приём того же токена: пользователь уже active → invitation_token_used (токен погашен).
+    const c5 = client();
+    await c5.acceptInvitation("d".repeat(64), "brand-new-password");
+    await expect(c5.acceptInvitation("d".repeat(64), "brand-new-password")).rejects.toMatchObject({ status: 400, code: "invitation_token_used" });
+  });
+
+  it("blocks login for an invited (inactive) user before they accept", async () => {
+    const c = client();
+    // Приглашённый ещё не задал пароль → нет credential → invalid_credentials.
+    await expect(c.login("invited@kiss-pm.local", "brand-new-password")).rejects.toMatchObject({ status: 401, code: "invalid_credentials" });
+  });
+
   it("throws AuthApiError instances carrying status, code and body", async () => {
     const c = client();
     await c.login(ADMIN, "wrong").catch((e: unknown) => {

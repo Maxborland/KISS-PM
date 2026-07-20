@@ -259,6 +259,42 @@ export const coreSchemas = openApiSchemaFragment({
     },
     additionalProperties: false
   },
+  WorkspaceInvitationRequest: {
+    type: "object",
+    required: ["email", "name", "accessProfileId"],
+    properties: {
+      id: stringIdSchema,
+      email: { type: "string", format: "email", maxLength: 254 },
+      name: { type: "string", minLength: 1, maxLength: 160 },
+      accessProfileId: stringIdSchema,
+      positionId: nullableStringSchema,
+      phone: nullableStringSchema,
+      telegram: nullableStringSchema
+    },
+    additionalProperties: false
+  },
+  WorkspaceInvitationResponse: {
+    type: "object",
+    required: ["user", "delivery"],
+    properties: {
+      user: schemaRef("WorkspaceUser"),
+      // "email" — письмо ушло каналом инсталляции; "none" — канал не настроен,
+      // и тогда сырой токен возвращается ровно один раз (иначе живёт лишь как хэш).
+      delivery: { type: "string", enum: ["email", "none"] },
+      invitationToken: { type: "string", minLength: 64, maxLength: 64, pattern: "^[0-9a-f]{64}$" },
+      expiresAt: { type: "string", format: "date-time" }
+    },
+    additionalProperties: false
+  },
+  WorkspaceInvitationAcceptRequest: {
+    type: "object",
+    required: ["token", "password"],
+    properties: {
+      token: { type: "string", minLength: 64, maxLength: 64, pattern: "^[0-9a-f]{64}$" },
+      password: { type: "string", minLength: 8, maxLength: 1024 }
+    },
+    additionalProperties: false
+  },
   WorkspaceUserResetTokenResponse: {
     type: "object",
     required: ["resetToken", "expiresAt"],

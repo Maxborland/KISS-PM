@@ -39,13 +39,11 @@ type FeedFilter = "" | "unread" | "read";
 
 // Все каналы доставки и типы уведомлений из доменных union'ов (для таблицы настроек).
 const CHANNELS: NotificationChannel[] = ["in_app", "email", "digest"];
-// Н8 capability-гейт: настройки показываем только для каналов с РАБОТАЮЩИМ путём
-// доставки. email/digest скрыты честно: серверный dispatch — no-op-заглушка
-// (apps/api/src/backgroundJobs/jobHandlers.ts, notificationDispatch: dispatched:0,
-// adapter "in_app_persisted"), а emailProvider умеет только сброс пароля.
-// Переключатель без канала доставки лгал бы; вместо него — плашка «канал не настроен».
-// Когда канал появится — верните его сюда, таблица подхватит колонку.
-const DELIVERABLE_CHANNELS: NotificationChannel[] = ["in_app"];
+// Каналы с РАБОТАЮЩИМ путём доставки. email/digest вернулись (Блок 8): фоновая
+// джоба notification.dispatch (apps/api/src/backgroundJobs/jobHandlers.ts) собирает
+// непрочитанные уведомления за окно и шлёт письмо-дайджест через emailProvider
+// (SMTP). Переключатель email/digest теперь честный — за ним реальная отправка.
+const DELIVERABLE_CHANNELS: NotificationChannel[] = ["in_app", "email", "digest"];
 const PENDING_CHANNELS = CHANNELS.filter((channel) => !DELIVERABLE_CHANNELS.includes(channel));
 const NOTIF_TYPES: NotificationType[] = [
   "mention",
@@ -287,8 +285,8 @@ export function NotificationsPrefs() {
   async function save() {
     setBusy(true);
     // Upsert по ключу channel×type: шлём все ячейки ДОСТУПНЫХ каналов (включая выключенные).
-    // Скрытые за capability каналы (email/digest) не отправляем — их серверные строки
-    // остаются нетронутыми (PUT upsert'ит только переданные пары, не replace-all).
+    // Все каналы (in_app/email/digest) теперь доставляемы (Блок 8) — PUT upsert'ит
+    // переданные пары (не replace-all), поэтому нетронутые ключи сохраняются.
     const payload: PreferenceInput[] = [];
     for (const c of DELIVERABLE_CHANNELS) {
       for (const t of NOTIF_TYPES) {
@@ -386,8 +384,8 @@ export function NotificationsPrefs() {
         </table>
       </div>
 
-      {/* Н8: честная плашка вместо мёртвых переключателей email/дайджеста —
-          канала доставки на сервере нет (dispatch — no-op), настройки были бы обманом. */}
+      {/* Честная плашка на случай, если канал временно снят из DELIVERABLE_CHANNELS
+          (нет рабочего пути доставки). Сейчас все каналы доставляемы — плашка скрыта. */}
       {PENDING_CHANNELS.length > 0 ? (
         <div className="flex items-start gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--panel-subtle)] px-3 py-2 text-[length:var(--text-xs)] text-[var(--muted)]">
           <span className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-[var(--panel-strong)] px-1.5 py-0.5 text-[length:var(--text-2xs)] font-semibold uppercase tracking-[0.04em] text-[var(--muted-strong)]">Канал не настроен</span>

@@ -214,6 +214,22 @@ export function createMockAuthFetch(): typeof fetch {
     [EXPIRED_RESET, { userId: "u-admin", expiresAt: Date.now() - 60 * 1000, consumedAt: null }],
     [USED_RESET, { userId: "u-admin", expiresAt: Date.now() + 60 * 60 * 1000, consumedAt: Date.now() - 30 * 1000 }]
   ]);
+  // Invite-токены (БЛОК 3): демо-приглашённый (inactive, без credential) + один
+  // валидный / просроченный / использованный токен. Приём приглашения задаёт
+  // пароль и активирует пользователя (зеркало POST /api/auth/invitation/accept).
+  users.push({
+    id: "u-invited", name: "Приглашённый сотрудник", email: "invited@kiss-pm.local",
+    tenantId: TENANT, accessProfileId: ACCESS_PROFILE, positionId: null, positionName: null,
+    phone: null, telegram: null, status: "inactive", theme: "light", accentColor: "#0f766e"
+  });
+  const VALID_INVITE = "d".repeat(64);
+  const EXPIRED_INVITE = "e".repeat(64);
+  const USED_INVITE = "f".repeat(64);
+  const invitationTokens = new Map<string, ResetToken>([
+    [VALID_INVITE, { userId: "u-invited", expiresAt: Date.now() + 60 * 60 * 1000, consumedAt: null }],
+    [EXPIRED_INVITE, { userId: "u-invited", expiresAt: Date.now() - 60 * 1000, consumedAt: null }],
+    [USED_INVITE, { userId: "u-invited", expiresAt: Date.now() + 60 * 60 * 1000, consumedAt: Date.now() - 30 * 1000 }]
+  ]);
   // Демо-rate-limiter: счётчик неудач по email в окне (боевое — email+ip+global, 5/15мин).
   const failures = new Map<string, { count: number; resetAt: number }>();
 
@@ -464,6 +480,27 @@ export function createMockAuthFetch(): typeof fetch {
       if (user) credentials.set(user.email, { userId: user.id, password: body.password as string });
       record.consumedAt = Date.now();
       if (currentUserId === record.userId) clearSession(); // инвалидация сессий пользователя
+      return json({ status: "ok" });
+    }
+
+    // POST /api/auth/invitation/accept {token,password} — приём приглашения.
+    //   400 invalid_reset_confirm_payload → 400 weak_password → 400 invalid_invitation_token
+    //   → 400 invitation_token_used → 400 invitation_token_expired → 400 invitation_not_pending
+    //   → 200 {status:"ok"} (порядок как боевой).
+    if (path === "/api/auth/invitation/accept" && method === "POST") {
+      const token = typeof body.token === "string" ? body.token : "";
+      if (token.length < 1 || token.length > 256 || !/^[A-Za-z0-9]+$/.test(token)) return err("invalid_reset_confirm_payload", 400);
+      if (isWeakPassword(body.password)) return err("weak_password", 400);
+      const record = invitationTokens.get(token);
+      if (!record) return err("invalid_invitation_token", 400);
+      if (record.consumedAt !== null) return err("invitation_token_used", 400);
+      if (Date.now() >= record.expiresAt) return err("invitation_token_expired", 400);
+      const user = findUser(record.userId);
+      // Приём — только для приглашённого (inactive) без активного доступа.
+      if (!user || user.status !== "inactive") return err("invitation_not_pending", 400);
+      credentials.set(user.email, { userId: user.id, password: body.password as string });
+      user.status = "active";
+      record.consumedAt = Date.now();
       return json({ status: "ok" });
     }
 

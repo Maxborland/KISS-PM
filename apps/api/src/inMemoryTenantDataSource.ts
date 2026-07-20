@@ -46,14 +46,40 @@ export function createInMemoryTenantDataSource(): Partial<PostgresTenantDataSour
       });
     },
     async listAuditEventsByTenantId(tenantId, options) {
+      const executionStatus = (event: AuditEventListItem): string | undefined => {
+        const status = (event.executionResult as { status?: unknown }).status;
+        return typeof status === "string" ? status : undefined;
+      };
       return auditEvents
+        .filter((event) => event.tenantId === tenantId)
         .filter(
           (event) =>
-            event.tenantId === tenantId &&
-            (!options?.projectId ||
-              (event.sourceEntity.type === "Project" &&
-                event.sourceEntity.id === options.projectId))
+            !options?.projectId ||
+            (event.sourceEntity.type === "Project" && event.sourceEntity.id === options.projectId)
         )
+        .filter((event) => !options?.actorUserId || event.actorUserId === options.actorUserId)
+        .filter((event) => !options?.actionType || event.actionType === options.actionType)
+        .filter(
+          (event) => !options?.executionResult || executionStatus(event) === options.executionResult
+        )
+        .filter((event) => !options?.fromDate || event.createdAt.getTime() >= options.fromDate.getTime())
+        .filter((event) => !options?.toDate || event.createdAt.getTime() <= options.toDate.getTime())
+        .sort((a, b) =>
+          a.createdAt.getTime() === b.createdAt.getTime()
+            ? a.id < b.id
+              ? 1
+              : a.id > b.id
+                ? -1
+                : 0
+            : b.createdAt.getTime() - a.createdAt.getTime()
+        )
+        .filter((event) => {
+          if (!options?.cursor) return true;
+          const cursorTime = options.cursor.createdAt.getTime();
+          const eventTime = event.createdAt.getTime();
+          if (eventTime !== cursorTime) return eventTime < cursorTime;
+          return event.id < options.cursor.id;
+        })
         .slice(0, options?.limit);
     }
   };

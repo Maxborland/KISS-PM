@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { type ChangeEvent, useRef, useState } from "react";
 
 import { FormDialog } from "@/components/domain/form-dialog";
 import { SurfaceState } from "@/components/domain/surface-state";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell } from "@/delivery/ui/workspace-shell";
 import { useTaskDetail } from "@/workspace/lib/use-workspace";
+import type { TaskAttachment } from "@/workspace/lib/workspace-client";
 
 import { TaskPeekDetails, taskPeekRecordFromWorkspace } from "./task-peek";
 
@@ -39,14 +40,44 @@ const activityLabel = (type: "comment" | "file" | "system") => {
   return "Изменение задачи";
 };
 
+// Честный текст ошибок операций с вложениями (коды attachmentRoutes / attachmentWorkspace).
+const attachmentError = (code?: string) => {
+  if (code === "file_too_large") return "Файл превышает допустимый размер (25 МБ).";
+  if (code === "upload_rate_limited") return "Слишком много загрузок подряд. Повторите через минуту.";
+  if (code === "file_required") return "Выберите файл для загрузки.";
+  if (code === "attachment_not_found") return "Вложение больше недоступно. Обновите страницу.";
+  if (code === "storage_not_configured" || code === "persistence_not_configured") return "Хранилище файлов сейчас недоступно.";
+  if (code === "same_tenant_permission_required") return "У вас нет прав на это действие.";
+  if (code === "download_failed") return "Не удалось скачать файл. Повторите попытку.";
+  return "Не удалось выполнить операцию с вложением. Повторите попытку.";
+};
+
+// Человекочитаемый размер файла (Б/КБ/МБ).
+const formatBytes = (bytes: number) => {
+  if (!Number.isFinite(bytes) || bytes < 0) return "";
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+};
+
+const attachmentName = (attachment: TaskAttachment) =>
+  attachment.fileAsset?.safeDisplayName ??
+  attachment.fileAsset?.originalName ??
+  attachment.externalReference?.title ??
+  "Вложение";
+
 export function TaskDetailSurface({ taskId }: TaskDetailSurfaceProps) {
-  const { data, status, error, reload, notFound, updateTask, createComment } = useTaskDetail(taskId);
+  const { data, status, error, reload, notFound, updateTask, createComment, uploadAttachment, downloadAttachment, deleteAttachment } = useTaskDetail(taskId);
   const [editOpen, setEditOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [plannedWork, setPlannedWork] = useState("");
   const [comment, setComment] = useState("");
   const [commentBusy, setCommentBusy] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const [attachmentBusyId, setAttachmentBusyId] = useState<string | null>(null);
+  const [attachmentMessage, setAttachmentMessage] = useState<string | null>(null);
   const surfaceStatus = notFound
     ? "empty"
     : status === "forbidden"
@@ -97,6 +128,47 @@ export function TaskDetailSurface({ taskId }: TaskDetailSurfaceProps) {
     }
     setComment("");
   };
+
+  const onFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // сброс — повторный выбор того же файла снова триггерит change
+    if (!file) return;
+    setUploadBusy(true);
+    setAttachmentMessage(null);
+    const result = await uploadAttachment(file);
+    setUploadBusy(false);
+    if (!result.ok) setAttachmentMessage(attachmentError(result.code ?? result.message));
+  };
+
+  const onDownload = async (attachment: TaskAttachment) => {
+    setAttachmentBusyId(attachment.id);
+    setAttachmentMessage(null);
+    const result = await downloadAttachment(attachment.id);
+    setAttachmentBusyId(null);
+    if (!result.ok) {
+      setAttachmentMessage(attachmentError(result.code ?? result.message));
+      return;
+    }
+    const href = URL.createObjectURL(result.data.blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = result.data.filename ?? attachmentName(attachment);
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(href);
+  };
+
+  const onDelete = async (attachment: TaskAttachment) => {
+    setAttachmentBusyId(attachment.id);
+    setAttachmentMessage(null);
+    const result = await deleteAttachment(attachment.id);
+    setAttachmentBusyId(null);
+    if (!result.ok) setAttachmentMessage(attachmentError(result.code ?? result.message));
+  };
+
+  // Только активные вложения-файлы: скачивание отдаёт бинарь именно по file-asset.
+  const attachments = (data?.attachmentItems ?? []).filter((item) => item.archivedAt === null);
 
   return (
     <WorkspaceShell activeNav="Мои задачи">
@@ -167,6 +239,73 @@ export function TaskDetailSurface({ taskId }: TaskDetailSurfaceProps) {
                 <div className="p-4">
                   <TaskPeekDetails task={taskPeekRecordFromWorkspace(data.task)} />
                 </div>
+
+                <section aria-labelledby="task-attachments-heading" className="border-t border-[var(--border)] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 id="task-attachments-heading" className="text-[length:var(--text-sm)] font-semibold text-[var(--text-strong)]">Вложения</h3>
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="sr-only"
+                        aria-label="Выбрать файл для загрузки"
+                        onChange={(event) => void onFileSelected(event)}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={uploadBusy}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {uploadBusy ? "Загрузка…" : "Прикрепить файл"}
+                      </Button>
+                    </div>
+                  </div>
+                  {attachmentMessage ? (
+                    <p role="alert" className="mt-2 text-[length:var(--text-sm)] text-[var(--danger)]">{attachmentMessage}</p>
+                  ) : null}
+                  {attachments.length > 0 ? (
+                    <ul className="mt-3 grid gap-2">
+                      {attachments.map((attachment) => {
+                        const busy = attachmentBusyId === attachment.id;
+                        return (
+                          <li
+                            key={attachment.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--canvas)] px-3 py-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-[length:var(--text-sm)] font-medium text-[var(--text-strong)]">{attachmentName(attachment)}</p>
+                              {attachment.fileAsset ? (
+                                <p className="text-[length:var(--text-xs)] text-[var(--muted)]">{formatBytes(attachment.fileAsset.sizeBytes)}</p>
+                              ) : null}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {attachment.kind === "file" ? (
+                                <Button variant="ghost" size="sm" disabled={busy} onClick={() => void onDownload(attachment)}>
+                                  {busy ? "…" : "Скачать"}
+                                </Button>
+                              ) : attachment.externalReference ? (
+                                <a
+                                  href={attachment.externalReference.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[length:var(--text-sm)] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+                                >
+                                  Открыть
+                                </a>
+                              ) : null}
+                              <Button variant="ghost" size="sm" disabled={busy} onClick={() => void onDelete(attachment)}>
+                                {busy ? "…" : "Удалить"}
+                              </Button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-[length:var(--text-sm)] text-[var(--muted)]">Файлы к задаче ещё не прикреплены.</p>
+                  )}
+                </section>
               </article>
 
               <section aria-labelledby="task-activity-heading" className="min-w-0 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--panel)] p-4">
@@ -197,6 +336,15 @@ export function TaskDetailSurface({ taskId }: TaskDetailSurfaceProps) {
                         </div>
                         {activity.title ? <p className="mt-1 font-medium text-[var(--text-strong)]">{activity.title}</p> : null}
                         {activity.body ? <p className="mt-1 whitespace-pre-wrap text-[length:var(--text-sm)] text-[var(--text)]">{activity.body}</p> : null}
+                        {activity.type === "file" && activity.fileUrl ? (
+                          <a
+                            href={activity.fileUrl}
+                            download
+                            className="mt-1 inline-block text-[length:var(--text-sm)] font-medium text-[var(--accent)] underline-offset-2 hover:underline"
+                          >
+                            Скачать файл{activity.fileSizeBytes != null ? ` (${formatBytes(activity.fileSizeBytes)})` : ""}
+                          </a>
+                        ) : null}
                       </li>
                     ))}
                   </ol>

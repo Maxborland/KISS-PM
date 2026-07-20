@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { type MutationResult } from "../../lib/domain-client";
+import { type MutationDataResult, type MutationResult } from "../../lib/domain-client";
 import { useDomainClient } from "../../lib/use-domain-client";
 import { useResource, type LoadStatus } from "../../lib/use-resource";
 import {
@@ -123,11 +123,48 @@ export function useTaskDetail(taskId: string) {
     }
   }, [client, resource.reload, taskId]);
 
+  // Загрузка вложения → перечитать карточку (attachmentItems приходят в детали задачи).
+  const uploadAttachment = useCallback(async (file: File): Promise<WorkspaceMutationResult> => {
+    try {
+      await client.uploadTaskAttachment(taskId, file);
+      await resource.reload();
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof WorkspaceApiError) return { ok: false, code: error.code, message: error.code };
+      return { ok: false, message: error instanceof Error ? error.message : "request_failed" };
+    }
+  }, [client, resource.reload, taskId]);
+
+  // Скачивание: возвращаем blob+имя; браузерную загрузку инициирует поверхность (DOM-side-effect).
+  const downloadAttachment = useCallback(async (attachmentId: string): Promise<MutationDataResult<{ blob: Blob; filename: string | null }>> => {
+    try {
+      return { ok: true, data: await client.downloadTaskAttachment(attachmentId) };
+    } catch (error) {
+      if (error instanceof WorkspaceApiError) return { ok: false, code: error.code, message: error.code };
+      return { ok: false, message: error instanceof Error ? error.message : "request_failed" };
+    }
+  }, [client]);
+
+  // Удаление (архив) вложения → перечитать карточку.
+  const deleteAttachment = useCallback(async (attachmentId: string): Promise<WorkspaceMutationResult> => {
+    try {
+      await client.deleteTaskAttachment(attachmentId);
+      await resource.reload();
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof WorkspaceApiError) return { ok: false, code: error.code, message: error.code };
+      return { ok: false, message: error instanceof Error ? error.message : "request_failed" };
+    }
+  }, [client, resource.reload]);
+
   return {
     ...resource,
     notFound: resource.status === "error" && resource.error === "task_not_found",
     updateTask,
-    createComment
+    createComment,
+    uploadAttachment,
+    downloadAttachment,
+    deleteAttachment
   };
 }
 

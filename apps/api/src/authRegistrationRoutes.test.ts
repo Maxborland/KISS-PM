@@ -439,7 +439,12 @@ describe("POST /api/auth/password-reset/request", () => {
       ...hashPassword("supersecret")
     });
     const sendPasswordReset = vi.fn(async (_input: PasswordResetEmailInput) => undefined);
-    const emailProvider: SmtpEmailProvider = { provider: "smtp", sendPasswordReset };
+    const emailProvider: SmtpEmailProvider = {
+      provider: "smtp",
+      sendPasswordReset,
+      sendNotificationDigest: async () => undefined,
+      sendInvitation: async () => undefined
+    };
     const publicAppOrigin = "https://app.kiss-pm.test";
     const app = createApp({
       dataSource,

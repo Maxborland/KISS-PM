@@ -9,7 +9,7 @@ import {
   createAdminClient,
   workspaceUserCountsAreKnown,
   type AccessProfile, type AccessRoleCreateInput, type AccessRoleUpdateInput,
-  type Permission, type Position, type UserCreateInput, type UserUpdateInput, type WorkspaceUser
+  type Permission, type Position, type UserCreateInput, type UserInviteInput, type UserInviteResponse, type UserUpdateInput, type WorkspaceUser
 } from "./admin-client";
 import { createMockAdminFetch } from "./mock-admin-backend";
 import { useAdminRuntime } from "./admin-runtime";
@@ -114,6 +114,17 @@ export function useAdmin(scope: AdminLoadScope = "all") {
 
   // ---- пользователи ----
   const createUser = useCallback((input: UserCreateInput) => guard(async () => { const r = await client.createUser(input); setData((d) => (d ? { ...d, users: [...d.users, r.user] } : d)); }), [client, guard]);
+  // Приглашение сотрудника: добавляем созданного (inactive) юзера в кэш, а ответ
+  // (delivery + invitationToken при delivery:"none") нужен UI один раз — guardData.
+  const inviteUser = useCallback(
+    (input: UserInviteInput): Promise<MutationDataResult<UserInviteResponse>> =>
+      guardData(async () => {
+        const r = await client.inviteUser(input);
+        setData((d) => (d ? { ...d, users: [...d.users, r.user] } : d));
+        return r;
+      }),
+    [client, setData]
+  );
   const updateUser = useCallback((userId: string, input: UserUpdateInput) => guard(async () => { const r = await client.updateUser(userId, input); patchUser(r.user); }), [client, guard]);
   // Деактивация = PATCH status:"inactive"; затронутый пользователь обновляется в кэше.
   const deactivateUser = useCallback((userId: string) => guard(async () => { const r = await client.deactivateUser(userId); patchUser(r.user); }), [client, guard]);
@@ -124,5 +135,5 @@ export function useAdmin(scope: AdminLoadScope = "all") {
     [client]
   );
 
-  return { client, data, status, error, reload: load, createRole, updateRole, deleteRole, createUser, updateUser, deactivateUser, issueUserResetToken };
+  return { client, data, status, error, reload: load, createRole, updateRole, deleteRole, createUser, inviteUser, updateUser, deactivateUser, issueUserResetToken };
 }

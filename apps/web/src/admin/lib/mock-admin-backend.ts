@@ -254,15 +254,41 @@ const err = (error: string, status: number) => json({ error }, status);
 // Сид журнала аудита: реальные action-типы со смешанными статусами (succeeded/denied/failed),
 // по убыванию времени — как боевой listAuditEventsByTenantId (orderBy createdAt desc).
 const AUDIT_EVENTS: AuditEvent[] = [
-  { id: "audit-1", actionType: "workspace.security_policy.updated", createdAt: "2026-01-14T10:42:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "SecurityPolicy", id: TENANT } },
-  { id: "audit-2", actionType: "access_role.created", createdAt: "2026-01-14T09:15:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "AccessProfile", id: "role-manager" } },
-  { id: "audit-3", actionType: "workspace.user.deactivated", createdAt: "2026-01-13T17:30:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "User", id: "user-oleg" } },
-  { id: "audit-4", actionType: "control_surface.published", createdAt: "2026-01-13T14:05:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "ControlSurface", id: "surface-deals" } },
-  { id: "audit-5", actionType: "access_role.update", createdAt: "2026-01-13T11:20:00.000Z", executionResult: { status: "denied" }, sourceEntity: { type: "AccessProfile", id: "role-administrator" } },
-  { id: "audit-6", actionType: "workspace.custom_field.created", createdAt: "2026-01-12T16:48:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "CustomFieldDefinition", id: "cf-priority" } },
-  { id: "audit-7", actionType: "control_surface.publish_blocked", createdAt: "2026-01-12T13:10:00.000Z", executionResult: { status: "failed" }, sourceEntity: { type: "ControlSurface", id: "surface-projects" } },
-  { id: "audit-8", actionType: "workspace.project_template.updated", createdAt: "2026-01-12T09:02:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "ProjectTemplate", id: "tpl-default" } }
+  { id: "audit-1", actorUserId: "user-anna", actionType: "workspace.security_policy.updated", createdAt: "2026-01-14T10:42:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "SecurityPolicy", id: TENANT } },
+  { id: "audit-2", actorUserId: "user-anna", actionType: "access_role.created", createdAt: "2026-01-14T09:15:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "AccessProfile", id: "role-manager" } },
+  { id: "audit-3", actorUserId: "user-ivan", actionType: "workspace.user.deactivated", createdAt: "2026-01-13T17:30:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "User", id: "user-oleg" } },
+  { id: "audit-4", actorUserId: "user-anna", actionType: "control_surface.published", createdAt: "2026-01-13T14:05:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "ControlSurface", id: "surface-deals" } },
+  { id: "audit-5", actorUserId: "user-ivan", actionType: "access_role.update", createdAt: "2026-01-13T11:20:00.000Z", executionResult: { status: "denied" }, sourceEntity: { type: "AccessProfile", id: "role-administrator" } },
+  { id: "audit-6", actorUserId: "user-anna", actionType: "workspace.custom_field.created", createdAt: "2026-01-12T16:48:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "CustomFieldDefinition", id: "cf-priority" } },
+  { id: "audit-7", actorUserId: "user-sergey", actionType: "control_surface.publish_blocked", createdAt: "2026-01-12T13:10:00.000Z", executionResult: { status: "failed" }, sourceEntity: { type: "ControlSurface", id: "surface-projects" } },
+  { id: "audit-8", actorUserId: "user-anna", actionType: "workspace.project_template.updated", createdAt: "2026-01-12T09:02:00.000Z", executionResult: { status: "succeeded" }, sourceEntity: { type: "ProjectTemplate", id: "tpl-default" } }
 ];
+
+// Серверная семантика ленты (mirror auditRoutes + persistence): фильтры + keyset-курсор.
+const decodeAuditCursor = (raw: string | null): { createdAt: number; id: string } | null => {
+  if (!raw) return null;
+  try {
+    const decoded =
+      typeof atob === "function"
+        ? atob(raw.replace(/-/g, "+").replace(/_/g, "/"))
+        : Buffer.from(raw, "base64url").toString("utf8");
+    const sep = decoded.indexOf("|");
+    if (sep <= 0) return null;
+    const time = new Date(decoded.slice(0, sep)).getTime();
+    if (Number.isNaN(time)) return null;
+    return { createdAt: time, id: decoded.slice(sep + 1) };
+  } catch {
+    return null;
+  }
+};
+const encodeAuditCursor = (createdAt: string, id: string): string => {
+  const payload = `${createdAt}|${id}`;
+  const base64 =
+    typeof btoa === "function"
+      ? btoa(payload)
+      : Buffer.from(payload, "utf8").toString("base64");
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
 
 // Парсинг тела роли (зеркало parseAccessProfileCreateBody): id → name → permissions, коды и порядок.
 type RoleParse = { ok: true; id: string; name: string; permissions: Permission[] } | { ok: false; error: string };
@@ -305,8 +331,32 @@ export function createMockAdminFetch(): typeof fetch {
 
     /* ---- audit-events (журнал аудита) ---- */
     if (path === "/api/tenant/current/audit-events" && method === "GET") {
-      const limit = Math.max(1, Math.min(100, Number(new URL(url, "http://x").searchParams.get("limit")) || 50));
-      return json({ auditEvents: AUDIT_EVENTS.slice(0, limit) });
+      const params = new URL(url, "http://x").searchParams;
+      const limit = Math.max(1, Math.min(100, Number(params.get("limit")) || 50));
+      const actorUserId = params.get("actorUserId");
+      const actionType = params.get("actionType");
+      const executionResult = params.get("executionResult");
+      const fromDate = params.get("fromDate");
+      const toDate = params.get("toDate");
+      const cursor = decodeAuditCursor(params.get("cursor"));
+      const fromTime = fromDate ? new Date(fromDate).getTime() : null;
+      const toTime = toDate ? new Date(toDate).getTime() : null;
+      const matched = AUDIT_EVENTS
+        .filter((event) => !actorUserId || event.actorUserId === actorUserId)
+        .filter((event) => !actionType || event.actionType === actionType)
+        .filter((event) => !executionResult || event.executionResult?.status === executionResult)
+        .filter((event) => fromTime === null || new Date(event.createdAt).getTime() >= fromTime)
+        .filter((event) => toTime === null || new Date(event.createdAt).getTime() <= toTime)
+        .filter((event) => {
+          if (!cursor) return true;
+          const at = new Date(event.createdAt).getTime();
+          return at !== cursor.createdAt ? at < cursor.createdAt : event.id < cursor.id;
+        });
+      const window = matched.slice(0, limit);
+      const hasMore = matched.length > limit;
+      const last = window[window.length - 1];
+      const nextCursor = hasMore && last ? encodeAuditCursor(last.createdAt, last.id) : null;
+      return json({ auditEvents: window, nextCursor });
     }
     // Точечная выборка (deep-link ?event=) — зеркало боевого GET /audit-events/:id.
     const auditEventMatch = /^\/api\/tenant\/current\/audit-events\/([^/]+)$/.exec(path);
@@ -464,6 +514,32 @@ export function createMockAdminFetch(): typeof fetch {
       };
       db.users.push(u);
       return json({ user: u }, 201);
+    }
+    // Приглашение сотрудника (зеркало POST /api/workspace/invitations): создаёт
+    // пользователя status:"inactive" БЕЗ пароля. Мок работает как delivery:"none"
+    // (письма нет) → invitationToken возвращается в ответе для ручной передачи.
+    if (path === "/api/workspace/invitations" && method === "POST") {
+      const id = typeof body.id === "string" && body.id.trim() ? body.id.trim() : `user-${cryptoRandom()}`;
+      if (!ROUTE_ID_RE.test(id)) return err("invalid_user_id", 400);
+      const accessProfileId = typeof body.accessProfileId === "string" ? body.accessProfileId.trim() : "";
+      if (!ROUTE_ID_RE.test(accessProfileId)) return err("invalid_access_role", 400);
+      const positionRaw = typeof body.positionId === "string" && body.positionId.trim() ? body.positionId.trim() : null;
+      if (positionRaw !== null && !ROUTE_ID_RE.test(positionRaw)) return err("invalid_position_id", 400);
+      const email = parseEmail(body.email);
+      if (email === null) return err("invalid_user_email", 400);
+      const name = parseSingleLine(body.name, MAX_NAME);
+      if (name === null) return err("invalid_user_name", 400);
+      if (db.users.some((u) => u.id === id)) return err("user_id_taken", 409);
+      if (db.users.some((u) => u.email === email)) return err("user_email_taken", 409);
+      if (!db.accessRoles.some((r) => r.id === accessProfileId)) return err("invalid_access_role", 400);
+      if (positionRaw && !db.positions.some((p) => p.id === positionRaw)) return err("invalid_position", 400);
+      const u: WorkspaceUser = {
+        id, tenantId: TENANT, email, name, accessProfileId,
+        positionId: positionRaw, positionName: positionRaw ? db.positions.find((p) => p.id === positionRaw)!.name : null,
+        phone: null, telegram: null, status: "inactive", theme: "light", accentColor: "#0f766e"
+      };
+      db.users.push(u);
+      return json({ user: u, delivery: "none", invitationToken: randomHex64(), expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() }, 201);
     }
     // Выдача токена сброса пароля (зеркало POST /api/workspace/users/:userId/password-reset-token):
     // raw hex(64) отдаётся РОВНО ОДИН РАЗ, TTL 60 минут; сервер хранит только хэш (в моке — ничего).
